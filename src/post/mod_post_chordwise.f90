@@ -338,8 +338,6 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
     !> Translate centers on reference station
     do ista = 1, n_station
       y_cen_tras = y_cen - span_station(ista)
-      write(*,*) y_cen_tras 
-
       !> Get index of the stripes across the span stripe
       bracket_found = .false.
       do is = 1, n_sect - 1
@@ -348,7 +346,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           id_plus(ista) = is + 1
           bracket_found = .true.
           exit ! exit loop once bracket is found
-        elseif (y_cen_tras(is) <= (1e-6_wp) .and. y_cen_tras(is + 1) <= (1e-6_wp)) then
+        elseif (y_cen_tras(is) <= (1e-6_wp) .and. y_cen_tras(is + 1) >= (1e-6_wp)) then
           id_minus(ista) = is - 1
           id_plus(ista) = is
           bracket_found = .true.
