@@ -993,8 +993,10 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
                 cos( 0.5_wp*real(i-1,wp)*pi/ real(nelems,wp) )
     elseif ( trim(type_span) .eq. 'equalarea' ) then 
       ! equalarea spacing in span 
-        rr(i,2) = sqrt(r1(2)**2.0_wp + (r2(2)**2.0_wp - r1(2)**2.0_wp) * &
-                  (real(i-1,wp))/(real(nelems,wp))) 
+        !rr(i,2) = sqrt(r1(2)**2.0_wp + (r2(2)**2.0_wp - r1(2)**2.0_wp) * &
+        !          (real(i-1,wp))/(real(nelems,wp))) 
+        rr(i,2) = sqrt(real(i-1,wp)/real(nelems,wp))*(r2(2) - r1(2)) + r1(2) 
+            
         rr(i,1) = r1(1) + (rr(i,2) - r1(2))*( r2(1) - r1(1) )/( r2(2) - r1(2) )
         rr(i,3) = r1(3) + (rr(i,2) - r1(2))*( r2(3) - r1(3) )/( r2(2) - r1(2) )
     else

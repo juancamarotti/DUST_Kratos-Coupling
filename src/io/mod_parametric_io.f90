@@ -715,8 +715,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                           ( rrSection2 - rrSection1 ) * &
               cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         elseif ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then 
-            rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
-                                  (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
+            !rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
+            !                      (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
+            rr(2, ista:iend) = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))* & 
+                              (rrSection2(2,:) - rrSection1(2,:)) + rrSection1(2,:) 
             rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
                               ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
             rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
