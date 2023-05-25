@@ -529,7 +529,7 @@ Use the fast multipole method for particles evolution.
 \textit{default:} F \textit{type:} logical.
 
 Use the fast multipole method also to compute interactions 
-of the particles on the solid bodies panels.
+of the particles on the solid bodies panels. Experimental feature, still in development.
 
 \item \param{viscosity_effects}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} F \textit{type:} logical.
@@ -1107,8 +1107,8 @@ not inside each \param{motion} group.
 Grouping keyword containing the specification of the pole motion, 
 the pole motion parameters are
 
-	\begin{itemize}
-	\item \param{input}: \textit{required:} yes. \textit{multiple:} 
+    \begin{itemize}
+    \item \param{input}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{pole} group. \textit{type:} string.
     
     In which way motion is imposed, can be \opt{position} or \opt{velocity}
@@ -1175,15 +1175,15 @@ the pole motion parameters are
     Starting position of the pole in the three component, considered only if 
     \param{input} is \opt{velocity}
     
-	\end{itemize}
+    \end{itemize}
 
 \item \param{rotation}: \textit{required:} yes. \textit{multiple:} not inside each 
 \param{motion} group.
 
 Grouping keyword containing the specification of the rotation, which parameters are:
 
-	\begin{itemize}
-	\item \param{input}: \textit{required:} yes. \textit{multiple:} not inside each 
+    \begin{itemize}
+    \item \param{input}: \textit{required:} yes. \textit{multiple:} not inside each 
     \param{rotation} group. \textit{type:} string.
     
     In which way the rotation is imposed, can be \opt{position} for imposing an angle  
@@ -1249,7 +1249,7 @@ Grouping keyword containing the specification of the rotation, which parameters 
     
     Starting angle of the rotation, considered only if \param{input} is \opt{velocity}
     
-	\end{itemize}
+    \end{itemize}
 
 \end{itemize}
 
@@ -1318,10 +1318,10 @@ is set to true, it must be followed by a grouping keyword, \param{multiplicity},
 which must contain the details of the multiplicity. The detailed parameters 
 required in the multiplicity are:
 \begin{itemize}
-	\item \param{mult_type}: \textit{required:} yes. \textit{multiple:} 
+    \item \param{mult_type}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{multiplicity} group. \textit{type:} string.
     
-	type of multiplicity. At the moment only \opt{rotor} is enabled.
+    type of multiplicity. At the moment only \opt{rotor} is enabled.
     
     \item \param{N\_Blades}: \textit{required:} yes if \param{mult_type} 
     is \opt{rotor}. \textit{multiple:} not inside each \param{multiplicity} group. 
