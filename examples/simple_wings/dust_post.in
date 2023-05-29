@@ -31,7 +31,7 @@ reference_tag = 0
 
 }
 
-!analysis = {
+analysis = {
 
 type = integral_loads
 name = loads_right
@@ -45,7 +45,7 @@ reference_tag = 0
 
 }
 
-!analysis = {
+analysis = {
 
 type = integral_loads
 name = loads_full
@@ -61,7 +61,7 @@ reference_tag = 0
 
 }
 
-analysis = {
+!analysis = {
   type = chordwise_loads
   name = cl01
   start_res = 1
