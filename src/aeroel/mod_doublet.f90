@@ -325,14 +325,17 @@ subroutine linear_potential_calc_doublet(this, TL, TR, pos)
   real(wp)                      :: radius, xQ, yQ, zQ, r0a(3), r0b(3) 
   real(wp)                      :: xa, ya, xb, yb, theta, dab, va, ra, rb, mab
   real(wp)                      :: ea, eb, ha, hb, AA, BB, Qn
-  real(wp)                      :: C_k_wake_TE_PHI, C_k_wake_TE_Q
+  real(wp)                      :: Phi, Q
   integer                       :: i1, indp1
-  
+
   radius = norm2(pos-this%cen)  
   ! Control point (Q): distance (normal proj) of the point <pos> from the panel <this>
   xQ = dot_product(pos-this%cen, this%tang(:,1))
   yQ = dot_product(pos-this%cen, this%tang(:,2))
   zQ = dot_product(pos-this%cen, this%nor) 
+
+  Phi = 0.0_wp
+  Q = 0.0_wp 
 
   do i1 = 1 , this%n_ver
     !This is ugly but should be general and work...
@@ -349,13 +352,13 @@ subroutine linear_potential_calc_doublet(this, TL, TR, pos)
     yb = dot_product(r0b, this%tang(:,2)) 
 
     theta = atan2(yb - ya, xb - xa)
-    dab = sqrt((xb - xa)**2 + (yb - ya)**2)
+    dab = this%edge_len(i1) !sqrt((xb - xa)**2 + (yb - ya)**2) (check) 
     va = (xQ - xa) * sin(theta) - (yQ - ya) * cos(theta)
-    ra = sqrt((xQ - xa)**2 + (yQ - ya)**2 + zQ**2)
-    rb = sqrt((xQ - xb)**2 + (yQ - yb)**2 + zQ**2)
+    ra = sqrt((xQ - xa)**2.0_wp + (yQ - ya)**2.0_wp + zQ**2.0_wp)
+    rb = sqrt((xQ - xb)**2.0_wp + (yQ - yb)**2.0_wp + zQ**2.0_wp)
     mab = (yb - ya) / (xb - xa)
-    ea = (xQ - xa)**2 + zQ**2
-    eb = (xQ - xb)**2 + zQ**2
+    ea = (xQ - xa)**2.0_wp + zQ**2.0_wp
+    eb = (xQ - xb)**2.0_wp + zQ**2.0_wp
     ha = (xQ - xa) * (yQ - ya)
     hb = (xQ - xb) * (yQ - yb)
     AA = atan2(mab * ea - ha, zQ * ra)
@@ -369,20 +372,20 @@ subroutine linear_potential_calc_doublet(this, TL, TR, pos)
 
     Qn = log((ra + rb + dab) / (ra + rb - dab))
 
-    C_k_wake_TE_PHI = C_k_wake_TE_PHI + (AA - BB)
+    Phi = Phi + (AA - BB)
 
-    C_k_wake_TE_Q = C_k_wake_TE_Q + Qn * (yQ * sin(theta) - xQ * cos(theta) +  &
-                     va * sin(theta) * cos(theta)) - (rb - ra) * cos(theta)**2
+    Q = Q + Qn * (yQ * sin(theta) - xQ * cos(theta) +  &
+                  va * sin(theta) * cos(theta)) - (rb - ra) * cos(theta)**2
   enddo
   
-  if (C_k_wake_TE_PHI .lt. -2*pi) then
-    C_k_wake_TE_PHI = C_k_wake_TE_PHI + 4*pi
-  elseif (C_k_wake_TE_PHI .gt. 2*pi) then
-    C_k_wake_TE_PHI = C_k_wake_TE_PHI - 4*pi
+  if (Phi .lt. -2.0_wp*pi) then
+    Phi = Phi + 4.0_wp*pi
+  elseif (Phi .gt. 2.0_wp*pi) then
+    Phi = Phi - 4.0_wp*pi
   end if
 
-  TL = C_k_wake_TE_PHI - (C_k_wake_TE_PHI*xQ*yQ + zQ*C_k_wake_TE_Q)
-  TR = C_k_wake_TE_PHI*xQ*yQ + zQ*C_k_wake_TE_Q
+  TL = Phi - (Phi*xQ*yQ + zQ*Q)
+  TR = Phi*xQ*yQ + zQ*Q
   
 end subroutine linear_potential_calc_doublet
 
