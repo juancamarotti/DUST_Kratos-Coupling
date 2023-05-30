@@ -2242,7 +2242,7 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 
   nelems_chord = npoints_chord_tot - 1
 
-  ! e_te ----------
+  ! e_te: goes with the elements 
   allocate(e_te(2,nelems_span)) ; e_te = 0
   if ( ElType .eq. 'p' ) then
     e_te(1,:) = (/(   (i1  )*nelems_chord , i1=1,nelems_span)/)
@@ -2251,7 +2251,7 @@ subroutine build_te_parametric ( ee , rr , ElType , &
     e_te(1,:) = (/(   (i1  )*nelems_chord , i1=1,nelems_span)/)
   end if
 
-  !> i_te 
+  !> i_te: goes with the nodes
   allocate(i_te(2,nelems_span+1)) ; i_te = 0
   if ( ElType .eq. 'p' ) then
     i_te(:,1) = (/ ee(2,1) , ee(3,nelems_chord)/)

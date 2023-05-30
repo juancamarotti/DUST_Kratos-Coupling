@@ -65,11 +65,11 @@ use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
-
 use mod_doublet, only: &
   potential_calc_doublet , &
   velocity_calc_doublet  , &
-  gradient_calc_doublet
+  gradient_calc_doublet  , & 
+  linear_potential_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -152,7 +152,7 @@ character(len=*), parameter :: this_mod_name = 'mod_surfpan'
 contains
 !----------------------------------------------------------------------
 
-!> Subroutine to populate the module variables from input
+!> Subroutine to populate the module variables from input (TODO move to a separate module)
 !!
 subroutine initialize_surfpan()
 
@@ -887,6 +887,8 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
 
 
 end subroutine create_chtls_stencil_surfpan
+
+
 
 !----------------------------------------------------------------------
 

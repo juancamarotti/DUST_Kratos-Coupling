@@ -143,6 +143,12 @@ vl_start_step = 0
 vl_dynstall = F
 aitken_relaxation = T 
 
+! --- Kutta Condition Correction ---
+kutta_beta = 0.01
+kutta_correction = F 
+kutta_startstep = 1
+kutta_maxiter = 20
+kutta_tol = 1.0e-6
 \end{inputfile}
 
 The details of each parameter are:
@@ -821,6 +827,16 @@ Average the solution between the iteration: this may further stabilize the solut
 \textit{default:} 10 \textit{type:} integer. 
 Number of iteration on which the average is computed. 
 
+\item \param{kutta_correction}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 'F' \textit{type:} logical
+    Employ kutta condition for surface panel with trailing edge.  
+\item \param{kutta_beta}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.01 \textit{type:} real  
+    Perturbation factor for kutta condition to compute jacobian matrix 
+\item \param{kutta_tol}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0e-6 \textit{type:} real
+    Tolerance in Newton scheme for Kutta condition correction  
+\item \param{kutta_maxiter}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 100  \textit{type:} integer
+    Maximum number of iterations Newton scheme for Kutta condition correction
+\item \param{kutta_start_step}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1 \textit{type:} integer 
+    Time step to start correcting the Kutta condition 
 \end{itemize}
 
 \begin{figure}

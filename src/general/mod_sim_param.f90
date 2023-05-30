@@ -294,6 +294,13 @@ type t_sim_param
   logical   :: rel_aitken  = .false. 
   logical   :: vl_ave      = .false.
 
+  !> kutta parameters 
+  logical   :: kutta_correction = .false.
+  real(wp)  :: kutta_beta 
+  real(wp)  :: kutta_tol
+  integer   :: kutta_maxiter
+  integer   :: kutta_startstep
+
   !> PreCICE
 #if USE_PRECICE
   character(len=max_char_len) :: precice_config
@@ -430,6 +437,13 @@ subroutine create_param_main(prms)
                                 &the fixed point iteration', 'T')  
   call prms%CreateLogicalOption('vl_average', 'Average panel intensity between the last iterations', 'F')  
   call prms%CreateIntOption('vl_average_iter', 'Number of iterations to average', '10')  
+  
+  !> kutta correction parameters
+  call prms%CreateLogicalOption('kutta_correction', 'Employ kutta condition', 'F') 
+  call prms%CreateRealOption('kutta_beta', 'perturbation factor for kutta condition', '0.01') 
+  call prms%CreateRealOption('kutta_tol', 'tolerance for kutta condition', '1.0e-6') 
+  call prms%CreateIntOption('kutta_maxiter', 'maximum number of iterations for kutta condition', '100')
+  call prms%CreateIntOption('kutta_start_step', 'step in which the kutta condition starts', '1') 
   
   !> Octree and multipole data 
   call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -773,6 +787,13 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !>  VL Dynamic stall
   sim_param%vl_dynstall                   = getlogical(prms, 'vl_dynstall')  
   
+  !> Kutta condition 
+  sim_param%kutta_correction              = getlogical(prms, 'kutta_correction') 
+  sim_param%kutta_beta                    = getreal(prms, 'kutta_beta')
+  sim_param%kutta_tol                     = getreal(prms, 'kutta_tol')
+  sim_param%kutta_maxiter                 = getint(prms, 'kutta_maxiter')
+  sim_param%kutta_startstep               = getint(prms, 'kutta_start_step') 
+
   !> Octree and FMM parameters
   sim_param%use_fmm                       = getlogical(prms, 'fmm')
 

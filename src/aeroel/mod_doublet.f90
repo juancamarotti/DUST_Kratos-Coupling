@@ -43,6 +43,7 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Alessandro Cocco 
 !!=========================================================================
 
 !> Module containing subroutines about doublets distributions.
@@ -72,7 +73,8 @@ implicit none
 public ::    initialize_doublet,  &
           potential_calc_doublet, &
           velocity_calc_doublet,  &
-          gradient_calc_doublet
+          gradient_calc_doublet,  & 
+          linear_potential_calc_doublet
 
 private
 
@@ -122,6 +124,7 @@ subroutine potential_calc_doublet(this, dou, pos)
   ! QUAD elem as 2 TRIA elems
   real(wp) :: radius
   integer :: i1!, i2
+
   radius = norm2(pos-this%cen)
   ! unit normal
   e3 = this%nor
@@ -313,5 +316,74 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
 end subroutine gradient_calc_doublet
 
 !----------------------------------------------------------------------
+
+subroutine linear_potential_calc_doublet(this, TL, TR, pos)
+  class(c_pot_elem), intent(in) :: this
+  real(wp), intent(out)         :: TL, TR
+  real(wp), intent(in)          :: pos(:)
+
+  real(wp)                      :: radius, xQ, yQ, zQ, r0a(3), r0b(3) 
+  real(wp)                      :: xa, ya, xb, yb, theta, dab, va, ra, rb, mab
+  real(wp)                      :: ea, eb, ha, hb, AA, BB, Qn
+  real(wp)                      :: C_k_wake_TE_PHI, C_k_wake_TE_Q
+  integer                       :: i1, indp1
+  
+  radius = norm2(pos-this%cen)  
+  ! Control point (Q): distance (normal proj) of the point <pos> from the panel <this>
+  xQ = dot_product(pos-this%cen, this%tang(:,1))
+  yQ = dot_product(pos-this%cen, this%tang(:,2))
+  zQ = dot_product(pos-this%cen, this%nor) 
+
+  do i1 = 1 , this%n_ver
+    !This is ugly but should be general and work...
+    indp1 = 1+mod(i1,this%n_ver)
+    !indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+    ! doublet  -----
+    r0a = this%ver(:,i1) - this%cen
+    r0b = this%ver(:,indp1) - this%cen
+
+    xa = dot_product(r0a, this%tang(:,1))
+    ya = dot_product(r0a, this%tang(:,2))
+    
+    xb = dot_product(r0b, this%tang(:,1))
+    yb = dot_product(r0b, this%tang(:,2)) 
+
+    theta = atan2(yb - ya, xb - xa)
+    dab = sqrt((xb - xa)**2 + (yb - ya)**2)
+    va = (xQ - xa) * sin(theta) - (yQ - ya) * cos(theta)
+    ra = sqrt((xQ - xa)**2 + (yQ - ya)**2 + zQ**2)
+    rb = sqrt((xQ - xb)**2 + (yQ - yb)**2 + zQ**2)
+    mab = (yb - ya) / (xb - xa)
+    ea = (xQ - xa)**2 + zQ**2
+    eb = (xQ - xb)**2 + zQ**2
+    ha = (xQ - xa) * (yQ - ya)
+    hb = (xQ - xb) * (yQ - yb)
+    AA = atan2(mab * ea - ha, zQ * ra)
+    if (abs(AA + pi) .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+        AA = pi
+    end if
+    BB = atan2(mab * eb - hb, zQ * rb)
+    if (abs(BB + pi) .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+        BB = pi
+    end if
+
+    Qn = log((ra + rb + dab) / (ra + rb - dab))
+
+    C_k_wake_TE_PHI = C_k_wake_TE_PHI + (AA - BB)
+
+    C_k_wake_TE_Q = C_k_wake_TE_Q + Qn * (yQ * sin(theta) - xQ * cos(theta) +  &
+                     va * sin(theta) * cos(theta)) - (rb - ra) * cos(theta)**2
+  enddo
+  
+  if (C_k_wake_TE_PHI .lt. -2*pi) then
+    C_k_wake_TE_PHI = C_k_wake_TE_PHI + 4*pi
+  elseif (C_k_wake_TE_PHI .gt. 2*pi) then
+    C_k_wake_TE_PHI = C_k_wake_TE_PHI - 4*pi
+  end if
+
+  TL = C_k_wake_TE_PHI - (C_k_wake_TE_PHI*xQ*yQ + zQ*C_k_wake_TE_Q)
+  TR = C_k_wake_TE_PHI*xQ*yQ + zQ*C_k_wake_TE_Q
+  
+end subroutine linear_potential_calc_doublet
 
 end module mod_doublet

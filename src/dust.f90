@@ -216,6 +216,12 @@ real(wp), allocatable             :: surf_vel_SurfPan_old(:,:)
 real(wp), allocatable             :: nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 real(wp)                          :: theta_cen(3), R_cen(3, 3) 
+
+!> Kutta correction 
+real(wp), allocatable             :: delta_pres_te(:)
+real(wp), allocatable             :: mag_pert(:,:) 
+real(wp), allocatable             :: delta_mag_te(:)
+real(wp)                          :: beta 
 !> VL viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
 integer                           :: it_vl, it_stall
@@ -745,6 +751,27 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
   !$omp end parallel do
 #endif
 
+  ! loads are computed, and also mu  
+  ! 1. get the delta p at the trailing edge for each panel element  
+  ! 2. compute the jacobi matrix deltagamma = (1 + diag(-beta))*gamma 
+  !    a. calculate new rhs using linear distribution at the trailing edge
+  !    b. solve the linear system to get delta mu = A^-1 * (rhs - T_L*deltagamma) 
+  !    c. compute the new p 
+  !    update jacobian matrix = (p_tilde - p)/(- gamma*beta) 
+  ! 3. start newton iteration to get the new gamma 
+  if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. it .gt. sim_param%kutta_startstep) then  
+    allocate(delta_pres_te(size(te%e,2))); delta_pres_te = 0.0_wp
+    allocate(delta_mag_te(size(te%e,2))); delta_mag_te = 0.0_wp
+    allocate(mag_pert(size(te%e,2),size(te%e,2))); mag_pert = 1.0_wp 
+    do i_el = 1, size(te%e,2)  ! for all panel elements 
+      delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
+      !> perturbation of the circulation
+      delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
+      mag_pert(i_el, i_el) = (1.0_wp - sim_param%kutta_beta)*(delta_mag_te(i_el))      
+    enddo
+    !> cleanup 
+    deallocate(delta_pres_te, mag_pert, delta_mag_te)
+  endif
 
   ! ifort bugs workaround:
   ! since even if the following calls looks thread safe, they mess up with
@@ -949,16 +976,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
               dforce_stripe = dforce_stripe + &
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce
             end do
-
-            !!> update cl and cd            
-            !e_l = nor * cos(a_v) - tang_cen * sin(a_v)
-            !e_d = nor * sin(a_v) + tang_cen * cos(a_v)
-            !e_l = e_l / norm2(e_l)
-            !e_d = e_d / norm2(e_d)
-
-            !geo%components(i_c)%stripe(i_s)%aero_coeff(1) = dot(dforce_stripe,e_l) / q_inf 
-            !geo%components(i_c)%stripe(i_s)%aero_coeff(2) = dot(dforce_stripe,e_d) / q_inf
-            
           end do
         end if 
       end do         
