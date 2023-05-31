@@ -739,7 +739,42 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
           &in init_sim_param() routine. Something went wrong. Stop')
     end if
   end if
-
+  !------ Compute loads -------
+! Implicit elements: vortex rings and 3d-panels
+! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
+! so far, select type() to keep the old formulation for t_surfpan and
+! use AVL formula for t_vortlatt
+#if USE_PRECICE
+  !$omp parallel do private(i_el, theta_cen, R_cen)
+    do i_el = 1, sel
+      ! ifort bugs workaround:
+      ! apparently it is not possible to call polymorphic methods inside
+      ! select cases for intel, need to call these for all elements and for the
+      ! vortex lattices it is going to be a dummy empty function call
+      if (geo%components(elems(i_el)%p%comp_id)%coupling) then  
+        !> calculate the pressure using the relative orientation matrix
+        call elems(i_el)%p%compute_pres(elems(i_el)%p%R_cen)  ! update surf_vel field too
+      else !> non coupled component 
+          call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+      endif  
+      call elems(i_el)%p%compute_dforce()      
+    end do
+  !$omp end parallel do
+#else
+  
+  !$omp parallel do private(i_el)
+    do i_el = 1 , sel
+      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+      call elems(i_el)%p%compute_dforce()  
+      
+      !write(*,*) 'i_el', i_el, elems(i_el)%p%pres
+      
+      
+    end do
+  !$omp end parallel do
+#endif
   ! loads are computed, and also mu  
   ! 1. get the delta p at the trailing edge for each panel element  
   ! 2. compute the jacobi matrix deltagamma = (1 + diag(-beta))*gamma 
@@ -755,15 +790,29 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     ! check i_el for multiple components !!!!  
     do i_el = 1, te%nte_surfpan  ! for all panel elements 
       !> perturbation of the circulation
-      delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag     
+      delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
+      delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
+      !write(*,*),'te%e(1,i_el)%p%id', te%e(1, i_el)%p%id 
+      !write(*,*),'te%e(2,i_el)%p%id', te%e(2, i_el)%p%id
+      !write(*,*),'te%e(1, i_el)%p%mag', te%e(1, i_el)%p%mag  
+      !write(*,*),'te%e(2, i_el)%p%mag', te%e(2, i_el)%p%mag  
+      !write(*,*),'te%e(1, i_el)%p%pres', te%e(1, i_el)%p%pres  
+      !write(*,*),'te%e(2, i_el)%p%pres', te%e(2, i_el)%p%pres  
+      !write(*,*),'delta_mag_te(i_el)',delta_mag_te(i_el)  
     enddo 
-
     if (it .gt. sim_param%kutta_startstep) then 
       rhs_tmp = linsys%b !> store the rhs for the next time iteration  
       do i_el = 1, te%nte_surfpan  ! for all panel elements 
-        delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
+        !delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
+        !write(*,*),'te%e(1,i_el)%p%id', te%e(1, i_el)%p%id 
+        !write(*,*),'te%e(2,i_el)%p%id', te%e(2, i_el)%p%id 
+        !
+        !write(*,*),'te%e(1, i_el)%p%pres',te%e(1, i_el)%p%pres
+        !write(*,*),'te%e(2, i_el)%p%pres',te%e(2, i_el)%p%pres
+        !write(*,*),'delta_pres_te(i_el)',delta_pres_te(i_el) 
+
         !> perturbation of the circulation
-        delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
+        !delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
         mag_pert(i_el, i_el) = (1.0_wp - sim_param%kutta_beta)*(delta_mag_te(i_el))
         linsys%b = rhs_tmp - matmul(linsys%TL, mag_pert(:, i_el)) - matmul(linsys%TR, delta_mag_te_old)          
         !> Solve the factorized system
@@ -799,10 +848,11 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
           jacobi(i_el, j_el) = (delta_pres_te_perturbed(j_el) - delta_pres_te(j_el))/(-delta_mag_te(i_el)*sim_param%kutta_beta)
         enddo 
       enddo
-      !write(*,*) 'jacobi matrix' 
-      !do i_el = 1, te%nte_surfpan
-      !  write(*,*) jacobi(i_el, :)
-      !enddo
+
+      write(*,*) 'jacobi matrix' 
+      do i_el = 1, te%nte_surfpan
+        write(*,*) jacobi(i_el, :)
+      enddo
       allocate(ipiv(te%nte_surfpan))
       allocate(work(te%nte_surfpan))
 #if (DUST_PRECISION==1)
@@ -818,7 +868,8 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       it_pan = 1 
       delta_pres_te_iter_old = 1.0_wp
       tol = 1.0_wp
-      do while (sim_param%kutta_tol .gt. tol .and. it_pan .lt. sim_param%kutta_maxiter)
+
+      do while (tol .gt. sim_param%kutta_tol .and. it_pan .lt. sim_param%kutta_maxiter)
         
         delta_mag_te_iter = delta_mag_te - matmul(jacobi, delta_pres_te)
         linsys%b = rhs_tmp - matmul(linsys%TL, delta_mag_te_iter) - matmul(linsys%TR, delta_mag_te_old)     
@@ -828,6 +879,8 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
           call solve_linsys(linsys)
         end if
         do j_el = 1, te%nte_surfpan
+          delta_pres_te_iter_old = delta_pres_te_iter
+          !write(*,*),'delta_pres_te_iter_old',delta_pres_te_iter_old
 #if USE_PRECICE
           if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
             !> calculate the pressure using the relative orientation matrix
@@ -851,11 +904,17 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
           call te%e(2, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
 #endif
-          delta_pres_te_iter(j_el) = te%e(2, j_el)%p%pres - te%e(1, j_el)%p%pres 
+          delta_pres_te_iter(j_el) = te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres 
+          write(*,*) 'iteration'
+          write(*,*) 'delta_pres_te_iter(j_el)' , delta_pres_te_iter(j_el)
+          write(*,*) 'te%e(1, j_el)%p%pres' , te%e(1, j_el)%p%pres
+          write(*,*) 'te%e(2, j_el)%p%pres' , te%e(2, j_el)%p%pres
         enddo
           tol = maxval(abs(delta_pres_te_iter - delta_pres_te_iter_old)/delta_pres_te_iter_old)
-          delta_pres_te_iter_old = delta_pres_te_iter
+          
           it_pan = it_pan + 1
+          write(*,*) 'it_pan' , it_pan 
+          write(*,*) 'tol' , tol 
         if(it_pan .eq. sim_param%kutta_maxiter) then
           call warning('dust','dust','max iteration reached for kutta condition:&
                       &increase kutta_maxiter!') 
