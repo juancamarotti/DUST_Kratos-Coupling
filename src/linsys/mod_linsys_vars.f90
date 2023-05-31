@@ -146,6 +146,12 @@ type :: t_linsys
   !> Skip dynamic update
   logical :: skip
 
+  !> TL matrix: left hand side of linear doublet 
+  real(wp), allocatable :: TL(:,:)
+
+  !> TR matrix: right hand side of linear doublet
+  real(wp), allocatable :: TR(:,:)
+
 end type t_linsys
 
 !----------------------------------------------------------------------

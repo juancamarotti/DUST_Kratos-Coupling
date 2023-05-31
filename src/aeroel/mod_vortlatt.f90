@@ -58,7 +58,8 @@ use mod_handling, only: &
 use mod_doublet, only: &
   potential_calc_doublet , &
   velocity_calc_doublet  , &
-  gradient_calc_doublet
+  gradient_calc_doublet  , &
+  linear_potential_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -118,6 +119,7 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: compute_grad             => compute_grad_vortlatt
   procedure, pass(this) :: compute_psi              => compute_psi_vortlatt
   !> Dummy for intel workaround
+  procedure, pass(this) :: compute_linear_pot       => compute_linear_pot_vortlatt
   procedure, pass(this) :: compute_pres             => compute_pres_dummy
   procedure, pass(this) :: compute_pres_vortlatt    => compute_pres_vortlatt
   procedure, pass(this) :: compute_dforce           => compute_dforce_dummy
@@ -353,6 +355,27 @@ subroutine compute_pot_vortlatt(this, A, b, pos,i,j)
   b = 0.0_wp
 
 end subroutine compute_pot_vortlatt
+
+!> Compute the linear potential due to a vortex ring
+!! this subroutine employs doublets basic subroutines to calculate
+!! the AIC of a vortex ring on a surface panel. The contribution to its rhs
+!! is zero since there are no sources (and no b.c. enforcing)
+subroutine compute_linear_pot_vortlatt(this, TL, TR, pos,i,j)
+  class(t_vortlatt), intent(inout) :: this
+  real(wp), intent(out) :: TL
+  real(wp), intent(out) :: TR
+  real(wp), intent(in) :: pos(:)
+  integer , intent(in) :: i,j
+
+  !if ( i .ne. j ) then
+    call linear_potential_calc_doublet(this, TL, TR, pos)
+    !write(*,*) 'TL, TR = ', TL, TR
+  !else
+  ! AIC (doublets) = 0.0   -> dou = 0
+    !dou = -2.0_wp*pi
+  !end if
+
+end subroutine compute_linear_pot_vortlatt
 
 !----------------------------------------------------------------------
 

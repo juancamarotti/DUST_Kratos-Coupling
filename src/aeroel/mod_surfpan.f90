@@ -121,18 +121,19 @@ type, extends(c_impl_elem) :: t_surfpan
 
 contains
 
-  procedure, pass(this) ::  build_row        => build_row_surfpan
-  procedure, pass(this) ::  build_row_static => build_row_static_surfpan
-  procedure, pass(this) ::  add_wake         => add_wake_surfpan
-  procedure, pass(this) ::  add_expl         => add_expl_surfpan
-  procedure, pass(this) ::  compute_pot      => compute_pot_surfpan
-  procedure, pass(this) ::  compute_vel      => compute_vel_surfpan
-  procedure, pass(this) ::  compute_grad     => compute_grad_surfpan
-  procedure, pass(this) ::  compute_psi      => compute_psi_surfpan
-  procedure, pass(this) ::  compute_pres     => compute_pres_surfpan
-  procedure, pass(this) ::  compute_dforce   => compute_dforce_surfpan
-  procedure, pass(this) ::  calc_geo_data    => calc_geo_data_surfpan
-  procedure, pass(this) ::  get_vort_vel     => get_vort_vel_surfpan
+  procedure, pass(this) ::  build_row               => build_row_surfpan
+  procedure, pass(this) ::  build_row_static        => build_row_static_surfpan
+  procedure, pass(this) ::  add_wake                => add_wake_surfpan
+  procedure, pass(this) ::  add_expl                => add_expl_surfpan
+  procedure, pass(this) ::  compute_pot             => compute_pot_surfpan
+  procedure, pass(this) ::  compute_linear_pot      => compute_linear_pot_surfpan
+  procedure, pass(this) ::  compute_vel             => compute_vel_surfpan
+  procedure, pass(this) ::  compute_grad            => compute_grad_surfpan
+  procedure, pass(this) ::  compute_psi             => compute_psi_surfpan
+  procedure, pass(this) ::  compute_pres            => compute_pres_surfpan
+  procedure, pass(this) ::  compute_dforce          => compute_dforce_surfpan
+  procedure, pass(this) ::  calc_geo_data           => calc_geo_data_surfpan
+  procedure, pass(this) ::  get_vort_vel            => get_vort_vel_surfpan
 
   procedure, pass(this) ::  create_local_velocity_stencil => &
                             create_local_velocity_stencil_surfpan
@@ -492,7 +493,7 @@ end subroutine build_row_static_surfpan
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of potential due to the wake
 subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
-                            ie,ista, iend)
+                            ie, ista, iend)
   class(t_surfpan), intent(inout) :: this
   type(t_pot_elem_p), intent(in)      :: wake_elems(:)
   integer, intent(in)             :: impl_wake_ind(:,:)
@@ -504,7 +505,7 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   integer :: j1, ind1, ind2
   real(wp) :: a, b
   integer :: n_impl
-
+  real (wp) :: TR, TL 
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
 
@@ -526,6 +527,20 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
     endif
 
   end do
+
+  if (sim_param%kutta_correction) then
+    do j1 = 1 , n_impl
+      ind1 = impl_wake_ind(1,j1); 
+      ind2 = impl_wake_ind(2,j1)
+      if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+        (ind2.ge.ista .and. ind2.le.iend)) then
+        !todo: find a more elegant solution to avoid i=j
+        call wake_elems(j1)%p%compute_linear_pot(TL, TR, this%cen, 1, 2 ) 
+        linsys%TL(ie, j1) = TL 
+        linsys%TR(ie, j1) = TR         
+      endif
+    end do
+  endif
 
   ! Add the explicit vortex panel wake contribution to the rhs
   do j1 = n_impl+1 , size(wake_elems)
@@ -603,7 +618,30 @@ subroutine compute_pot_surfpan(this, A, b, pos , i , j )
 
   b =  sou
 
-end subroutine compute_pot_surfpan
+end subroutine compute_pot_surfpan 
+
+!> Compute the potential due to a surface panel
+!!
+!! this subroutine employs doublets and sources basic subroutines to calculate
+!! the AIC of a suface panel on another surface panel, and the contribution
+!! to its rhs
+subroutine compute_linear_pot_surfpan(this, TL, TR, pos , i , j )
+  class(t_surfpan), intent(inout) :: this
+  real(wp), intent(out)           :: TL
+  real(wp), intent(out)           :: TR
+  real(wp), intent(in)            :: pos(:)
+  integer , intent(in)            :: i, j
+
+  real(wp)                        :: dou
+  
+  if ( i .ne. j ) then
+    call linear_potential_calc_doublet(this, TL, TR, pos)
+  else
+  ! AIC (doublets) = 0.0   -> dou = 0
+    dou = -2.0_wp*pi
+  end if
+
+end subroutine compute_linear_pot_surfpan 
 
 !----------------------------------------------------------------------
 

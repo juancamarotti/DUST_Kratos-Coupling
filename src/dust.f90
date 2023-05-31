@@ -395,7 +395,7 @@ call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
-call initialize_linsys(linsys, geo, elems, elems_expl, wake ) 
+call initialize_linsys(linsys, geo, te, elems, elems_expl, wake ) 
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then

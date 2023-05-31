@@ -236,6 +236,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   integer , allocatable       :: e_te(:,:), i_te(:,:), ii_te(:,:)
   integer , allocatable       :: neigh_te(:,:), o_te(:,:)
   real(wp), allocatable       :: rr_te(:,:), t_te(:,:)
+  integer                     :: n_e_te_panel
 
   integer :: i
 
@@ -1161,7 +1162,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         !TODO: IMPORTANT: what should be the behaviour here?
         if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
             npoints_chord_tot , nelems_span_tot , &
-            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, n_e_te_panel ) !te as an output
       else
         if(.not. suppress_te) call build_te_general ( ee , rr , ElType , &
                   tol_sewing , inner_product_threshold , &
@@ -1189,7 +1190,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                       neigh )
         if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
           npoints_chord_tot , nelems_span_tot , &
-          e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+          e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, n_e_te_panel ) !te as an output
       elseif(ElType .eq. 'a') then
         allocate(neigh(size(ee,1), size(ee,2)))
         neigh = 0 !All actuator disk are isolated
@@ -1230,14 +1231,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       allocate(o_te(2,0), t_te(3,0))
     endif
     call new_hdf5_group(comp_loc, 'Trailing_Edge', te_loc)
-    call write_hdf5(    e_te,    'e_te',te_loc)
-    call write_hdf5(    i_te,    'i_te',te_loc)
-    call write_hdf5(   rr_te,   'rr_te',te_loc)
-    call write_hdf5(   ii_te,   'ii_te',te_loc)
-    call write_hdf5(neigh_te,'neigh_te',te_loc)
-    call write_hdf5(    o_te,    'o_te',te_loc)
-    call write_hdf5(    t_te,    't_te',te_loc)
-    call write_hdf5(scale_te,'scale_te',te_loc)
+    call write_hdf5(    e_te,             'e_te',te_loc)
+    call write_hdf5(n_e_te_panel, 'n_e_te_panel',te_loc)
+    call write_hdf5(    i_te,             'i_te',te_loc)
+    call write_hdf5(   rr_te,            'rr_te',te_loc)
+    call write_hdf5(   ii_te,            'ii_te',te_loc)
+    call write_hdf5(neigh_te,         'neigh_te',te_loc)
+    call write_hdf5(    o_te,             'o_te',te_loc)
+    call write_hdf5(    t_te,             't_te',te_loc)
+    call write_hdf5(scale_te,         'scale_te',te_loc)
     call close_hdf5_group(te_loc)
   endif
 
@@ -2226,7 +2228,7 @@ end subroutine build_te_general
 !! structure of parametric components
 subroutine build_te_parametric ( ee , rr , ElType , &
                 npoints_chord_tot , nelems_span , &
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, n_e_te_panel) !te as an output
 
   integer , intent(in)  :: ee(:,:)
   real(wp), intent(in)  :: rr(:,:)
@@ -2238,15 +2240,17 @@ subroutine build_te_parametric ( ee , rr , ElType , &
   real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
   integer               :: nelems_chord
   integer               :: i1
-
+  integer               :: n_e_te_panel
 
   nelems_chord = npoints_chord_tot - 1
-
+  n_e_te_panel = 0
   ! e_te: goes with the elements 
   allocate(e_te(2,nelems_span)) ; e_te = 0
+
   if ( ElType .eq. 'p' ) then
     e_te(1,:) = (/(   (i1  )*nelems_chord , i1=1,nelems_span)/)
     e_te(2,:) = (/( 1+(i1-1)*nelems_chord , i1=1,nelems_span)/)
+    n_e_te_panel = size(e_te,2)
   else
     e_te(1,:) = (/(   (i1  )*nelems_chord , i1=1,nelems_span)/)
   end if
