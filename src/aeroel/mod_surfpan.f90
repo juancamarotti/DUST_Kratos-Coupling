@@ -509,6 +509,9 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
 
+  ! preserving the A coefficient matrix before adding the wake implicit effect
+  linsys%C=linsys%A
+  
   !Add the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
   !ones since are at the beginning of the list
@@ -517,7 +520,7 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
     if ((ind1.ge.ista .and. ind1.le.iend) .and. &
         (ind2.ge.ista .and. ind2.le.iend)) then
 
-
+          
       !todo: find a more elegant solution to avoid i=j
       call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
 

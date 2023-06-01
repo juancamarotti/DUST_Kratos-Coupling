@@ -127,7 +127,7 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   linsys%nmoving      = geo%nmoving_impl
   linsys%nstatic_expl = geo%nstatic_expl
   linsys%nmoving_expl = geo%nmoving_expl
-  linsys%n_expl       =  geo%nelem_expl
+  linsys%n_expl       = geo%nelem_expl
   linsys%skip         = .false.
   
   ntot = linsys%rank

@@ -72,8 +72,11 @@ type :: t_linsys
   !> Rank of the linear system
   integer :: rank
 
-  !> Linear system matrix
+  !> Linear system matrix, will include Morino-kutta effect
   real(wp), allocatable :: A(:,:)
+
+  !> Linear system matrix, will not include Morino-kutta effect
+  real(wp), allocatable :: C(:,:)
 
   !> Linear system right hand side
   real(wp), allocatable :: b(:)
