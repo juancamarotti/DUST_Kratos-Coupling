@@ -515,21 +515,21 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   !Add the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
   !ones since are at the beginning of the list
-  do j1 = 1 , n_impl
-    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-    if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-        (ind2.ge.ista .and. ind2.le.iend)) then
-
-          
-      !todo: find a more elegant solution to avoid i=j
-      call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
-      linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
-      linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
-
-    endif
-
-  end do
+  !do j1 = 1 , n_impl
+  !  ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
+  !  if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+  !      (ind2.ge.ista .and. ind2.le.iend)) then
+!
+  !        
+  !    !todo: find a more elegant solution to avoid i=j
+  !    call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+!
+  !    linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
+  !    linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
+!
+  !  endif
+!
+  !end do
 
   if (sim_param%kutta_correction) then
     do j1 = 1 , n_impl
@@ -540,10 +540,28 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
         !todo: find a more elegant solution to avoid i=j
         call wake_elems(j1)%p%compute_linear_pot(TL, TR, this%cen, 1, 2 ) 
         linsys%TL(ie, j1) = TL 
-        linsys%TR(ie, j1) = TR         
+        linsys%TR(ie, j1) = TR  
+        
+        linsys%A(ie,ind1) = linsys%A(ie,ind1) + TL
+        linsys%A(ie,ind2) = linsys%A(ie,ind2) - TL
       endif
     end do
-  endif
+    else 
+      do j1 = 1 , n_impl
+        ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
+        if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+            (ind2.ge.ista .and. ind2.le.iend)) then
+
+          !todo: find a more elegant solution to avoid i=j
+          call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+
+          linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
+          linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
+
+        endif
+      
+      end do
+    endif
 
   ! Add the explicit vortex panel wake contribution to the rhs
   do j1 = n_impl+1 , size(wake_elems)

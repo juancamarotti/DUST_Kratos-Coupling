@@ -221,6 +221,8 @@ real(wp)                          :: theta_cen(3), R_cen(3, 3)
 real(wp), allocatable             :: delta_pres_te(:), delta_pres_te_perturbed(:), delta_pres_te_iter(:), delta_pres_te_iter_old(:)
 real(wp), allocatable             :: mag_pert(:,:) 
 real(wp), allocatable             :: delta_mag_te(:), delta_mag_te_old(:), delta_mag_te_iter_old(:), delta_mag_te_iter(:)
+real(wp), allocatable             :: delta_mag_te_lower_old(:), delta_mag_te_upper_old(:)
+real(wp), allocatable             :: mag_te_tmp_lower(:), mag_te_tmp_upper(:)
 real(wp)                          :: beta 
 real(wp), allocatable             :: rhs_tmp(:) 
 real(wp), allocatable             :: A_tmp(:,:)
@@ -230,7 +232,7 @@ integer, allocatable              :: ipiv(:)
 real(wp), allocatable             :: work(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2, j_el
+integer                           :: i_el, j_el, k_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
 integer                           :: it_vl, it_stall
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3), a_v, area_stripe, dforce_stripe(3), e_d(3), e_l(3)
@@ -515,6 +517,11 @@ if (sim_param%kutta_correction) then
 
   allocate(delta_mag_te(te%nte_surfpan)); delta_mag_te = 0.0_wp
   allocate(delta_mag_te_old(te%nte_surfpan)); delta_mag_te_old = 0.0_wp
+  allocate(mag_te_tmp_upper(te%nte_surfpan)); mag_te_tmp_upper = 0.0_wp
+  allocate(mag_te_tmp_lower(te%nte_surfpan)); mag_te_tmp_lower = 0.0_wp
+  allocate(delta_mag_te_upper_old(te%nte_surfpan)); delta_mag_te_upper_old = 0.0_wp
+  allocate(delta_mag_te_lower_old(te%nte_surfpan)); delta_mag_te_lower_old = 0.0_wp
+
   allocate(delta_mag_te_iter(te%nte_surfpan)); delta_mag_te_iter = 0.0_wp
 
   allocate(mag_pert(te%nte_surfpan,te%nte_surfpan)); mag_pert = 1.0_wp  
@@ -693,6 +700,14 @@ it = 1
       call solve_pressure_sys(linsys)
     end if
 
+
+    !write(*,*) 'linsys%b'
+    !do i_el = 1, sel
+    !  write(*,*) linsys%b(i_el)
+    !enddo  
+ 
+
+
     !------ Solve the system ------
     t0 = dust_time()
     if (linsys%rank .gt. 0) then
@@ -701,6 +716,12 @@ it = 1
     t1 = dust_time()
 
     sel = size(elems)
+
+        !!> Solve the factorized system
+    !write(*,*) 'linsys%res'
+    !do i_el = 1, sel
+    !  write(*,*) linsys%res(i_el)
+    !enddo 
 
     !> compute dGamma_dt for unsteady contribution
 
@@ -800,158 +821,230 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
   !    update jacobian matrix = (p_tilde - p)/(- gamma*beta) 
   ! 3. start newton iteration to get the new gamma 
 
+
   if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
-    linsys%skip = .true. 
-    
+    linsys%skip = .true.  
+
+
+    rhs_tmp = linsys%b 
+
+    do i_el = 1, size(delta_mag_te_old)
+      write(*,*) 'delta_mag_te_old', delta_mag_te_old(i_el)
+    enddo
+
+    !do i_el = 1, size(rhs_tmp)
+    !  write(*,*) 'rhs_tmp', rhs_tmp(i_el)
+    !enddo
+!
+    if  (it .gt. sim_param%kutta_startstep) then
+      !linsys%b = rhs_tmp - matmul(linsys%TL, delta_mag_te) - matmul(linsys%TR, delta_mag_te_old)     
+      
+      linsys%b = rhs_tmp - matmul(linsys%TR, delta_mag_te_old)
+      !write(*,*) 'linsys%b'
+      !do i_el = 1, sel
+      !  write(*,*) linsys%b(i_el)
+      !enddo  
+      !!> Solve the factorized system
+      if (linsys%rank .gt. 0) then ! A matrix includes the steady kutta condition
+        !linsys%A=linsys%C ! replacing A with C, to get rid of Morino Kutta effect
+        call solve_linsys(linsys)
+      end if
+        !$omp parallel do private(k_el)
+        do k_el = 1 , sel      
+          elems(k_el)%p%didou_dt = (linsys%res(k_el) - res_old(k_el)) / sim_param%dt
+        enddo 
+        !$omp end parallel do 
+      !write(*,*) 'linsys%res'
+      do i_el = 1, sel
+        write(*,*) linsys%res(i_el)
+      enddo  
+    endif 
+
     ! check i_el for multiple components !!!!  
     do i_el = 1, te%nte_surfpan  ! for all panel elements 
       delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
       delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
     enddo 
 
-    if (it .eq. sim_param%kutta_startstep-1) then
+    do i_el = 1, te%nte_surfpan
+      mag_te_tmp_upper(i_el) = te%e(1, i_el)%p%mag
+      mag_te_tmp_lower(i_el) = te%e(2, i_el)%p%mag
+      !> send to the wake the average of the two values: old the one from the previous time-step, new the one from the current time-step
+      te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag + delta_mag_te_upper_old(i_el)) /2.0_wp
+      te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag + delta_mag_te_lower_old(i_el)) /2.0_wp
+    enddo 
 
-      delta_mag_te_old=delta_mag_te
+    delta_mag_te_old = delta_mag_te
 
-    else 
+    !do i_el = 1, size(delta_mag_te_old)
+    !  write(*,*) 'delta_mag_te    ', delta_mag_te(i_el)
+    !enddo  
 
-      rhs_tmp = linsys%b !> store the rhs for the next time iteration
-      A_tmp   = linsys%A !> preserving the A coefficient matrix 
-
-      do i_el = 1, te%nte_surfpan  ! for all panel elements 
-        !> perturbation of the circulation
-        mag_pert(i_el, i_el) = (1.0_wp - sim_param%kutta_beta)*(delta_mag_te(i_el))
-        linsys%b = rhs_tmp - matmul(linsys%TL, mag_pert(:, i_el)) - matmul(linsys%TR, delta_mag_te_old)          
-        
-        !> Solve the factorized system
-        if (linsys%rank .gt. 0) then ! A matrix includes the steady kutta condition
-          linsys%A=linsys%C ! replacing A with C, to get rid of Morino Kutta effect
-          call solve_linsys(linsys)
-        end if
-
-        !calculate pressure using the perturbed circulation only at the trailing edge 
-        do j_el = 1, te%nte_surfpan
-#if USE_PRECICE
-          if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
-            !> calculate the pressure using the relative orientation matrix
-            !> upper side of the panel
-            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
-            !> lower side of the panel  
-            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
-          else !> non coupled component
-            !> upper side of the panel 
-            call te%e(1, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
-            !> lower side of the panel
-            call te%e(2, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-          endif      
-#else
-          !> upper side of the panel
-          call te%e(1, j_el)%p%compute_pres( &     
-                geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
-          !> lower side of the panel
-          call te%e(2, j_el)%p%compute_pres( &     
-                geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-#endif
-          delta_pres_te_perturbed(j_el) = te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres 
-          jacobi(i_el, j_el) = (delta_pres_te_perturbed(j_el) - delta_pres_te(j_el))/(mag_pert(i_el, i_el)-delta_mag_te(i_el))
-        enddo 
-      enddo
-
-      write(*,*) 'jacobi matrix' 
-      do i_el = 1, te%nte_surfpan
-        write(*,*) jacobi(i_el, :)
-      enddo
-      allocate(ipiv(te%nte_surfpan))
-      allocate(work(te%nte_surfpan))
-#if (DUST_PRECISION==1)
-      call sgetrf(te%nte_surfpan,te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,info_inverse)  
-      call sgetri(te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,work,te%nte_surfpan,info_inverse)
-#elif(DUST_PRECISION==2)
-      call dgetrf(te%nte_surfpan,te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,info_inverse)  
-      call dgetri(te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,work,te%nte_surfpan,info_inverse)
-#endif
-      deallocate(ipiv, work) 
-      ! jacobi is now the inverse of jacobi
+    do i_el = 1, te%nte_surfpan
+      delta_mag_te_upper_old(i_el) = mag_te_tmp_upper(i_el)
+      delta_mag_te_lower_old(i_el) = mag_te_tmp_lower(i_el)
+    enddo
+    
+!    if (it .gt. sim_param%kutta_startstep) then
+!
+!      rhs_tmp = linsys%b !> store the rhs for the next time iteration
+!      A_tmp   = linsys%A !> preserving the A coefficient matrix 
+!      
+!      do i_el = 1, te%nte_surfpan  ! for all panel elements 
+!        mag_pert(i_el, :) = delta_mag_te
+!      enddo 
+!
+!      ! Starting the perturbation
+!      do i_el = 1, te%nte_surfpan  ! for all panel elements 
+!        !> perturbation of the circulation
+!        mag_pert(i_el, i_el) = (1.0_wp - sim_param%kutta_beta)*(delta_mag_te(i_el))
+!
+!        write(*,*) mag_pert(:, i_el) 
+!
+!        linsys%b = rhs_tmp - matmul(linsys%TL, mag_pert(:, i_el)) - matmul(linsys%TR, delta_mag_te_old)          
+!        
+!        !> Solve the factorized system
+!        if (linsys%rank .gt. 0) then ! A matrix includes the steady kutta condition
+!          if (i_el .eq. 1) then 
+!            linsys%skip = .false.
+!            linsys%A = linsys%C ! replacing A with C, to get rid of Morino Kutta effect
+!            call solve_linsys(linsys) 
+!          else 
+!            linsys%skip = .true.
+!            !linsys%A = linsys%C ! replacing A with C, to get rid of Morino Kutta effect
+!            call solve_linsys(linsys) 
+!          endif   
+!
+!        end if
+!        !> update unsteady term 
+!        !$omp parallel do private(k_el)
+!        do k_el = 1 , sel      
+!          elems(k_el)%p%didou_dt = (linsys%res(k_el) - res_old(k_el)) / sim_param%dt
+!        enddo 
+!        !$omp end parallel do 
+!
+!        !calculate pressure using the perturbed circulation only at the trailing edge 
+!        do j_el = 1, te%nte_surfpan
+!#if USE_PRECICE
+!          if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
+!            !> calculate the pressure using the relative orientation matrix
+!            !> upper side of the panel
+!            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
+!            !> lower side of the panel  
+!            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
+!          else !> non coupled component
+!            !> upper side of the panel 
+!            call te%e(1, j_el)%p%compute_pres( &     
+!                  geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
+!            !> lower side of the panel
+!            call te%e(2, j_el)%p%compute_pres( &     
+!                  geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+!          endif      
+!#else
+!          !> upper side of the panel
+!          call te%e(1, j_el)%p%compute_pres( &     
+!                geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
+!          !> lower side of the panel
+!          call te%e(2, j_el)%p%compute_pres( &     
+!                geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+!#endif
+!          delta_pres_te_perturbed(j_el) = ((te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres)) !/ &
+!          !                                (0.5_wp*sim_param%rho_inf*norm2(sim_param%U_inf)**2.0_wp)   
+!          !delta_pres_te(j_el)           = delta_pres_te(j_el)/ &
+!          !                                (0.5_wp*sim_param%rho_inf*norm2(sim_param%U_inf)**2.0_wp)
+!          jacobi(j_el, i_el) = (delta_pres_te_perturbed(j_el) - delta_pres_te(j_el))/(mag_pert(i_el, i_el)-delta_mag_te(i_el)) &
+!                                /(0.5_wp*sim_param%rho_inf*norm2(sim_param%U_inf)**2.0_wp)
+!        enddo 
+!      enddo
+!
+!      write(*,*) 'jacobi matrix' 
+!      do i_el = 1, te%nte_surfpan
+!        write(*,*) jacobi(i_el, :)
+!      enddo
+!      allocate(ipiv(te%nte_surfpan))
+!      allocate(work(te%nte_surfpan))
+!
+!
+!#if (DUST_PRECISION==1)
+!      call sgetrf(te%nte_surfpan,te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,info_inverse)  
+!      call sgetri(te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,work,te%nte_surfpan,info_inverse)
+!#elif(DUST_PRECISION==2)
+!      call dgetrf(te%nte_surfpan,te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,info_inverse)  
+!      call dgetri(te%nte_surfpan,jacobi,te%nte_surfpan,ipiv,work,te%nte_surfpan,info_inverse)
+!#endif
+!      deallocate(ipiv, work) 
+!      ! jacobi is now the inverse of jacobi
+!
+!
       !> Newton-Raphson iteration to get the new circulation 
-      it_pan = 1 
-      delta_pres_te_iter_old = 1.0_wp  !!!!!!!!!!
-      tol = 1.0_wp
-      delta_pres_te_iter=delta_pres_te
-      do while (tol .gt. sim_param%kutta_tol .and. it_pan .lt. sim_param%kutta_maxiter)
-        
-        delta_mag_te_iter = delta_mag_te - matmul(jacobi, delta_pres_te_iter)
-        linsys%b = rhs_tmp - matmul(linsys%TL, delta_mag_te_iter) - matmul(linsys%TR, delta_mag_te_old)     
-            
-        !> Solve the factorized system
-        if (linsys%rank .gt. 0) then
-          linsys%A=linsys%C ! replacing A with C, to get rid of Morino Kutta effect
-          call solve_linsys(linsys)
-        end if
-        do j_el = 1, te%nte_surfpan
-          delta_pres_te_iter_old = delta_pres_te_iter
-#if USE_PRECICE
-          if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
-            !> calculate the pressure using the relative orientation matrix
-            !> upper side of the panel
-            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
-            !> lower side of the panel  
-            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
-          else !> non coupled component
-            !> upper side of the panel 
-            call te%e(1, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
-            !> lower side of the panel
-            call te%e(2, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-          endif      
-#else
-          !> upper side of the panel
-          call te%e(1, j_el)%p%compute_pres( &     
-                geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
-          !> lower side of the panel
-          call te%e(2, j_el)%p%compute_pres( &     
-                geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-#endif
-          delta_pres_te_iter(j_el) = te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres 
-        enddo
-          tol = maxval(abs(delta_pres_te_iter - delta_pres_te_iter_old)/delta_pres_te_iter_old)
-          
-          it_pan = it_pan + 1
+!      it_pan = 1 
+!      delta_pres_te_iter_old = 1.0_wp  !!!!!!!!!!
+!      tol = 1.0_wp
+!      delta_pres_te_iter=delta_pres_te
 
-        if(it_pan .eq. sim_param%kutta_maxiter) then
-          call warning('dust','dust','max iteration reached for kutta condition:&
-                      &increase kutta_maxiter!') 
-          write(message,*) 'Last iteration error: ', tol
-          call printout(message)
-        endif
-      enddo !> while 
+!      do while (tol .gt. sim_param%kutta_tol .and. it_pan .lt. sim_param%kutta_maxiter)
+!        
+!        delta_mag_te_iter = delta_mag_te - matmul(jacobi, delta_pres_te_iter)
+!        linsys%b = rhs_tmp - matmul(linsys%TL, delta_mag_te_iter) - matmul(linsys%TR, delta_mag_te_old)     
+!            
+!        !> Solve the factorized system
+!        if (linsys%rank .gt. 0) then
+!          linsys%A=linsys%C ! replacing A with C, to get rid of Morino Kutta effect
+!          call solve_linsys(linsys)
+!        end if
+!
+!        !!> update unsteady term 
+!        !!$omp parallel do private(k_el)
+!        !do k_el = 1 , sel      
+!        !  elems(k_el)%p%didou_dt = (linsys%res(k_el) - res_old(k_el)) / sim_param%dt
+!        !enddo 
+!        !!$omp end parallel do 
+!
+!        do j_el = 1, te%nte_surfpan
+!          delta_pres_te_iter_old = delta_pres_te_iter
+!#if USE_PRECICE
+!          if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
+!            !> calculate the pressure using the relative orientation matrix
+!            !> upper side of the panel
+!            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
+!            !> lower side of the panel  
+!            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
+!          else !> non coupled component
+!            !> upper side of the panel 
+!            call te%e(1, j_el)%p%compute_pres( &     
+!                  geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
+!            !> lower side of the panel
+!            call te%e(2, j_el)%p%compute_pres( &     
+!                  geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+!          endif      
+!#else
+!          !> upper side of the panel
+!          call te%e(1, j_el)%p%compute_pres( &     
+!                geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
+!          !> lower side of the panel
+!          call te%e(2, j_el)%p%compute_pres( &     
+!                geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+!#endif
+!          delta_pres_te_iter(j_el) = te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres 
+!        enddo
+!          tol = maxval(abs(delta_pres_te_iter - delta_pres_te_iter_old)/delta_pres_te_iter_old)
+!          
+!          it_pan = it_pan + 1
+!
+!        if(it_pan .eq. sim_param%kutta_maxiter) then
+!          call warning('dust','dust','max iteration reached for kutta condition:&
+!                      &increase kutta_maxiter!') 
+!          write(message,*) 'Last iteration error: ', tol
+!          call printout(message)
+!        endif
+!      enddo !> while 
 
-      delta_mag_te_old=delta_mag_te_iter
-      linsys%b = rhs_tmp !> restore the rhs for the next time iteration 
-    endif 
+!      delta_mag_te_old=delta_mag_te_iter
+!      linsys%b = rhs_tmp !> restore the rhs for the next time iteration 
+ !   endif 
 
   endif
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  !------ Compute loads -------
-! Implicit elements: vortex rings and 3d-panels
-! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
-! so far, select type() to keep the old formulation for t_surfpan and
-! use AVL formula for t_vortlatt
 #if USE_PRECICE
   !$omp parallel do private(i_el, theta_cen, R_cen)
     do i_el = 1, sel
@@ -970,6 +1063,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     end do
   !$omp end parallel do
 #else
+  
   !$omp parallel do private(i_el)
     do i_el = 1 , sel
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
@@ -978,6 +1072,58 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     end do
   !$omp end parallel do
 #endif
+
+
+!  !------ Compute loads -------
+!! Implicit elements: vortex rings and 3d-panels
+!! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
+!! so far, select type() to keep the old formulation for t_surfpan and
+!! use AVL formula for t_vortlatt
+!#if USE_PRECICE
+!  !$omp parallel do private(i_el, theta_cen, R_cen)
+!    do i_el = 1, sel
+!      ! ifort bugs workaround:
+!      ! apparently it is not possible to call polymorphic methods inside
+!      ! select cases for intel, need to call these for all elements and for the
+!      ! vortex lattices it is going to be a dummy empty function call
+!      if (geo%components(elems(i_el)%p%comp_id)%coupling) then  
+!        !> calculate the pressure using the relative orientation matrix
+!        call elems(i_el)%p%compute_pres(elems(i_el)%p%R_cen)  ! update surf_vel field too
+!      else !> non coupled component 
+!          call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+!              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+!      endif  
+!      call elems(i_el)%p%compute_dforce()      
+!    end do
+!  !$omp end parallel do
+!#else
+!  !$omp parallel do private(i_el)
+!    do i_el = 1 , sel
+!      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+!              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+!      call elems(i_el)%p%compute_dforce()  
+!    end do
+!  !$omp end parallel do
+!#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   ! ifort bugs workaround:
   ! since even if the following calls looks thread safe, they mess up with
   ! ifort and parallel runs, so the cycle is executed another time just for the
@@ -999,7 +1145,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
           !> compute dforce using AVL formula 
           call el%compute_dforce_jukowski(.true.) 
           !> update the pressure field, p = df.n / area
-
           el%pres = sum(el%dforce * el%nor)/el%area
         end select
     end do
@@ -1367,9 +1512,9 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     !> Save old solution (at the previous dt) of the linear system
     res_old = linsys%res
 
-    if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
-      delta_mag_te_old = delta_mag_te 
-    endif 
+    !if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
+    !  delta_mag_te_old = delta_mag_te 
+    !endif 
 
 
     !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx

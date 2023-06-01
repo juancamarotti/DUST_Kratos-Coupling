@@ -893,6 +893,7 @@ subroutine update_wake(wake, geo, elems, octree)
     if      ( associated(wake%pan_gen_elems(2,iw)%p) ) then
       wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag - &
                                     wake%pan_gen_elems(2,iw)%p%mag
+      !write(*,*) wake%pan_gen_elems(1,iw)%p%mag
     else if ( .not. associated(wake%pan_gen_elems(2,iw)%p) ) then
       wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag
     end if

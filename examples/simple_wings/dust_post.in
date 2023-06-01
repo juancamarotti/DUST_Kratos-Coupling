@@ -1,4 +1,4 @@
-basename = Postprocessing/post
+basename = Postprocessing/post_pan_corr
 data_basename = Output/wings
 
 analysis = {
@@ -17,7 +17,7 @@ analysis = {
 
 }
 
-analysis = {
+!analysis = {
 
 type = integral_loads
 name = loads_left
@@ -31,7 +31,7 @@ reference_tag = 0
 
 }
 
-analysis = {
+!analysis = {
 
 type = integral_loads
 name = loads_right
@@ -45,7 +45,7 @@ reference_tag = 0
 
 }
 
-analysis = {
+!analysis = {
 
 type = integral_loads
 name = loads_full
@@ -61,7 +61,7 @@ reference_tag = 0
 
 }
 
-!analysis = {
+analysis = {
   type = chordwise_loads
   name = cl01
   start_res = 1

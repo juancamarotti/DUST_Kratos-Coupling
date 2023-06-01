@@ -202,16 +202,6 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
     elems(ie)%p%mag => linsys%res(ie)
   enddo
 !$omp end parallel do
-  !write(*,*) 'linsys%TL', shape(linsys%TL) 
-  !do ie = 1, nst 
-  !  write(*,*) linsys%TL(ie, :) 
-  !enddo 
-!
-  !write(*,*) 'linsys%TR', shape(linsys%TR) 
-  !do ie = 1, nst 
-  !  write(*,*) linsys%TR(ie, :) 
-  !enddo 
-  
 
   !> all the moving part will be assembled in \ref assemble_linsys, here
   !> only the pointer to the solutions are associated
@@ -241,6 +231,11 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
         el%pres_sol => linsys%res_pres(ie)
     end select
   end do
+
+  !> debug A matrix 
+  !do ie = 1, geo%nSurfPan
+  !  write(*,*) linsys%A(ie,:) 
+  !enddo 
 
   !> Now perform a one-time LU decomposition of the static part of the system
   if (linsys%nstatic .gt. 0)  then
@@ -379,7 +374,7 @@ subroutine solve_linsys(linsys)
     if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
       !> Create the upper-diagonal block Usd
       !> Swap in place Asd to get PssAsd
-
+  
 
 #if (DUST_PRECISION==1)
     call slaswp(linsys%nmoving, &
