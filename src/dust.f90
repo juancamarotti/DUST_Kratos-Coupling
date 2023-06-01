@@ -519,7 +519,7 @@ if (sim_param%kutta_correction) then
 
   allocate(mag_pert(te%nte_surfpan,te%nte_surfpan)); mag_pert = 1.0_wp  
   allocate(rhs_tmp(size(linsys%b))); rhs_tmp = 0.0_wp 
-  allocate(A_tmp(size(linsys%A))); A_tmp = 0.0_wp 
+  allocate(A_tmp(size(linsys%A,1),size(linsys%A,1))); A_tmp = 0.0_wp 
   allocate(jacobi(te%nte_surfpan,te%nte_surfpan)); jacobi = 0.0_wp
 endif 
 
