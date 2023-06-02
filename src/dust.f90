@@ -762,11 +762,8 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
           &in init_sim_param() routine. Something went wrong. Stop')
     end if
   end if
-  !------ Compute loads -------
-! Implicit elements: vortex rings and 3d-panels
-! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
-! so far, select type() to keep the old formulation for t_surfpan and
-! use AVL formula for t_vortlatt
+
+
 #if USE_PRECICE
   !$omp parallel do private(i_el, theta_cen, R_cen)
     do i_el = 1, sel
@@ -808,8 +805,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
 
 
-
-
   ! press and mag with Morino-kutta condition, i.e. implicit wake panels, are already computed
 
 ! Unsteady Kutta Condition
@@ -828,9 +823,9 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
     rhs_tmp = linsys%b 
 
-    do i_el = 1, size(delta_mag_te_old)
-      write(*,*) 'delta_mag_te_old', delta_mag_te_old(i_el)
-    enddo
+    !do i_el = 1, size(delta_mag_te_old)
+    !  write(*,*) 'delta_mag_te_old', delta_mag_te_old(i_el)
+    !enddo
 
     !do i_el = 1, size(rhs_tmp)
     !  write(*,*) 'rhs_tmp', rhs_tmp(i_el)
@@ -846,7 +841,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       !enddo  
       !!> Solve the factorized system
       if (linsys%rank .gt. 0) then ! A matrix includes the steady kutta condition
-        !linsys%A=linsys%C ! replacing A with C, to get rid of Morino Kutta effect
         call solve_linsys(linsys)
       end if
         !$omp parallel do private(k_el)
@@ -864,26 +858,23 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     do i_el = 1, te%nte_surfpan  ! for all panel elements 
       delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
       delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
-    enddo 
-
-    do i_el = 1, te%nte_surfpan
       mag_te_tmp_upper(i_el) = te%e(1, i_el)%p%mag
       mag_te_tmp_lower(i_el) = te%e(2, i_el)%p%mag
-      !> send to the wake the average of the two values: old the one from the previous time-step, new the one from the current time-step
-      te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag + delta_mag_te_upper_old(i_el)) /2.0_wp
-      te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag + delta_mag_te_lower_old(i_el)) /2.0_wp
+      !> send to the wake the average of the two values: 
+      !> old the one from the previous time-step, new the one from the current time-step
+      !te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag + delta_mag_te_upper_old(i_el)) /2.0_wp
+      !te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag + delta_mag_te_lower_old(i_el)) /2.0_wp
     enddo 
 
-    delta_mag_te_old = delta_mag_te
+
+
 
     !do i_el = 1, size(delta_mag_te_old)
     !  write(*,*) 'delta_mag_te    ', delta_mag_te(i_el)
     !enddo  
 
-    do i_el = 1, te%nte_surfpan
-      delta_mag_te_upper_old(i_el) = mag_te_tmp_upper(i_el)
-      delta_mag_te_lower_old(i_el) = mag_te_tmp_lower(i_el)
-    enddo
+    !do i_el = 1, te%nte_surfpan
+    !enddo
     
 !    if (it .gt. sim_param%kutta_startstep) then
 !
@@ -1045,6 +1036,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
   endif
 
+
 #if USE_PRECICE
   !$omp parallel do private(i_el, theta_cen, R_cen)
     do i_el = 1, sel
@@ -1072,39 +1064,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     end do
   !$omp end parallel do
 #endif
-
-
-!  !------ Compute loads -------
-!! Implicit elements: vortex rings and 3d-panels
-!! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
-!! so far, select type() to keep the old formulation for t_surfpan and
-!! use AVL formula for t_vortlatt
-!#if USE_PRECICE
-!  !$omp parallel do private(i_el, theta_cen, R_cen)
-!    do i_el = 1, sel
-!      ! ifort bugs workaround:
-!      ! apparently it is not possible to call polymorphic methods inside
-!      ! select cases for intel, need to call these for all elements and for the
-!      ! vortex lattices it is going to be a dummy empty function call
-!      if (geo%components(elems(i_el)%p%comp_id)%coupling) then  
-!        !> calculate the pressure using the relative orientation matrix
-!        call elems(i_el)%p%compute_pres(elems(i_el)%p%R_cen)  ! update surf_vel field too
-!      else !> non coupled component 
-!          call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-!              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
-!      endif  
-!      call elems(i_el)%p%compute_dforce()      
-!    end do
-!  !$omp end parallel do
-!#else
-!  !$omp parallel do private(i_el)
-!    do i_el = 1 , sel
-!      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-!              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
-!      call elems(i_el)%p%compute_dforce()  
-!    end do
-!  !$omp end parallel do
-!#endif
 
 
 
@@ -1462,7 +1421,21 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     
     t0 = dust_time()
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+      
+      !> update the trailing edge to go into the wake  
+      if (sim_param%kutta_correction .and. it .gt. sim_param%kutta_startstep - 1) then
+        do i_el = 1, te%nte_surfpan
+          te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag + delta_mag_te_upper_old(i_el)) /2.0_wp
+          te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag + delta_mag_te_lower_old(i_el)) /2.0_wp
+        enddo
+      endif
       call update_wake(wake, geo, elems_tot, octree)
+      if (sim_param%kutta_correction .and. it .gt. sim_param%kutta_startstep - 1) then
+        do i_el = 1, te%nte_surfpan
+          te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag*2.0_wp - delta_mag_te_upper_old(i_el))
+          te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag*2.0_wp - delta_mag_te_lower_old(i_el))
+        enddo
+      endif
     end if
     t1 = dust_time()
 
@@ -1511,7 +1484,9 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     endif
     !> Save old solution (at the previous dt) of the linear system
     res_old = linsys%res
-
+    delta_mag_te_old = delta_mag_te
+    delta_mag_te_upper_old = mag_te_tmp_upper
+    delta_mag_te_lower_old = mag_te_tmp_lower
     !if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
     !  delta_mag_te_old = delta_mag_te 
     !endif 
