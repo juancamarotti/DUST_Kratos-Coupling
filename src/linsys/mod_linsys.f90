@@ -192,7 +192,8 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
       linsys%A_pres(i,j) = linsys%A( geo%idSurfPan(i) , geo%idSurfPan(j) )
     enddo
   enddo
-
+  ! preserving the A coefficient matrix before adding the wake implicit effect
+  linsys%A_wake_free = linsys%A
   !> add the wake contribution
 !$omp parallel do private(ie) firstprivate(nst)
   do ie = 1,nst
@@ -366,7 +367,7 @@ subroutine solve_linsys(linsys)
   !logical, optional, intent(in) :: vl_correction
   character(len=max_char_len)   :: msg
   character(len=*), parameter   :: this_sub_name = 'solve_linsys'
-
+ 
   if (.not. linsys%skip) then
     
     !> Operations on the side band matrices: done only if the system is
@@ -374,7 +375,6 @@ subroutine solve_linsys(linsys)
     if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
       !> Create the upper-diagonal block Usd
       !> Swap in place Asd to get PssAsd
-  
 
 #if (DUST_PRECISION==1)
     call slaswp(linsys%nmoving, &
@@ -475,6 +475,7 @@ subroutine solve_linsys(linsys)
   linsys%P(linsys%nstatic+1:linsys%rank) = &
   linsys%P(linsys%nstatic+1:linsys%rank) + linsys%nstatic
 end if
+
   !==> Solve the factorized system
   linsys%res = linsys%b
 #if (DUST_PRECISION==1)

@@ -76,7 +76,7 @@ type :: t_linsys
   real(wp), allocatable :: A(:,:)
 
   !> Linear system matrix, will not include Morino-kutta effect
-  real(wp), allocatable :: C(:,:)
+  real(wp), allocatable :: A_wake_free(:,:)
 
   !> Linear system right hand side
   real(wp), allocatable :: b(:)
