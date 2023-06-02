@@ -1484,12 +1484,13 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     endif
     !> Save old solution (at the previous dt) of the linear system
     res_old = linsys%res
-    delta_mag_te_old = delta_mag_te
-    delta_mag_te_upper_old = mag_te_tmp_upper
-    delta_mag_te_lower_old = mag_te_tmp_lower
-    !if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
-    !  delta_mag_te_old = delta_mag_te 
-    !endif 
+
+    
+    if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
+      delta_mag_te_old = delta_mag_te
+      delta_mag_te_upper_old = mag_te_tmp_upper
+      delta_mag_te_lower_old = mag_te_tmp_lower
+    endif 
 
 
     !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
