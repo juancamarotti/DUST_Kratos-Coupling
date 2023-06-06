@@ -134,16 +134,19 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
 
   !> Allocate the vectors of the right size
   allocate(linsys%A(linsys%rank, linsys%rank))
+  allocate(linsys%A_wake_free(linsys%rank, linsys%rank))
   allocate(linsys%L_static(linsys%nstatic, linsys%nstatic_expl))
   allocate(linsys%b(linsys%rank))
   allocate(linsys%P(linsys%rank))
+  allocate(linsys%P_wake_free(linsys%rank))
   allocate(linsys%b_static(linsys%nstatic,linsys%nstatic))
   allocate(linsys%res(linsys%rank))
   allocate(linsys%res_expl(linsys%n_expl,2))
   linsys%b_static = 0.0_wp
   linsys%res_expl = 0.0_wp
   linsys%P = 0
-
+  linsys%P_wake_free = 0
+  linsys%A_wake_free = 0.0_wp
   !> Pressure
   !> Set the number of surface panels
   linsys%n_sp = geo%nSurfPan
@@ -272,7 +275,23 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
         write(msg,*) 'error while factorizing the static part of the linear &
                       &system for pressure, Lapack XGETRF error code ', info
         call error(this_sub_name, this_mod_name, trim(msg))
-      end if
+      endif
+    if (sim_param%kutta_correction) then       
+#if (DUST_PRECISION==1)
+    call sgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
+                  linsys%A_wake_free(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+                  linsys%nstatic_sp, linsys%P_wake_free(1:linsys%nstatic_sp),info)
+#elif(DUST_PRECISION==2)
+    call dgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
+                  linsys%A_wake_free(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+                  linsys%nstatic_sp, linsys%P_wake_free(1:linsys%nstatic_sp),info)
+#endif /*DUST_PRECISION*/
+      if ( info .ne. 0 ) then
+        write(msg,*) 'error while factorizing the static part of the linear &
+                      &system for pressure, Lapack XGETRF error code ', info
+        call error(this_sub_name, this_mod_name, trim(msg))
+      endif
+    endif
   endif
 
 
@@ -326,14 +345,23 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, wake)
 !$omp end do
 !$omp end parallel
 
+  linsys%A_wake_free(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = &
+                      linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
+                      geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) )
+  linsys%A_wake_free(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%n_sp) = &
+                      linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
+                                              geo%idSurfPan(1:linsys%n_sp))
+  !write(*,*) 'A_wake_free', linsys%A_wake_free
   !> 3) Copy the non modified dynamic part of the matrix into the pressure one
   linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = &
                         linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
                         geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) )
   
   linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%n_sp) = &
-            linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
+                linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
                                           geo%idSurfPan(1:linsys%n_sp))
+
+  
 
   !> 4) Correct the matrix with the wake contributions
   !>    First all the static ones (passing as start and end only the dynamic part)

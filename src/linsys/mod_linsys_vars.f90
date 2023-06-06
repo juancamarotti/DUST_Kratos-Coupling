@@ -90,7 +90,7 @@ type :: t_linsys
   !> LU solvers pivot permutation matrix (in vector form)
   integer, allocatable :: P(:)
   integer, allocatable :: P_pres(:)
-
+  integer, allocatable :: P_wake_free(:) 
   !> Static part of the right hand side
   !!
   !! The right hand side contains contributions from all the surface panels.

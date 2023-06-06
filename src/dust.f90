@@ -529,31 +529,11 @@ if (sim_param%kutta_correction) then
   allocate(res_tmp(size(linsys%b))); res_tmp = 0.0_wp
   allocate(A_tmp(size(linsys%A,1),size(linsys%A,1))); A_tmp = 0.0_wp
   allocate(A_wake_free_tmp(size(linsys%A,1),size(linsys%A,1))); A_wake_free_tmp = 0.0_wp
-   
   allocate(jacobi(te%nte_surfpan,te%nte_surfpan)); jacobi = 0.0_wp
 endif 
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
-!> factorizing A_free_wake TODO optimize this part as in solve linsys  
-if (sim_param%kutta_correction) then 
-  allocate(ipiv(size(linsys%A_wake_free,1)))
-#if (DUST_PRECISION==1)
-      call sgetrf(size(linsys%A_wake_free,1),size(linsys%A_wake_free,1), &
-                  linsys%A_wake_free, &
-                  size(linsys%A_wake_free,1), ipiv, info_inverse)
-#elif (DUST_PRECISION==2)
-      call dgetrf(size(linsys%A_wake_free,1),size(linsys%A_wake_free,1), &
-                  linsys%A_wake_free, &
-                  size(linsys%A_wake_free,1), ipiv ,info_inverse)
-#endif /*DUST_PRECISION*/
-  deallocate(ipiv)
-  if (info_inverse .ne. 0) then
-    write(*,*) 'error in computing inverse of A_free_wake'
-    stop
-  endif
-endif 
-
 allocate(res_old(size(elems)))
 res_old = 0.0_wp
 
@@ -699,7 +679,7 @@ it = 1
     call assemble_linsys(linsys, geo, elems, elems_expl, wake)
     call assemble_pressure_sys(linsys, geo, elems, wake)
     t1 = dust_time()
-
+    
     if(sim_param%debug_level .ge. 1) then
       write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
       call printout(message)
@@ -721,28 +701,23 @@ it = 1
       call solve_pressure_sys(linsys)
     end if
 
+    !> factorize A_wake_free > todo move in a separate subroutine like solve_linsys (without solve)
+    if (linsys%nmoving .gt. 0) then 
+      call dgetrf(linsys%nmoving,linsys%nmoving, &
+                  linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
+                  linsys%nmoving,linsys%P_wake_free(linsys%nstatic+1:linsys%rank),info_inverse) 
+    endif 
 
-    !write(*,*) 'linsys%b'
-    !do i_el = 1, sel
-    !  write(*,*) linsys%b(i_el)
-    !enddo  
- 
-
-
+    
     !------ Solve the system ------
     t0 = dust_time()
     if (linsys%rank .gt. 0) then
       call solve_linsys(linsys)
     endif
+    
     t1 = dust_time()
 
     sel = size(elems)
-
-        !!> Solve the factorized system
-    !write(*,*) 'linsys%res'
-    !do i_el = 1, sel
-    !  write(*,*) linsys%res(i_el)
-    !enddo 
 
     !> compute dGamma_dt for unsteady contribution
 
@@ -840,9 +815,11 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
   A_tmp = linsys%A 
   res_tmp = linsys%res 
   A_wake_free_tmp = linsys%A_wake_free !> not factorized 
+  
+
 
   if (geo%nSurfPan .gt. 0 .and. sim_param%kutta_correction .and. (it .gt. sim_param%kutta_startstep - 1)) then  
-    linsys%skip = .true.  
+      
 
     if  (it .gt. sim_param%kutta_startstep) then
 
@@ -850,6 +827,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
       !!> Solve the factorized system
       if (linsys%rank .gt. 0) then ! A matrix includes the steady kutta condition
+        linsys%skip = .true.
         call solve_linsys(linsys)
       end if
       
@@ -910,7 +888,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         !> perturbation of the circulation
         mag_pert(i_el, i_el) = (1.0_wp - sim_param%kutta_beta)*(delta_mag_te(i_el)) 
 
-        !write(*,*)  'mag_pert(i_el, i_el) ', mag_pert(i_el, i_el)
         !> rhs perturbed 
         linsys%b = rhs_tmp - matmul(linsys%TL, mag_pert(i_el, :)) - matmul(linsys%TR, delta_mag_te_old)      
         
@@ -918,10 +895,10 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         !> for A_free_wake and rhs_perturbed  
         if (linsys%rank .gt. 0) then ! A matrix includes the steady kutta condition
             linsys%skip = .true.
-            linsys%A = linsys%A_wake_free 
+            linsys%A = linsys%A_wake_free
+
             call solve_linsys(linsys) 
         end if
-
         !> update unsteady term 
         !$omp parallel do private(k_el)
         do k_el = 1 , sel      
@@ -1039,8 +1016,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         endif
         
       enddo !> while 
-
-      linsys%A = A_tmp !> restore the A matrix for the next time iteration
+      
     endif !>  sim_param%kutta_startstep
 
 !> update pressure field 
@@ -1071,7 +1047,8 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     end do
   !$omp end parallel do
 #endif
-
+    linsys%skip = .false.
+    linsys%A = A_tmp !> restore the A matrix for the next time iteration
   endif !> sim_param%kutta 
 
   ! ifort bugs workaround:
