@@ -59,7 +59,7 @@ implicit none
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
           unique, infinite_plate_spline, tessellate, & 
-          vec2mat, mat2vec 
+          vec2mat, mat2vec, invmat 
 
 private
 
@@ -171,13 +171,34 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
                                   ( val_arr(:,it+1)-val_arr(:,it) )
 
     end if
-
   end do
 
 end subroutine linear_interp_array
 
 ! ----------------------------------------------------------------------
+subroutine invmat(A) 
+  real(wp), intent(inout) :: A(:,:)
+  real(wp), allocatable   :: work(:)
+  integer                 :: info
+  integer, allocatable    :: ipiv(:)
+  character(len=*), parameter :: this_sub_name= 'invmat'
 
+  !> invert the A matrix
+  allocate(ipiv(size(A,1)))
+  allocate(work(size(A,1)))
+#if (DUST_PRECISION == 1)
+  call sgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
+  call sgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
+#elif(DUST_PRECISION == 2)
+  call dgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
+  call dgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
+#endif
+  deallocate(ipiv, work) 
+
+end subroutine invmat
+
+
+! ----------------------------------------------------------------------
 subroutine compute_qr ( A , Q , R )
   real(wp) , intent(inout) ::  A(:,:)
   real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
@@ -214,9 +235,9 @@ subroutine compute_qr ( A , Q , R )
   lwork = n       ! <-- its size should be .ge. n*nb
                   ! with nb = optimal blocksize (???)
 
-#if (DUST_PRECISION==1)
+#if (DUST_PRECISION == 1)
   call sgeqrf( m , n , A , m , tau , work , lwork , info )
-#elif(DUST_PRECISION==2)
+#elif(DUST_PRECISION == 2)
   call dgeqrf( m , n , A , m , tau , work , lwork , info )
 #endif /*DUST_PRECISION*/
 
@@ -488,32 +509,14 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   enddo  
 
   ! inverse matrix (NB the inverse is overwritten into Z_r)
-  allocate(ipiv(n_r))
-  allocate(work(n_r))
-#if (DUST_PRECISION==1)
-  call sgetrf(n_r,n_r,Z_r,n_r,ipiv,info)  
-  call sgetri(n_r,Z_r,n_r,ipiv,work,n_r,info)
-#elif(DUST_PRECISION==2)
-  call dgetrf(n_r,n_r,Z_r,n_r,ipiv,info)  
-  call dgetri(n_r,Z_r,n_r,ipiv,work,n_r,info)
-#endif
-  deallocate(ipiv, work)
+  call invmat(Z_r)
 
   allocate(Y_r(4,4))  
   
   ! inverse matrix (NB the inverse is overwritten into Y_r)
   Y_r = matmul(transpose(R_r),matmul(Z_r,R_r))
   Y_r = Y_r + 1e-6_wp
-  allocate(ipiv(4))
-  allocate(work(4)) 
-#if (DUST_PRECISION==1) 
-  call sgetrf(4,4,Y_r,4,ipiv,info)
-  call sgetri(4,Y_r,4,ipiv,work,n_r,info)
-#elif(DUST_PRECISION==2)
-  call dgetrf(4,4,Y_r,4,ipiv,info)
-  call dgetri(4,Y_r,4,ipiv,work,n_r,info)
-#endif
-  deallocate(ipiv, work) 
+  call invmat(Y_r)
 
   allocate(eye(n_r,n_r))
   eye = 0.0_wp
