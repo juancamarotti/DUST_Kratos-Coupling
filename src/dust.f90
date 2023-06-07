@@ -105,7 +105,7 @@ use mod_linsys_vars, only: &
 
 use mod_linsys, only: &
   initialize_linsys, assemble_linsys, solve_linsys, destroy_linsys, &
-  dump_linsys
+  factorize_kutta, dump_linsys 
 
 use mod_pressure_equation, only: &
   dump_linsys_pres, press_normvel_der, initialize_pressure_sys, &
@@ -218,9 +218,11 @@ real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 real(wp)                          :: theta_cen(3), R_cen(3, 3) 
 
 !> Kutta correction 
-real(wp), allocatable             :: delta_pres_te(:), delta_pres_te_perturbed(:), delta_pres_te_iter(:), delta_pres_te_iter_old(:)
+real(wp), allocatable             :: delta_pres_te(:), delta_pres_te_perturbed(:) 
+real(wp), allocatable             :: delta_pres_te_iter(:), delta_pres_te_iter_old(:)
 real(wp), allocatable             :: mag_pert(:,:) 
-real(wp), allocatable             :: delta_mag_te(:), delta_mag_te_old(:), delta_mag_te_iter_old(:), delta_mag_te_iter(:)
+real(wp), allocatable             :: delta_mag_te(:), delta_mag_te_old(:) 
+real(wp), allocatable             :: delta_mag_te_iter_old(:), delta_mag_te_iter(:)
 real(wp), allocatable             :: delta_mag_te_lower_old(:), delta_mag_te_upper_old(:)
 real(wp), allocatable             :: mag_te_tmp_lower(:), mag_te_tmp_upper(:)
 real(wp)                          :: beta 
@@ -677,7 +679,7 @@ it = 1
     sel = size(elems) ! total number of elements
 
     call assemble_linsys(linsys, geo, elems, elems_expl, wake)
-    call assemble_pressure_sys(linsys, geo, elems, wake)
+    !call assemble_pressure_sys(linsys, geo, elems, wake)
     t1 = dust_time()
     
     if(sim_param%debug_level .ge. 1) then
@@ -696,19 +698,16 @@ it = 1
                               trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
     endif
 
-    !> Solve the pressure system 
-    if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
-      call solve_pressure_sys(linsys)
-    end if
+    !!> Solve the pressure system 
+    !if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
+    !  call solve_pressure_sys(linsys)
+    !end if
 
-    !> factorize A_wake_free > todo move in a separate subroutine like solve_linsys (without solve)
-    if (linsys%nmoving .gt. 0) then 
-      call dgetrf(linsys%nmoving,linsys%nmoving, &
-                  linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
-                  linsys%nmoving,linsys%P_wake_free(linsys%nstatic+1:linsys%rank),info_inverse) 
-    endif 
+    if (sim_param%kutta_correction) then  
+      call factorize_kutta(linsys) 
+    end if 
 
-    
+
     !------ Solve the system ------
     t0 = dust_time()
     if (linsys%rank .gt. 0) then
@@ -761,7 +760,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
 
 #if USE_PRECICE
-  !$omp parallel do private(i_el, theta_cen, R_cen)
+  !$omp parallel do private(i_el)
     do i_el = 1, sel
       ! ifort bugs workaround:
       ! apparently it is not possible to call polymorphic methods inside
@@ -801,7 +800,8 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     !> save the temporary values
     rhs_tmp = linsys%b 
     A_tmp = linsys%A 
-    res_tmp = linsys%res 
+    res_tmp = linsys%res
+    
     if  (it .gt. sim_param%kutta_startstep) then
 
       linsys%b = rhs_tmp - matmul(linsys%TR, delta_mag_te_old)
@@ -819,8 +819,10 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       !$omp end parallel do
 
       !> compute delta pressure at the trailing edge 
-      do j_el = 1, te%nte_surfpan
+      
 #if USE_PRECICE
+      !$omp parallel do private(j_el)
+        do j_el = 1, te%nte_surfpan
           if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
             !> calculate the pressure using the relative orientation matrix
             !> upper side of the panel
@@ -834,16 +836,21 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
             !> lower side of the panel
             call te%e(2, j_el)%p%compute_pres( &     
                   geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-          endif      
+          endif 
+        end do 
+      !$omp end parallel do      
 #else
+      !$omp parallel do private(j_el)
+        do j_el = 1, te%nte_surfpan
           !> upper side of the panel
-          call te%e(1, j_el)%p%compute_pres( &     
+            call te%e(1, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
           !> lower side of the panel
           call te%e(2, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+        end do
+      !$omp end parallel do 
 #endif    
-      enddo 
     endif 
 
     ! check i_el for multiple components   
@@ -888,8 +895,9 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         !$omp end parallel do 
         !> compute perturbed pressure at trailing edge 
 
-        do j_el = 1, te%nte_surfpan
 #if USE_PRECICE
+        !$omp parallel do private(j_el)
+          do j_el = 1, te%nte_surfpan
           if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
             !> calculate the pressure using the relative orientation matrix
             !> upper side of the panel
@@ -904,15 +912,22 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
             call te%e(2, j_el)%p%compute_pres( &     
                   geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
           endif      
+          enddo
+        !$omp end parallel do
 #else
+        !$omp parallel do private(j_el)
+          do j_el = 1, te%nte_surfpan
           !> upper side of the panel
           call te%e(1, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
           !> lower side of the panel
           call te%e(2, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+          enddo
+        !$omp end parallel do
 #endif   
-
+        !> compute the perturbed pressure difference
+        do j_el = 1, te%nte_surfpan
           delta_pres_te_perturbed(j_el) = ((te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres)) 
           jacobi(j_el, i_el) = (delta_pres_te_perturbed(j_el) - delta_pres_te(j_el))/ & 
                               (mag_pert(i_el, i_el)-delta_mag_te(i_el)) 
@@ -950,8 +965,10 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         !$omp end parallel do 
 
         !> compute perturbed pressure at trailing edge
-        do j_el = 1, te%nte_surfpan
+        
 #if USE_PRECICE
+        !$omp parallel do private(j_el)
+        do j_el = 1, te%nte_surfpan
           if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
             !> calculate the pressure using the relative orientation matrix
             !> upper side of the panel
@@ -966,17 +983,26 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
             call te%e(2, j_el)%p%compute_pres( &     
                   geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
           endif      
-#else
+        end do
+        !$omp end parallel do
+#else   
+        !$omp parallel do private(j_el)
+        do j_el = 1, te%nte_surfpan
           !> upper side of the panel
           call te%e(1, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
           !> lower side of the panel
           call te%e(2, j_el)%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+        end do
+        !$omp end parallel do
 #endif
+        !$omp parallel do private(j_el)
+        do j_el = 1, te%nte_surfpan
           delta_pres_te_iter(j_el) = (te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres) 
         enddo
-        
+        !$omp end parallel do
+
         tol = maxval(abs(delta_pres_te_iter))
         it_pan = it_pan + 1
 

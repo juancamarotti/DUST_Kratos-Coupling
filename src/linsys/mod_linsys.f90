@@ -84,7 +84,7 @@ use mod_wake, only: &
 implicit none
 
 public :: initialize_linsys, assemble_linsys, solve_linsys, &
-          destroy_linsys, dump_linsys
+          factorize_kutta, destroy_linsys, dump_linsys
 
 private
 
@@ -236,11 +236,6 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
     end select
   end do
 
-  !> debug A matrix 
-  !do ie = 1, geo%nSurfPan
-  !  write(*,*) linsys%A(ie,:) 
-  !enddo 
-
   !> Now perform a one-time LU decomposition of the static part of the system
   if (linsys%nstatic .gt. 0)  then
 #if (DUST_PRECISION==1)
@@ -391,11 +386,10 @@ end subroutine assemble_linsys
 !> factorized system is solved.
 subroutine solve_linsys(linsys)
   type(t_linsys), intent(inout) :: linsys
-  integer                       :: INFO
-  !logical, optional, intent(in) :: vl_correction
+  integer                       :: info 
   character(len=max_char_len)   :: msg
   character(len=*), parameter   :: this_sub_name = 'solve_linsys'
- 
+
   if (.not. linsys%skip) then
     
     !> Operations on the side band matrices: done only if the system is
@@ -412,7 +406,7 @@ subroutine solve_linsys(linsys)
     call dlaswp(linsys%nmoving, &
                 linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
                 linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
-#endif /*DUST_PRECISION*/
+#endif 
 
   !> Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
 #if (DUST_PRECISION==1)
@@ -425,7 +419,7 @@ subroutine solve_linsys(linsys)
                 linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
                 linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
                 linsys%nstatic)               
-#endif /*DUST_PRECISION*/
+#endif 
 
   !==>Solve the lower-diagoal block Lds
   !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
@@ -439,7 +433,7 @@ subroutine solve_linsys(linsys)
               linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
               linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
               linsys%nmoving)
-#endif /*DUST_PRECISION*/
+#endif 
 
   !> Modify the dynamic square block
   !> Modify the square block from Add to Add - Pdd-1Lds Usd
@@ -459,7 +453,7 @@ subroutine solve_linsys(linsys)
               linsys%nstatic,1.0d+0,&
               linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
               linsys%nmoving)
-#endif /*DUST_PRECISION*/
+#endif 
 
   endif
 
@@ -521,6 +515,120 @@ end if
 
 end subroutine solve_linsys
 
+!----------------------------------------------------------------------
+subroutine factorize_kutta(linsys)
+  type(t_linsys), intent(inout) :: linsys
+  integer                       :: info 
+  character(len=max_char_len)   :: msg
+  character(len=*), parameter   :: this_sub_name = 'factorize_kutta' 
+
+  if (.not. linsys%skip) then
+    !> Operations on the side band matrices: done only if the system is
+    !> mixed static/dynamic and those matrices exists
+    if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
+      !> Create the upper-diagonal block Usd
+      !> Swap in place Asd to get PssAsd
+#if (DUST_PRECISION==1)
+    call slaswp(linsys%nmoving, &
+                linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+                linsys%nstatic,1,linsys%nstatic,linsys%P_wake_free(1:linsys%nstatic),1)
+#elif (DUST_PRECISION==2)
+    call dlaswp(linsys%nmoving, &
+                linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+                linsys%nstatic,1,linsys%nstatic,linsys%P_wake_free(1:linsys%nstatic),1)
+#endif
+
+  !> Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
+#if (DUST_PRECISION==1)
+    call strsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
+                linsys%A_wake_free(1:linsys%nstatic, 1:linsys%nstatic),linsys%nstatic, &
+                linsys%A_wake_free(1:linsys%nstatic, linsys%nstatic+1:linsys%rank),    &
+                linsys%nstatic)
+#elif (DUST_PRECISION==2)
+    call dtrsm('L','L','N','U',linsys%nstatic, linsys%nmoving,1.0d+0,   &
+                linsys%A_wake_free(1:linsys%nstatic, 1:linsys%nstatic), linsys%nstatic, &
+                linsys%A_wake_free(1:linsys%nstatic, linsys%nstatic+1:linsys%rank),    &
+                linsys%nstatic)               
+#endif
+
+  !==>Solve the lower-diagoal block Lds
+  !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
+#if (DUST_PRECISION==1)
+  call strsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
+              linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic), linsys%nstatic,  &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic),    &
+              linsys%nmoving)
+#elif (DUST_PRECISION==2)
+  call dtrsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
+              linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
+              linsys%nmoving)
+#endif 
+
+  !> Modify the dynamic square block
+  !> Modify the square block from Add to Add - Pdd-1Lds Usd
+#if (DUST_PRECISION==1)
+  call sgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic), &
+              linsys%nmoving, &
+              linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+              linsys%nstatic, 1.0d+0, &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
+              linsys%nmoving)
+#elif (DUST_PRECISION==2)
+  call dgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+              linsys%nmoving, &
+              linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+              linsys%nstatic, 1.0d+0, &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank, linsys%nstatic+1:linsys%rank),&
+              linsys%nmoving)
+#endif 
+
+  endif
+
+  ! If the system has a dynamic part, factorize such part
+  if (linsys%nmoving .gt. 0) then
+    !==>Factorize and put in place the square dynamic block
+#if (DUST_PRECISION==1)
+    call sgetrf(linsys%nmoving,linsys%nmoving, &
+                linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
+                linsys%nmoving,linsys%P_wake_free(linsys%nstatic+1:linsys%rank),info)
+#elif (DUST_PRECISION==2)
+    call dgetrf(linsys%nmoving,linsys%nmoving, &
+                linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
+                linsys%nmoving,linsys%P_wake_free(linsys%nstatic+1:linsys%rank),info)
+#endif /*DUST_PRECISION*/
+
+    if ( info .ne. 0 ) then
+      write(msg,*) 'error while factorizing the dynamic  block of &
+                    &the linear system, Lapack DGETRF error code ', info
+      call error(this_sub_name, this_mod_name, trim(msg))
+    endif
+  endif
+
+  !> If the system is mixed finish the operation on the band blocks
+  if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
+  !==> Permute the lower mixed bloc
+#if (DUST_PRECISION==1)
+  call slaswp(linsys%nstatic, &
+                linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+                linsys%nmoving,1,linsys%nmoving,&
+                linsys%P_wake_free(linsys%nstatic+1:linsys%rank),1)
+#elif (DUST_PRECISION==2)
+  call dlaswp(linsys%nstatic, &
+                linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic), &
+                linsys%nmoving, 1, linsys%nmoving, &
+                linsys%P_wake_free(linsys%nstatic+1:linsys%rank), 1)
+#endif /*DUST_PRECISION*/
+  endif
+
+  !==> Fix the lower part of the permutation matrix to make it global
+  linsys%P_wake_free(linsys%nstatic+1: linsys%rank) = &
+  linsys%P_wake_free(linsys%nstatic+1: linsys%rank) + linsys%nstatic
+end if
+
+end subroutine factorize_kutta
 !----------------------------------------------------------------------
 
 !> Destructor function for the linear system
