@@ -1623,8 +1623,7 @@ subroutine load_components(geo, in_file, out_file, te)
           te%e(2,i1)%p => null()
           te%e(1,i1)%p  => geo%components(i_comp)%el(e_te(1,i1))
           if(e_te(2,i1) .gt. 0) &
-            te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1))
-            
+            te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1))            
         enddo
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te

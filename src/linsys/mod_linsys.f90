@@ -114,7 +114,7 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   type(t_expl_elem_p), intent(inout)      :: expl_elems(:)
   type(t_wake), intent(inout)             :: wake
   real(wp)                                :: rhoinf, Pinf
-  integer                                 :: ie, ntot, info, nst, i, j
+  integer                                 :: ie, ntot, n_pan_te, info, nst, i, j
   character(len=max_char_len)             :: msg
   character(len=*), parameter             :: this_sub_name = 'initialize_linsys'
 
@@ -131,7 +131,8 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   linsys%skip         = .false.
   
   ntot = linsys%rank
-
+  n_pan_te = size(wake%pan_gen_elems_id,2)
+  write(*,*) 'n_pan_te', n_pan_te
   !> Allocate the vectors of the right size
   allocate(linsys%A(linsys%rank, linsys%rank))
   allocate(linsys%A_wake_free(linsys%rank, linsys%rank))
@@ -173,8 +174,8 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) )
 
   if (sim_param%kutta_correction) then
-    allocate(linsys%TL(geo%nSurfPan, te%nte_surfpan)); linsys%TL = 0.0_wp  !!!!!!FIXME CHECK for multiple components   
-    allocate(linsys%TR(geo%nSurfPan, te%nte_surfpan)); linsys%TR = 0.0_wp  !!!!!!FIXME CHECK for multiple components   
+    allocate(linsys%TL(geo%nSurfPan, n_pan_te)); linsys%TL = 0.0_wp  !!!!!!FIXME CHECK for multiple components   
+    allocate(linsys%TR(geo%nSurfPan, n_pan_te)); linsys%TR = 0.0_wp  !!!!!!FIXME CHECK for multiple components   
   endif 
 
   nst = linsys%nstatic

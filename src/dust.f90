@@ -229,7 +229,7 @@ real(wp)                          :: beta
 real(wp), allocatable             :: rhs_tmp(:), res_tmp(:) 
 real(wp), allocatable             :: A_tmp(:,:), A_wake_free_tmp(:,:)
 real(wp), allocatable             :: jacobi(:,:)
-integer                           :: it_pan, info_inverse
+integer                           :: it_pan, info_inverse, n_pan_te 
 integer, allocatable              :: ipiv(:)
 real(wp), allocatable             :: work(:)
 
@@ -512,26 +512,27 @@ time_no_out = 0.0_wp
 time_no_out_debug = 0.0_wp
 
 if (sim_param%kutta_correction) then
-  allocate(delta_pres_te(te%nte_surfpan)); delta_pres_te = 0.0_wp
-  allocate(delta_pres_te_perturbed(te%nte_surfpan)); delta_pres_te_perturbed = 0.0_wp
-  allocate(delta_pres_te_iter(te%nte_surfpan)); delta_pres_te_iter = 0.0_wp
-  allocate(delta_pres_te_iter_old(te%nte_surfpan)); delta_pres_te_iter_old = 0.0_wp
+  n_pan_te = size(wake%pan_gen_elems_id,2) 
+  allocate(delta_pres_te(n_pan_te)); delta_pres_te = 0.0_wp
+  allocate(delta_pres_te_perturbed(n_pan_te)); delta_pres_te_perturbed = 0.0_wp
+  allocate(delta_pres_te_iter(n_pan_te)); delta_pres_te_iter = 0.0_wp
+  allocate(delta_pres_te_iter_old(n_pan_te)); delta_pres_te_iter_old = 0.0_wp
 
-  allocate(delta_mag_te(te%nte_surfpan)); delta_mag_te = 0.0_wp
-  allocate(delta_mag_te_old(te%nte_surfpan)); delta_mag_te_old = 0.0_wp
-  allocate(mag_te_tmp_upper(te%nte_surfpan)); mag_te_tmp_upper = 0.0_wp
-  allocate(mag_te_tmp_lower(te%nte_surfpan)); mag_te_tmp_lower = 0.0_wp
-  allocate(delta_mag_te_upper_old(te%nte_surfpan)); delta_mag_te_upper_old = 0.0_wp
-  allocate(delta_mag_te_lower_old(te%nte_surfpan)); delta_mag_te_lower_old = 0.0_wp
+  allocate(delta_mag_te(n_pan_te)); delta_mag_te = 0.0_wp
+  allocate(delta_mag_te_old(n_pan_te)); delta_mag_te_old = 0.0_wp
+  allocate(mag_te_tmp_upper(n_pan_te)); mag_te_tmp_upper = 0.0_wp
+  allocate(mag_te_tmp_lower(n_pan_te)); mag_te_tmp_lower = 0.0_wp
+  allocate(delta_mag_te_upper_old(n_pan_te)); delta_mag_te_upper_old = 0.0_wp
+  allocate(delta_mag_te_lower_old(n_pan_te)); delta_mag_te_lower_old = 0.0_wp
 
-  allocate(delta_mag_te_iter(te%nte_surfpan)); delta_mag_te_iter = 0.0_wp
+  allocate(delta_mag_te_iter(n_pan_te)); delta_mag_te_iter = 0.0_wp
 
-  allocate(mag_pert(te%nte_surfpan,te%nte_surfpan)); mag_pert = 1.0_wp  
+  allocate(mag_pert(n_pan_te,n_pan_te)); mag_pert = 1.0_wp  
   allocate(rhs_tmp(size(linsys%b))); rhs_tmp = 0.0_wp 
   allocate(res_tmp(size(linsys%b))); res_tmp = 0.0_wp
   allocate(A_tmp(size(linsys%A,1),size(linsys%A,1))); A_tmp = 0.0_wp
   allocate(A_wake_free_tmp(size(linsys%A,1),size(linsys%A,1))); A_wake_free_tmp = 0.0_wp
-  allocate(jacobi(te%nte_surfpan,te%nte_surfpan)); jacobi = 0.0_wp
+  allocate(jacobi(n_pan_te,n_pan_te)); jacobi = 0.0_wp
 endif 
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
@@ -822,31 +823,31 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       
 #if USE_PRECICE
       !$omp parallel do private(j_el)
-        do j_el = 1, te%nte_surfpan
+        do j_el = 1, n_pan_te
           if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
             !> calculate the pressure using the relative orientation matrix
             !> upper side of the panel
-            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
+            call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres(te%e(1, j_el)%p%R_cen) 
             !> lower side of the panel  
-            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
+            call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres(te%e(2, j_el)%p%R_cen) 
           else !> non coupled component
             !> upper side of the panel 
-            call te%e(1, j_el)%p%compute_pres( &     
+            call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
                   geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
             !> lower side of the panel
-            call te%e(2, j_el)%p%compute_pres( &     
+            call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
                   geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
           endif 
         end do 
       !$omp end parallel do      
 #else
       !$omp parallel do private(j_el)
-        do j_el = 1, te%nte_surfpan
+        do j_el = 1, n_pan_te
           !> upper side of the panel
-            call te%e(1, j_el)%p%compute_pres( &     
+            call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
                 geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
           !> lower side of the panel
-          call te%e(2, j_el)%p%compute_pres( &     
+          call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
         end do
       !$omp end parallel do 
@@ -854,11 +855,13 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     endif 
 
     ! check i_el for multiple components   
-    do i_el = 1, te%nte_surfpan  ! for all panel elements 
-      delta_mag_te(i_el) = te%e(1, i_el)%p%mag - te%e(2, i_el)%p%mag
-      delta_pres_te(i_el) = te%e(1, i_el)%p%pres - te%e(2, i_el)%p%pres
-      mag_te_tmp_upper(i_el) = te%e(1, i_el)%p%mag
-      mag_te_tmp_lower(i_el) = te%e(2, i_el)%p%mag
+    do i_el = 1, n_pan_te  ! for all panel elements 
+      delta_mag_te(i_el) = elems(wake%pan_gen_elems_id(1,i_el))%p%mag - &
+                            elems(wake%pan_gen_elems_id(2,i_el))%p%mag
+      delta_pres_te(i_el) = elems(wake%pan_gen_elems_id(1,i_el))%p%pres - &
+                            elems(wake%pan_gen_elems_id(2,i_el))%p%pres
+      mag_te_tmp_upper(i_el) = elems(wake%pan_gen_elems_id(1,i_el))%p%mag
+      mag_te_tmp_lower(i_el) = elems(wake%pan_gen_elems_id(2,i_el))%p%mag
     enddo 
 
     if (it .gt. sim_param%kutta_startstep) then
@@ -866,13 +869,13 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       !> initialize the perturbation matrix: for each columns we have the 
       !> intensities from the steady kutta condition for each trailing edge panel element 
       
-      do i_el = 1, te%nte_surfpan  ! for all panel elements 
+      do i_el = 1, n_pan_te  ! for all panel elements 
         mag_pert(i_el, :) = delta_mag_te
       enddo 
 
       !> Starting the perturbation on the diagonal terms of mag_pert 
 
-      do i_el = 1, te%nte_surfpan  ! for all panel elements 
+      do i_el = 1, n_pan_te  ! for all panel elements 
 
         !> perturbation of the circulation
         mag_pert(i_el, i_el) = (1.0_wp - sim_param%kutta_beta)*(delta_mag_te(i_el)) 
@@ -897,38 +900,39 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
 #if USE_PRECICE
         !$omp parallel do private(j_el)
-          do j_el = 1, te%nte_surfpan
-          if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
-            !> calculate the pressure using the relative orientation matrix
-            !> upper side of the panel
-            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
-            !> lower side of the panel  
-            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
-          else !> non coupled component
-            !> upper side of the panel 
-            call te%e(1, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
-            !> lower side of the panel
-            call te%e(2, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-          endif      
+          do j_el = 1, n_pan_te
+            if (geo%components(elems(wake%pan_gen_elems_id(1,j_el))%p%comp_id)%coupling) then  
+              !> calculate the pressure using the relative orientation matrix
+              !> upper side of the panel
+              call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres(te%e(1, j_el)%p%R_cen) 
+              !> lower side of the panel  
+              call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres(te%e(2, j_el)%p%R_cen) 
+            else !> non coupled component
+              !> upper side of the panel 
+              call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
+                    geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
+              !> lower side of the panel
+              call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres( &     
+                    geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+            endif      
           enddo
         !$omp end parallel do
 #else
         !$omp parallel do private(j_el)
-          do j_el = 1, te%nte_surfpan
+          do j_el = 1, n_pan_te
           !> upper side of the panel
-          call te%e(1, j_el)%p%compute_pres( &     
+          call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
                 geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
           !> lower side of the panel
-          call te%e(2, j_el)%p%compute_pres( &     
+          call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
           enddo
         !$omp end parallel do
 #endif   
         !> compute the perturbed pressure difference
-        do j_el = 1, te%nte_surfpan
-          delta_pres_te_perturbed(j_el) = ((te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres)) 
+        do j_el = 1, n_pan_te
+          delta_pres_te_perturbed(j_el) = ((elems(wake%pan_gen_elems_id(1,j_el))%p%pres - & 
+                                            elems(wake%pan_gen_elems_id(2,j_el))%p%pres)) 
           jacobi(j_el, i_el) = (delta_pres_te_perturbed(j_el) - delta_pres_te(j_el))/ & 
                               (mag_pert(i_el, i_el)-delta_mag_te(i_el)) 
         enddo
@@ -968,38 +972,39 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         
 #if USE_PRECICE
         !$omp parallel do private(j_el)
-        do j_el = 1, te%nte_surfpan
-          if (geo%components(te%e(1, j_el)%p%comp_id)%coupling) then  
-            !> calculate the pressure using the relative orientation matrix
-            !> upper side of the panel
-            call te%e(1, j_el)%p%compute_pres(te%e(1, j_el)%p%R_cen) 
-            !> lower side of the panel  
-            call te%e(2, j_el)%p%compute_pres(te%e(2, j_el)%p%R_cen) 
-          else !> non coupled component
-            !> upper side of the panel 
-            call te%e(1, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
-            !> lower side of the panel
-            call te%e(2, j_el)%p%compute_pres( &     
-                  geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
-          endif      
-        end do
+          do j_el = 1, n_pan_te
+            if (geo%components(elems(wake%pan_gen_elems_id(1,j_el))%p%comp_id)%coupling) then  
+              !> calculate the pressure using the relative orientation matrix
+              !> upper side of the panel
+              call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres(te%e(1, j_el)%p%R_cen) 
+              !> lower side of the panel  
+              call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres(te%e(2, j_el)%p%R_cen) 
+            else !> non coupled component
+              !> upper side of the panel 
+              call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
+                    geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
+              !> lower side of the panel
+              call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres( &     
+                    geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
+            endif      
+          enddo
         !$omp end parallel do
 #else   
         !$omp parallel do private(j_el)
-        do j_el = 1, te%nte_surfpan
+        do j_el = 1, n_pan_te
           !> upper side of the panel
-          call te%e(1, j_el)%p%compute_pres( &     
+          call elems(wake%pan_gen_elems_id(1,j_el))%p%compute_pres( &     
                 geo%refs(geo%components(te%e(1, j_el)%p%comp_id)%ref_id)%R_g)
           !> lower side of the panel
-          call te%e(2, j_el)%p%compute_pres( &     
+          call elems(wake%pan_gen_elems_id(2,j_el))%p%compute_pres( &     
                 geo%refs(geo%components(te%e(2, j_el)%p%comp_id)%ref_id)%R_g)
         end do
         !$omp end parallel do
 #endif
         !$omp parallel do private(j_el)
-        do j_el = 1, te%nte_surfpan
-          delta_pres_te_iter(j_el) = (te%e(1, j_el)%p%pres - te%e(2, j_el)%p%pres) 
+        do j_el = 1, n_pan_te
+          delta_pres_te_iter(j_el) = (elems(wake%pan_gen_elems_id(1,j_el))%p%pres - &
+                                      elems(wake%pan_gen_elems_id(2,j_el))%p%pres) 
         enddo
         !$omp end parallel do
 
@@ -1384,9 +1389,11 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       !> update the trailing edge to go into the wake (average)
       if (sim_param%kutta_correction .and. it .gt. sim_param%kutta_startstep - 1) then
         !$omp parallel do private(i_el)
-          do i_el = 1, te%nte_surfpan
-            te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag + delta_mag_te_upper_old(i_el))/2.0_wp
-            te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag + delta_mag_te_lower_old(i_el))/2.0_wp
+          do i_el = 1, n_pan_te
+            elems(wake%pan_gen_elems_id(1,i_el))%p%mag  = (elems(wake%pan_gen_elems_id(1,i_el))%p%mag + &
+                                                            delta_mag_te_upper_old(i_el))/2.0_wp
+            elems(wake%pan_gen_elems_id(2,i_el))%p%mag  = (elems(wake%pan_gen_elems_id(2,i_el))%p%mag + &
+                                                            delta_mag_te_lower_old(i_el))/2.0_wp
           enddo
         !$omp end parallel do
       endif
@@ -1396,9 +1403,11 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       !> restore the trailing edge to its original intensity 
       if (sim_param%kutta_correction .and. it .gt. sim_param%kutta_startstep - 1) then
         !$omp parallel do private(i_el)
-          do i_el = 1, te%nte_surfpan
-            te%e(1, i_el)%p%mag  = (te%e(1, i_el)%p%mag*2.0_wp - delta_mag_te_upper_old(i_el))
-            te%e(2, i_el)%p%mag  = (te%e(2, i_el)%p%mag*2.0_wp - delta_mag_te_lower_old(i_el))
+          do i_el = 1, n_pan_te
+            elems(wake%pan_gen_elems_id(1,i_el))%p%mag  = (elems(wake%pan_gen_elems_id(1,i_el))%p%mag*2.0_wp - &
+                                                            delta_mag_te_upper_old(i_el))
+            elems(wake%pan_gen_elems_id(2,i_el))%p%mag  = (elems(wake%pan_gen_elems_id(2,i_el))%p%mag*2.0_wp - &
+                                                            delta_mag_te_lower_old(i_el))
           enddo
         !$omp end parallel do
       endif

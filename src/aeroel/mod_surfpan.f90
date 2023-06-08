@@ -515,15 +515,14 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
 
   if (sim_param%kutta_correction) then
     do j1 = 1 , n_impl
-      ind1 = impl_wake_ind(1,j1); 
+      ind1 = impl_wake_ind(1,j1)
       ind2 = impl_wake_ind(2,j1)
       if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-        (ind2.ge.ista .and. ind2.le.iend)) then
+          (ind2.ge.ista .and. ind2.le.iend)) then
         !todo: find a more elegant solution to avoid i=j
         call wake_elems(j1)%p%compute_linear_pot(TL, TR, this%cen, 1, 2 ) 
         linsys%TL(ie, j1) = TL 
         linsys%TR(ie, j1) = TR  
-        
         linsys%A(ie,ind1) = linsys%A(ie,ind1) + TL
         linsys%A(ie,ind2) = linsys%A(ie,ind2) - TL
       endif
