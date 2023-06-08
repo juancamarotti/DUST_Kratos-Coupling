@@ -49,7 +49,7 @@
 module mod_math
 
 use mod_param, only: &
-  wp, eps
+  wp, eps, max_char_len
 
 use mod_handling, only: &
   error, warning
@@ -176,25 +176,71 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 end subroutine linear_interp_array
 
 ! ----------------------------------------------------------------------
-subroutine invmat(A) 
-  real(wp), intent(inout) :: A(:,:)
-  real(wp), allocatable   :: work(:)
-  integer                 :: info
-  integer, allocatable    :: ipiv(:)
-  character(len=*), parameter :: this_sub_name= 'invmat'
+subroutine invmat(A, n, nb)
+  integer, intent(in)                     :: n   ! n is the A size 
+  integer, intent(in)                     :: nb  ! nb is the non_zero block size
+  real(wp), intent(inout)                 :: A(n,n)
+  
+  integer                                 :: info
+  real(wp)                                :: work(n)
+  integer                                 :: i, j, i1, i2, j1, j2
+  real(wp), allocatable                   :: A11(:,:)
+  integer, allocatable                    :: ipiv2(:)
+  
+  character(len=max_char_len)             :: msg
+  character(len=*), parameter             :: this_sub_name = 'invmat'
+  !> Compute the inverse of the non-zero blocks of the matrix
+  allocate(A11(nb,nb)); A11 = 0.0_wp
+  allocate(ipiv2(nb)); ipiv2 = 0
+  
+  do i = 1, n, nb
+    do j = 1, n, nb
+      i1 = i
+      i2 = min(i+nb-1, n)
+      j1 = j
+      j2 = min(j+nb-1, n)      
+      !> Extract the non-zero block
+      A11(:,:) = 0.0_wp
+      if (any(A(i1:i2, j1:j2) /= 0.0_wp)) then
+        A11(1:i2-i1+1, 1:j2-j1+1) = A(i1:i2, j1:j2)
+        !> Factorize the non-zero block
+#if (DUST_PRECISION==1)
+        call sgetrf(nb, nb, A11, nb, ipiv2, info)
+        if (info /= 0) then
+          write(msg,*) 'sgetrf failed with info = ', info
+          call error(this_sub_name, this_mod_name, trim(msg))
+        end if
+#elif(DUST_PRECISION==2)
+        call dgetrf(nb, nb, A11, nb, ipiv2, info)
+        if (info /= 0) then
+          write(msg,*) 'dgetrf failed with info = ', info
+          call error(this_sub_name, this_mod_name, trim(msg))
+        end if
+#endif /*DUST_PRECISION*/
 
-  !> invert the A matrix
-  allocate(ipiv(size(A,1)))
-  allocate(work(size(A,1)))
-#if (DUST_PRECISION == 1)
-  call sgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
-  call sgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
-#elif(DUST_PRECISION == 2)
-  call dgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
-  call dgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
-#endif
-  deallocate(ipiv, work) 
-
+      !> Compute the inverse of the non-zero block
+#if (DUST_PRECISION==1)
+        call sgetri(nb, A11, nb, ipiv2, work, nb, info)
+        if (info /= 0) then
+          write(msg,*) 'sgetri failed with info = ', info
+          call error(this_sub_name, this_mod_name, trim(msg))
+        end if
+#elif(DUST_PRECISION==2)
+        call dgetri(nb, A11, nb, ipiv2, work, nb, info)
+        if (info /= 0) then
+          write(msg,*) 'dgetri failed with info = ', info
+          call error(this_sub_name, this_mod_name, trim(msg)) 
+        end if
+#endif /*DUST_PRECISION*/
+        
+        !> Update the matrix with the inverse of the non-zero block
+        A(i1:i2, j1:j2) = A11(1:i2-i1+1, 1:j2-j1+1)
+      end if 
+    end do
+  end do
+  
+  !> Free the memory
+  deallocate(A11, ipiv2)
 end subroutine invmat
 
 
@@ -466,8 +512,7 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   
   integer                               :: n_r, n_i, i, j
   real(wp), allocatable                 :: R_r(:,:), R_i(:,:), Z_r(:,:), Z_ir(:,:), Y_r(:,:)
-  real(wp), allocatable                 :: ipiv(:), work(:), eye(:,:)
-  integer                               :: info                     
+  real(wp), allocatable                 :: eye(:,:)                    
   real(wp)                              :: nrm 
   
   n_r = size(pos_ref,2)
@@ -509,14 +554,14 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   enddo  
 
   ! inverse matrix (NB the inverse is overwritten into Z_r)
-  call invmat(Z_r)
+  call invmat(Z_r, size(Z_r,1), size(Z_r,1))
 
   allocate(Y_r(4,4))  
   
   ! inverse matrix (NB the inverse is overwritten into Y_r)
   Y_r = matmul(transpose(R_r),matmul(Z_r,R_r))
   Y_r = Y_r + 1e-6_wp
-  call invmat(Y_r)
+  call invmat(Y_r, size(Y_r,1), size(Y_r,1))
 
   allocate(eye(n_r,n_r))
   eye = 0.0_wp

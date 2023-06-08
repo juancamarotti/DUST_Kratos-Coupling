@@ -143,6 +143,8 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   allocate(linsys%b_static(linsys%nstatic,linsys%nstatic))
   allocate(linsys%res(linsys%rank))
   allocate(linsys%res_expl(linsys%n_expl,2))
+  linsys%A = 0.0_wp
+  linsys%b = 0.0_wp 
   linsys%b_static = 0.0_wp
   linsys%res_expl = 0.0_wp
   linsys%P = 0
@@ -174,8 +176,8 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) )
 
   if (sim_param%kutta_correction) then
-    allocate(linsys%TL(geo%nSurfPan, n_pan_te)); linsys%TL = 0.0_wp  !!!!!!FIXME CHECK for multiple components   
-    allocate(linsys%TR(geo%nSurfPan, n_pan_te)); linsys%TR = 0.0_wp  !!!!!!FIXME CHECK for multiple components   
+    allocate(linsys%TL(linsys%rank, n_pan_te)); linsys%TL = 0.0_wp     
+    allocate(linsys%TR(linsys%rank, n_pan_te)); linsys%TR = 0.0_wp     
   endif 
 
   nst = linsys%nstatic
@@ -197,7 +199,11 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
     enddo
   enddo
   ! preserving the A coefficient matrix before adding the wake implicit effect
+  
   linsys%A_wake_free = linsys%A
+  do i = 1, linsys%rank
+    write(*,*) linSys%A_wake_free(i,:)
+  enddo 
   !> add the wake contribution
 !$omp parallel do private(ie) firstprivate(nst)
   do ie = 1,nst
@@ -240,12 +246,12 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   !> Now perform a one-time LU decomposition of the static part of the system
   if (linsys%nstatic .gt. 0)  then
 #if (DUST_PRECISION==1)
-  call sgetrf(linsys%nstatic,linsys%nstatic, &
-                linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+  call sgetrf(linsys%nstatic, linsys%nstatic, &
+                linsys%A(1:linsys%nstatic,1:linsys%nstatic), linsys%nstatic, &
                 linsys%P(1:linsys%nstatic),info)
 #elif(DUST_PRECISION==2)
   call dgetrf(linsys%nstatic,linsys%nstatic, &
-                linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+                linsys%A(1:linsys%nstatic,1:linsys%nstatic), linsys%nstatic, &
                 linsys%P(1:linsys%nstatic),info)
 #endif /*DUST_PRECISION*/
   
@@ -272,24 +278,23 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
                       &system for pressure, Lapack XGETRF error code ', info
         call error(this_sub_name, this_mod_name, trim(msg))
       endif
-    if (sim_param%kutta_correction) then       
+    endif 
+    if (sim_param%kutta_correction .and. geo%nSurfPan .gt. 0 .and. linsys%nstatic .gt. 0) then       
 #if (DUST_PRECISION==1)
-    call sgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
-                  linsys%A_wake_free(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
-                  linsys%nstatic_sp, linsys%P_wake_free(1:linsys%nstatic_sp),info)
+    call sgetrf(linsys%nstatic, linsys%nstatic, &
+                  linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic), &
+                  linsys%nstatic, linsys%P_wake_free(1:linsys%nstatic),info)
 #elif(DUST_PRECISION==2)
-    call dgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
-                  linsys%A_wake_free(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
-                  linsys%nstatic_sp, linsys%P_wake_free(1:linsys%nstatic_sp),info)
+    call dgetrf(linsys%nstatic, linsys%nstatic, &
+                  linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic), &
+                  linsys%nstatic, linsys%P_wake_free(1:linsys%nstatic),info)
 #endif /*DUST_PRECISION*/
       if ( info .ne. 0 ) then
         write(msg,*) 'error while factorizing the static part of the linear &
                       &system for pressure, Lapack XGETRF error code ', info
         call error(this_sub_name, this_mod_name, trim(msg))
       endif
-    endif
-  endif
-
+    endif 
 
 end subroutine initialize_linsys
 
@@ -341,13 +346,26 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, wake)
 !$omp end do
 !$omp end parallel
 
-  linsys%A_wake_free(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = &
-                      linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
-                      geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) )
-  linsys%A_wake_free(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%n_sp) = &
-                      linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
-                                              geo%idSurfPan(1:linsys%n_sp))
-  !write(*,*) 'A_wake_free', linsys%A_wake_free
+  write(*,*) 'linsys%nstatic', linsys%nstatic 
+  write(*,*) 'linsys%rank', linsys%rank
+
+  if (sim_param%kutta_correction .and. geo%nSurfPan .gt. 0) then
+    !if (linsys%nstatic .gt. 0) then !mixed components 
+      linsys%A_wake_free(1:linsys%nstatic, linsys%nstatic+1:linsys%rank) = &
+                        linsys%A(1:linsys%nstatic, linsys%nstatic+1:linsys%rank)
+      linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic) = &
+                        linsys%A(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic)
+      linsys%A_wake_free(linsys%nstatic+1:linsys%rank, linsys%nstatic+1:linsys%rank)  = & 
+                      linsys%A(linsys%nstatic+1:linsys%rank, linsys%nstatic+1:linsys%rank)
+    !else 
+      !linsys%A_wake_free = linsys%A 
+    !endif 
+  endif 
+
+  !write(*,*) 'A_wake_free'
+  do ie = 1, linsys%rank
+    write(*,*) linsys%A_wake_free(ie,:)
+  enddo
   !> 3) Copy the non modified dynamic part of the matrix into the pressure one
   linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = &
                         linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
@@ -524,11 +542,13 @@ subroutine factorize_kutta(linsys)
   character(len=*), parameter   :: this_sub_name = 'factorize_kutta' 
 
   if (.not. linsys%skip) then
+    
     !> Operations on the side band matrices: done only if the system is
     !> mixed static/dynamic and those matrices exists
     if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
       !> Create the upper-diagonal block Usd
       !> Swap in place Asd to get PssAsd
+
 #if (DUST_PRECISION==1)
     call slaswp(linsys%nmoving, &
                 linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
@@ -536,28 +556,28 @@ subroutine factorize_kutta(linsys)
 #elif (DUST_PRECISION==2)
     call dlaswp(linsys%nmoving, &
                 linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
-                linsys%nstatic,1,linsys%nstatic,linsys%P_wake_free(1:linsys%nstatic),1)
-#endif
+                linsys%nstatic, 1, linsys%nstatic, linsys%P_wake_free(1:linsys%nstatic),1)
+#endif 
 
   !> Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
 #if (DUST_PRECISION==1)
     call strsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
-                linsys%A_wake_free(1:linsys%nstatic, 1:linsys%nstatic),linsys%nstatic, &
-                linsys%A_wake_free(1:linsys%nstatic, linsys%nstatic+1:linsys%rank),    &
+                linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+                linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
                 linsys%nstatic)
 #elif (DUST_PRECISION==2)
-    call dtrsm('L','L','N','U',linsys%nstatic, linsys%nmoving,1.0d+0,   &
-                linsys%A_wake_free(1:linsys%nstatic, 1:linsys%nstatic), linsys%nstatic, &
-                linsys%A_wake_free(1:linsys%nstatic, linsys%nstatic+1:linsys%rank),    &
+    call dtrsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
+                linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+                linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
                 linsys%nstatic)               
-#endif
+#endif 
 
   !==>Solve the lower-diagoal block Lds
   !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
 #if (DUST_PRECISION==1)
   call strsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
-              linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic), linsys%nstatic,  &
-              linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic),    &
+              linsys%A_wake_free(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
               linsys%nmoving)
 #elif (DUST_PRECISION==2)
   call dtrsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
@@ -570,19 +590,19 @@ subroutine factorize_kutta(linsys)
   !> Modify the square block from Add to Add - Pdd-1Lds Usd
 #if (DUST_PRECISION==1)
   call sgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
-              linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic), &
-              linsys%nmoving, &
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+              linsys%nmoving,&
               linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
-              linsys%nstatic, 1.0d+0, &
+              linsys%nstatic,1.0d+0,&
               linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
               linsys%nmoving)
 #elif (DUST_PRECISION==2)
   call dgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
               linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
-              linsys%nmoving, &
+              linsys%nmoving,&
               linsys%A_wake_free(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
-              linsys%nstatic, 1.0d+0, &
-              linsys%A_wake_free(linsys%nstatic+1:linsys%rank, linsys%nstatic+1:linsys%rank),&
+              linsys%nstatic,1.0d+0,&
+              linsys%A_wake_free(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
               linsys%nmoving)
 #endif 
 
@@ -618,15 +638,15 @@ subroutine factorize_kutta(linsys)
                 linsys%P_wake_free(linsys%nstatic+1:linsys%rank),1)
 #elif (DUST_PRECISION==2)
   call dlaswp(linsys%nstatic, &
-                linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic), &
-                linsys%nmoving, 1, linsys%nmoving, &
-                linsys%P_wake_free(linsys%nstatic+1:linsys%rank), 1)
+                linsys%A_wake_free(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+                linsys%nmoving,1,linsys%nmoving,&
+                linsys%P_wake_free(linsys%nstatic+1:linsys%rank),1)
 #endif /*DUST_PRECISION*/
   endif
 
   !==> Fix the lower part of the permutation matrix to make it global
-  linsys%P_wake_free(linsys%nstatic+1: linsys%rank) = &
-  linsys%P_wake_free(linsys%nstatic+1: linsys%rank) + linsys%nstatic
+  linsys%P_wake_free(linsys%nstatic+1:linsys%rank) = &
+  linsys%P_wake_free(linsys%nstatic+1:linsys%rank) + linsys%nstatic
 end if
 
 end subroutine factorize_kutta

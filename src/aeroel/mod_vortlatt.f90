@@ -292,6 +292,7 @@ subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
   integer :: j1, ind1, ind2
   real(wp) :: a, b
   integer :: n_impl
+  real (wp) :: TR, TL
 
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
@@ -299,27 +300,23 @@ subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
   !Add the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
   !ones since are at the beginning of the list
-  do j1 = 1 , n_impl
-    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-
+  do j1 = 1, n_impl
+    ind1 = impl_wake_ind(1,j1) 
+    ind2 = impl_wake_ind(2,j1)
     if ((ind1.ge.ista .and. ind1.le.iend)) then
-
       call wake_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
-
       linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
-      if ( ind2 .ne. 0 ) linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
-
+      if ( ind2 .ne. 0 ) then 
+        linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
+      endif 
     endif
   end do
 
   ! Add the explicit vortex panel wake contribution to the rhs
   do j1 = n_impl+1 , size(wake_elems)
-
     call wake_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
-
-  linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
-  
-end do
+    linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
+  end do
 
 end subroutine add_wake_vortlatt
 

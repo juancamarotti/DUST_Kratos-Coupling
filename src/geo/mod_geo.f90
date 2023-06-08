@@ -1617,7 +1617,7 @@ subroutine load_components(geo, in_file, out_file, te)
       if (.not.allocated(te%e) ) then ! it should be enough
         allocate(te%e    (2,ne_te) )
         te%nte_surfpan = n_e_te_panel  !> number of panels in the trailing edge 
-        write(*,*)  'te%nte_surfpan', te%nte_surfpan
+        !write(*,*)  'te%nte_surfpan', te%nte_surfpan
         do i1 = 1,ne_te
           te%e(1,i1)%p => null()
           te%e(2,i1)%p => null()

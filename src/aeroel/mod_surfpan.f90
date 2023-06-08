@@ -495,7 +495,7 @@ end subroutine build_row_static_surfpan
 subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
                             ie, ista, iend)
   class(t_surfpan), intent(inout) :: this
-  type(t_pot_elem_p), intent(in)      :: wake_elems(:)
+  type(t_pot_elem_p), intent(in)  :: wake_elems(:)
   integer, intent(in)             :: impl_wake_ind(:,:)
   type(t_linsys), intent(inout)   :: linsys
   integer, intent(in)             :: ie
@@ -506,6 +506,7 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   real(wp) :: a, b
   integer :: n_impl
   real (wp) :: TR, TL 
+
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
 
@@ -527,31 +528,25 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
         linsys%A(ie,ind2) = linsys%A(ie,ind2) - TL
       endif
     end do
-    else 
-      do j1 = 1 , n_impl
-        ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-        if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-            (ind2.ge.ista .and. ind2.le.iend)) then
-
-          !todo: find a more elegant solution to avoid i=j
-          call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
-          linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
-          linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
-
-        endif
-      
-      end do
-    endif
+  else !> old formulation (with constant potential)
+    do j1 = 1 , n_impl
+      ind1 = impl_wake_ind(1,j1)
+      ind2 = impl_wake_ind(2,j1)
+      if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+          (ind2.ge.ista .and. ind2.le.iend)) then
+        !todo: find a more elegant solution to avoid i=j
+        call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+        linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
+        linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
+      endif
+    end do
+  endif
 
   ! Add the explicit vortex panel wake contribution to the rhs
   do j1 = n_impl+1 , size(wake_elems)
-
     !todo: find a more elegant solution to avoid i=j
     call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
-
   end do
 
 end subroutine add_wake_surfpan
@@ -581,12 +576,9 @@ subroutine add_expl_surfpan(this, expl_elems, linsys, &
 
   !Dynamic part: compute the things now
   do j1 = ista , iend
-
     !todo: find a more elegant solution to avoid i=j
     call expl_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
     linsys%b(ie) = linsys%b(ie) - a*expl_elems(j1)%p%mag
-
   end do
 
 end subroutine add_expl_surfpan
@@ -897,9 +889,12 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
 
   ! inverse Cls ----
   det_cls = Cls_tilde(1,1) * Cls_tilde(2,2) - Cls_tilde(1,2) * Cls_tilde(2,1)
-  iCls_tilde(1,1) =  Cls_tilde(2,2) / det_cls ; iCls_tilde(1,2) = -Cls_tilde(1,2) / det_cls
-  iCls_tilde(2,1) = -Cls_tilde(2,1) / det_cls ; iCls_tilde(2,2) =  Cls_tilde(1,1) / det_cls
-
+  if (det_cls .eq. 0.0_wp) then
+    iCls_tilde = 0.0_wp
+  else
+    iCls_tilde(1,1) =  Cls_tilde(2,2) / det_cls ; iCls_tilde(1,2) = -Cls_tilde(1,2) / det_cls
+    iCls_tilde(2,1) = -Cls_tilde(2,1) / det_cls ; iCls_tilde(2,2) =  Cls_tilde(1,1) / det_cls
+  endif 
   if ( .not. allocated(this%chtls_stencil) ) then
     allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
   end if
