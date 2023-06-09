@@ -774,7 +774,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       end if
     end if
   end if
-  !write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
   !> VL correction 
   sim_param%vl_tol                        = getreal(prms, 'vl_tol')
   sim_param%vl_relax                      = getreal(prms, 'vl_relax')
@@ -850,7 +849,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     
     if(countoption(prms,'gust_front_speed') .gt. 0) then
       sim_param%gust_front_speed          = getreal(prms, 'gust_front_speed')
-      write(*,*) 'sim_param%gust_front_speed', sim_param%gust_front_speed
     else
       sim_param%gust_front_speed          = norm2(sim_param%u_inf)
     end if

@@ -1385,7 +1385,6 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5_al(    o_te,           'o_te', te_loc)
         call read_hdf5_al(    t_te,           't_te', te_loc)
         
-        !write(*,*) 'n_e_te_panel', n_e_te_panel 
         if(check_dset_hdf5('scale_te',te_loc)) then
           call read_hdf5(scale_te, 'scale_te',te_loc)
         else
@@ -1617,7 +1616,6 @@ subroutine load_components(geo, in_file, out_file, te)
       if (.not.allocated(te%e) ) then ! it should be enough
         allocate(te%e    (2,ne_te) )
         te%nte_surfpan = n_e_te_panel  !> number of panels in the trailing edge 
-        !write(*,*)  'te%nte_surfpan', te%nte_surfpan
         do i1 = 1,ne_te
           te%e(1,i1)%p => null()
           te%e(2,i1)%p => null()

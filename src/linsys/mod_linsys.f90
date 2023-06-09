@@ -132,7 +132,6 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   
   ntot = linsys%rank
   n_pan_te = size(wake%pan_gen_elems_id,2)
-  write(*,*) 'n_pan_te', n_pan_te
   !> Allocate the vectors of the right size
   allocate(linsys%A(linsys%rank, linsys%rank))
   allocate(linsys%A_wake_free(linsys%rank, linsys%rank))
@@ -201,9 +200,6 @@ subroutine initialize_linsys(linsys, geo, te, elems, expl_elems, wake )
   ! preserving the A coefficient matrix before adding the wake implicit effect
   
   linsys%A_wake_free = linsys%A
-  do i = 1, linsys%rank
-    write(*,*) linSys%A_wake_free(i,:)
-  enddo 
   !> add the wake contribution
 !$omp parallel do private(ie) firstprivate(nst)
   do ie = 1,nst

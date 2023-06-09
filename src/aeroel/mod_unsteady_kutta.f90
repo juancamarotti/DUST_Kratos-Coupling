@@ -46,7 +46,48 @@
 
 module mod_unsteady_kutta
 
+use mod_param, only: &
+  wp , nl, &
+  prev_tri , next_tri , &
+  prev_qua , next_qua , &
+  pi, max_char_len
 
+use mod_handling, only: &
+  error, warning, printout
+
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
+use mod_doublet, only: &
+  potential_calc_doublet , &
+  velocity_calc_doublet  , &
+  gradient_calc_doublet  , & 
+  linear_potential_calc_doublet
+
+use mod_linsys_vars, only: &
+  t_linsys
+
+use mod_sim_param, only: &
+  t_sim_param, sim_param
+
+use mod_math, only: &
+  cross , compute_qr
+
+use mod_wind, only: &
+  variable_wind
+
+implicit none
+
+public :: initialize_unsteady_kutta
+
+private
+
+contains 
+
+subroutine initialize_unsteady_kutta
+
+end subroutine initialize_unsteady_kutta
 
 
 
