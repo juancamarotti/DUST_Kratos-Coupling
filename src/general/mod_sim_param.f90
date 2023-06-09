@@ -300,6 +300,7 @@ type t_sim_param
   real(wp)  :: kutta_tol
   integer   :: kutta_maxiter
   integer   :: kutta_startstep
+  integer   :: kutta_update_jacobian
 
   !> PreCICE
 #if USE_PRECICE
@@ -444,6 +445,7 @@ subroutine create_param_main(prms)
   call prms%CreateRealOption('kutta_tol', 'tolerance for kutta condition', '1.0e-6') 
   call prms%CreateIntOption('kutta_maxiter', 'maximum number of iterations for kutta condition', '100')
   call prms%CreateIntOption('kutta_start_step', 'step in which the kutta condition starts', '1') 
+  call prms%CreateIntOption('kutta_update_jacobian', 'step frequency where the Jacobian is updated', '1')   
   
   !> Octree and multipole data 
   call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -792,7 +794,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%kutta_tol                     = getreal(prms, 'kutta_tol')
   sim_param%kutta_maxiter                 = getint(prms, 'kutta_maxiter')
   sim_param%kutta_startstep               = getint(prms, 'kutta_start_step') 
-
+  sim_param%kutta_update_jacobian         = getint(prms,'kutta_update_jacobian')
   !> Octree and FMM parameters
   sim_param%use_fmm                       = getlogical(prms, 'fmm')
 

@@ -889,9 +889,10 @@ end if
     enddo 
 #if USE_PRECICE 
     !update jacobian only at the first iteration
-    if (it .gt. sim_param%kutta_startstep .and. it_precice .eq. 1) then 
+    if ((it .eq. sim_param%kutta_startstep .or. mod(it, sim_param%kutta_update_jacobian) .eq. 0) & 
+        .and. it_precice .eq. 1 ) then 
 #else
-    if (it .gt. sim_param%kutta_startstep) then 
+    if (it .eq. sim_param%kutta_startstep .or. mod(it, sim_param%kutta_update_jacobian) .eq. 0) then 
 #endif 
       !> initialize the perturbation matrix: for each columns we have the 
       !> intensities from the steady kutta condition for each trailing edge panel element 
@@ -979,8 +980,9 @@ end if
       enddo
       !> inverse of jacobian matrix (only the non zero part is inverted, the rest is zero) 
       call invmat(jacobi, size(jacobi,1), nzero)
-    endif 
+    endif !> update jacobi matrix
 
+    !> Newton Raphson iteration to get the new circulation/pressure difference
     if (it .gt. sim_param%kutta_startstep) then 
       !> Newton-Raphson iteration to get the new circulation 
       it_pan = 1 
