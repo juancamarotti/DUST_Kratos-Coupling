@@ -149,6 +149,7 @@ module mod_stripe
     procedure, pass(this) :: get_vel_ctr_pt           => get_vel_ctr_pt_stripe
     procedure, pass(this) :: calc_geo_data            => calc_geo_data_stripe
     !> Dummy for intel workaround
+    procedure, pass(this) :: compute_linear_pot       => compute_linear_pot_stripe
     procedure, pass(this) :: compute_vel              => compute_vel_dummy
     procedure, pass(this) :: build_row                => build_row_stripe
     procedure, pass(this) :: build_row_static         => build_row_static_stripe
@@ -537,6 +538,15 @@ module mod_stripe
     integer , intent(in) :: i,j
 
   end subroutine compute_pot_stripe
+
+  subroutine compute_linear_pot_stripe(this, TL, TR, pos,i,j)
+    class(t_stripe), intent(inout) :: this
+    real(wp), intent(out) :: TL
+    real(wp), intent(out) :: TR
+    real(wp), intent(in) :: pos(:)
+    integer , intent(in) :: i,j
+
+  end subroutine compute_linear_pot_stripe
 
   subroutine compute_psi_stripe(this, A, b, pos, nor, i, j )
     class(t_stripe), intent(inout) :: this

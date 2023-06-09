@@ -1161,8 +1161,6 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
         if ( trim(hinge_node_subset) .eq. 'range' ) then
           id_1 = getint(coupling_prs,'coupling_node_first')
           id_2 = getint(coupling_prs,'coupling_node_last' )
-          !write(*,*) 'id_1' , ID_1
-          !write(*,*) 'id_2' , ID_2
            ! *** to do *** add some checks on node numbering ???
 
           allocate( hinges(i) % coupling_nodes( id_2-id_1+1 ) )

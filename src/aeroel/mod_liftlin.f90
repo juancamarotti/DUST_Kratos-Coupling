@@ -127,6 +127,7 @@ type, extends(c_expl_elem) :: t_liftlin
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
+  procedure, pass(this) :: compute_linear_pot      => compute_linear_pot_liftlin
   procedure, pass(this) :: compute_vel      => compute_vel_liftlin
   procedure, pass(this) :: compute_grad     => compute_grad_liftlin
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
@@ -176,6 +177,21 @@ subroutine compute_pot_liftlin (this, A, b, pos,i,j)
 
 end subroutine compute_pot_liftlin
 
+
+!> Compute the linear potential due to a lifting line
+!! (DUMMY ROUTINE)
+!! this subroutine employs doublets  to calculate
+!! the AIC of a lifting line on a surface panel, adding the contribution
+!! to an equation for the potential.
+subroutine compute_linear_pot_liftlin (this, TL, TR, pos,i,j)
+  class(t_liftlin), intent(inout) :: this
+  real(wp), intent(out) :: TL
+  real(wp), intent(out) :: TR
+  real(wp), intent(in) :: pos(:)
+  integer , intent(in) :: i,j
+
+
+end subroutine compute_linear_pot_liftlin
 !----------------------------------------------------------------------
 
 !> Compute the velocity due to a lifting line

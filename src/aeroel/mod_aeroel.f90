@@ -201,6 +201,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   contains
 
   procedure(i_compute_pot)   , deferred, pass(this) :: compute_pot
+  procedure(i_compute_linear_pot)   , deferred, pass(this) :: compute_linear_pot
   procedure(i_compute_psi)   , deferred, pass(this) :: compute_psi
   procedure(i_compute_pres)  , deferred, pass(this) :: compute_pres
   procedure(i_compute_dforce), deferred, pass(this) :: compute_dforce
@@ -397,6 +398,24 @@ abstract interface
   end subroutine
 end interface
 
+
+!> Compute the linear potential induced by an aerodinamic element in a certain
+!! position
+!!
+!! The structure of the subroutine is already intended to be used to calculate
+!! the contribution to the linear system matrix and to the right hand side
+!! for an equation for the potential
+abstract interface
+  subroutine i_compute_linear_pot(this, TL, TR, pos,i,j)
+    import                            :: c_pot_elem, wp, t_linsys
+    implicit none
+    class(c_pot_elem), intent(inout)  :: this
+    real(wp), intent(out)             :: TL
+    real(wp), intent(out)             :: TR
+    real(wp), intent(in)              :: pos(:)
+    integer , intent(in)              :: i, j
+  end subroutine
+end interface
 !----------------------------------------------------------------------
 
 !> Compute the velocity induced by an aerodynamic element in a certain
