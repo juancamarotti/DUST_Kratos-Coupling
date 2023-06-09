@@ -346,26 +346,15 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, wake)
 !$omp end do
 !$omp end parallel
 
-  write(*,*) 'linsys%nstatic', linsys%nstatic 
-  write(*,*) 'linsys%rank', linsys%rank
-
   if (sim_param%kutta_correction .and. geo%nSurfPan .gt. 0) then
-    !if (linsys%nstatic .gt. 0) then !mixed components 
       linsys%A_wake_free(1:linsys%nstatic, linsys%nstatic+1:linsys%rank) = &
                         linsys%A(1:linsys%nstatic, linsys%nstatic+1:linsys%rank)
       linsys%A_wake_free(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic) = &
                         linsys%A(linsys%nstatic+1:linsys%rank, 1:linsys%nstatic)
       linsys%A_wake_free(linsys%nstatic+1:linsys%rank, linsys%nstatic+1:linsys%rank)  = & 
                       linsys%A(linsys%nstatic+1:linsys%rank, linsys%nstatic+1:linsys%rank)
-    !else 
-      !linsys%A_wake_free = linsys%A 
-    !endif 
   endif 
 
-  !write(*,*) 'A_wake_free'
-  do ie = 1, linsys%rank
-    write(*,*) linsys%A_wake_free(ie,:)
-  enddo
   !> 3) Copy the non modified dynamic part of the matrix into the pressure one
   linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = &
                         linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
@@ -374,8 +363,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, wake)
   linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%n_sp) = &
                 linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
                                           geo%idSurfPan(1:linsys%n_sp))
-
-  
 
   !> 4) Correct the matrix with the wake contributions
   !>    First all the static ones (passing as start and end only the dynamic part)

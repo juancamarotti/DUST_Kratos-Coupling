@@ -292,7 +292,6 @@ subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
   integer :: j1, ind1, ind2
   real(wp) :: a, b
   integer :: n_impl
-  real (wp) :: TR, TL
 
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
