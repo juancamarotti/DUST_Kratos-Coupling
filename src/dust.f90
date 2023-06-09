@@ -226,7 +226,7 @@ real(wp), allocatable             :: delta_mag_te_iter(:)
 real(wp), allocatable             :: delta_mag_te_lower_old(:), delta_mag_te_upper_old(:)
 real(wp), allocatable             :: mag_te_tmp_lower(:), mag_te_tmp_upper(:)
 real(wp), allocatable             :: rhs_tmp(:), res_tmp(:) 
-real(wp), allocatable             :: A_tmp(:,:), A_wake_free_tmp(:,:)
+real(wp), allocatable             :: A_tmp(:,:)
 real(wp), allocatable             :: jacobi(:,:)
 integer                           :: it_pan, n_pan_te, nzero 
 
@@ -251,6 +251,7 @@ type(t_octree)                    :: octree
   logical                         :: precice_convergence
   integer                         :: j
   real(wp)                        :: sum_force(3)
+  integer                         :: it_precice = 0
 #endif
 
 
@@ -378,7 +379,7 @@ call finalizeParameters(prms)
   call precice%initialize_mesh( geo )
   call precice%initialize_fields()
   call precicef_initialize(precice%dt_precice)
-  call precice%update_elems(geo, elems_tot, te ) ! TEST
+  call precice%update_elems(geo, elems_tot, te ) 
 #endif
 
 !> Initialization 
@@ -521,14 +522,12 @@ if (sim_param%kutta_correction) then
   allocate(mag_te_tmp_lower(n_pan_te)); mag_te_tmp_lower = 0.0_wp
   allocate(delta_mag_te_upper_old(n_pan_te)); delta_mag_te_upper_old = 0.0_wp
   allocate(delta_mag_te_lower_old(n_pan_te)); delta_mag_te_lower_old = 0.0_wp
-
   allocate(delta_mag_te_iter(n_pan_te)); delta_mag_te_iter = 0.0_wp
 
   allocate(mag_pert(n_pan_te,n_pan_te)); mag_pert = 1.0_wp  
   allocate(rhs_tmp(size(linsys%b))); rhs_tmp = 0.0_wp 
   allocate(res_tmp(size(linsys%b))); res_tmp = 0.0_wp
   allocate(A_tmp(size(linsys%A,1),size(linsys%A,1))); A_tmp = 0.0_wp
-  allocate(A_wake_free_tmp(size(linsys%A,1),size(linsys%A,1))); A_wake_free_tmp = 0.0_wp
   allocate(jacobi(n_pan_te,n_pan_te)); jacobi = 0.0_wp
   !> get block size of the non-zero jacobian matrix
   nzero = 0
@@ -573,6 +572,7 @@ it = 1
     call init_timestep(time)
 
 #if USE_PRECICE
+      it_precice = it_precice + 1
       precice_convergence = .false.
     end if
 #endif
@@ -682,7 +682,6 @@ it = 1
     !>-------------- Assemble the system ------
     t0 = dust_time()
     sel = size(elems) ! total number of elements
-
     call assemble_linsys(linsys, geo, elems, elems_expl, wake)
     !call assemble_pressure_sys(linsys, geo, elems, wake)
     t1 = dust_time()
@@ -712,23 +711,19 @@ it = 1
     if (linsys%rank .gt. 0) then
       call solve_linsys(linsys)
     endif
-    
     t1 = dust_time()
-
-    sel = size(elems)
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
+      call printout(message)
+    endif
 
     !> compute dGamma_dt for unsteady contribution
-
 !$omp parallel do private(i_el)
     do i_el = 1 , sel
       elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
     end do
 !$omp end parallel do
 
-if(sim_param%debug_level .ge. 1) then
-  write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
-  call printout(message)
-endif
 
 !debug print of the results
 if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
@@ -892,9 +887,12 @@ end if
         mag_te_tmp_lower(i_el) = elems(wake%pan_gen_elems_id(2,i_el))%p%mag
       endif 
     enddo 
-
-    if (it .gt. sim_param%kutta_startstep) then
-
+#if USE_PRECICE 
+    !update jacobian only at the first iteration
+    if (it .gt. sim_param%kutta_startstep .and. it_precice .eq. 1) then 
+#else
+    if (it .gt. sim_param%kutta_startstep) then 
+#endif 
       !> initialize the perturbation matrix: for each columns we have the 
       !> intensities from the steady kutta condition for each trailing edge panel element 
       
@@ -979,10 +977,11 @@ end if
         linsys%A = A_tmp 
       endif
       enddo
-      
       !> inverse of jacobian matrix (only the non zero part is inverted, the rest is zero) 
       call invmat(jacobi, size(jacobi,1), nzero)
-      
+    endif 
+
+    if (it .gt. sim_param%kutta_startstep) then 
       !> Newton-Raphson iteration to get the new circulation 
       it_pan = 1 
       tol = sim_param%kutta_tol + 1.0e-6_wp
@@ -1344,6 +1343,7 @@ end if
         end if
       end do
       call precicef_mark_action_fulfilled( precice%read_it_checkp )
+      it_precice = it_precice + 1
     else ! else contains everything down to the end of the time cycle (l. 1310)
       !> timestep converged
       precice_convergence = .true.
@@ -1530,6 +1530,8 @@ end if
       
       !> Update n. time step
       it = it + 1
+      !> reset it_precice counter 
+      it_precice = 0
     endif ! End of the if statement that check whether the timestep
           ! has converged or not (l. 1115)
 #endif
