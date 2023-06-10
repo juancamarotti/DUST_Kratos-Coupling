@@ -17,7 +17,7 @@ analysis = {
 }
 
 
-Analysis = {
+analysis = {
 
 Type = integral_loads
 Name = wing
@@ -31,7 +31,6 @@ Reference_Tag = 0
 }
 
 analysis = {
-
     type = sectional_loads
     name = sl01
     start_res = 1
@@ -45,7 +44,6 @@ analysis = {
 }
 
 analysis = {
-
     type = sectional_loads
     name = sl02
     start_res = 1
@@ -56,6 +54,34 @@ analysis = {
     component = Wing__02
     axis_nod = (/ 0.0, 0.0, 0.0 /)
     axis_dir = (/ 0.0, 1.0, 0.0 /)
+}
 
-    
+analysis = {
+  type = chordwise_loads
+  name = cl01
+  start_res = 1
+  end_res = 100
+  step_res = 1
+  format = dat
+  average = F  
+  component = Wing__01
+  n_station  = 2
+  span_station = (/2., 4./) 
+  axis_nod = (/ 0.0, 0.0, 0.0 /)
+  axis_dir = (/ 0.0, 1.0, 0.0 /)
+}
+
+analysis = {
+  type = chordwise_loads
+  name = cl02
+  start_res = 1
+  end_res = 100
+  step_res = 1
+  format = dat
+  average = F  
+  component = Wing__02
+  n_station  = 2
+  span_station = (/2., 4./) 
+  axis_nod = (/ 0.0, 0.0, 0.0 /)
+  axis_dir = (/ 0.0, 1.0, 0.0 /)
 }
