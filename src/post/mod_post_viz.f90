@@ -125,6 +125,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   integer(h5loc)                                            :: floc , ploc
   logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
   logical                                                   :: out_wake, out_surfvel, out_vrad
+  logical                                                   :: out_dforce, out_dmom
   logical                                                   :: out_turbvisc
   logical                                                   :: separate_wake
   integer                                                   :: n_var , i_var
@@ -142,6 +143,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
   real(wp), allocatable                                     :: refs_R(:,:,:), refs_off(:,:)
   real(wp), allocatable                                     :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
+  real(wp), allocatable                                     :: force(:,:), moment(:,:)
   real(wp), allocatable                                     :: wvort(:)
 
   type(t_output_var), allocatable                           :: out_vars(:), ave_out_vars(:)
@@ -174,9 +176,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_cp       = isInList('cp'       ,          var_names)
   out_turbvisc = isInList('turbulent_viscosity',var_names)
   out_vrad     = isInList('vortex_rad',         var_names)
+  out_dforce   = isInList('force',              var_names)  
+  out_dmom     = isInList('moment',            var_names)
 
   nprint = 0; nprint_w = 0
-
   if(out_vort)  nprint = nprint+1
   if(out_vort_vec)  nprint = nprint+1
   if(out_cp)    nprint = nprint+1
@@ -185,7 +188,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_press) nprint = nprint+1  !<--- *** TODO ***
   if(out_turbvisc) nprint = nprint+1
   if(out_vrad) nprint = nprint+1
-  
+  if(out_dforce) nprint = nprint+1
+  if(out_dmom) nprint = nprint+1
+
   allocate(out_vars(nprint))
   if(average) allocate(ave_out_vars(nprint))
   !for the wake
@@ -198,12 +203,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   ! Load the components (just once)
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 
-
   call load_components_postpro(comps, points, nelem, floc, &
-                               components_names, all_comp)
+                                components_names, all_comp)
 
   call close_hdf5_file(floc)
-
 
   if(out_wake .and. average) call error(this_sub_name, this_mod_name, &
   'Cannot output an averaged wake visualization. Remove the wake or avoid &
@@ -229,13 +232,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     call read_hdf5(rho,'rho_inf',ploc)
     call close_hdf5_group(ploc)
 
-    ! Load the references
+    !> Load the references
     call load_refs(floc,refs_R,refs_off)
 
-    ! Move the points
+    !> Move the points
     call update_points_postpro(comps, points, refs_R, refs_off, &
-                               filen = trim(filename) )
-    !expand the actuator disks
+                                filen = trim(filename) )
+    !> Expand the actuator disks
     call expand_actdisk_postpro(comps, points, points_exp, elems)
     if(average .and. it .eq. an_avg) then
       ! Save the points of this iteration for the average visualization
@@ -243,12 +246,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         points_ave = points
     endif
 
-    !Load the results ! TODO: check this routine and the content of the files to be read
-    ! TODO : compute the missing quantities
+    ! Load the results 
     if(out_surfvel) then
-      call load_res(floc, comps, vort, press, t, surfvel)
+      call load_res(floc, comps, vort, press, t, force, moment, surfvel)
     else
-      call load_res(floc, comps, vort, press, t)
+      call load_res(floc, comps, vort, press, t, force, moment)
     endif
 
     !Prepare the variable for output
@@ -281,7 +283,14 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       call add_output_var(out_vars(i_var), press, 'Pressure',.false.)
       i_var = i_var +1
     endif
-
+    if(out_dforce) then 
+      call add_output_var(out_vars(i_var), force, 'Force',.false.)
+      i_var = i_var +1
+    endif
+    if(out_dmom) then 
+      call add_output_var(out_vars(i_var), moment, 'Moment',.false.)
+      i_var = i_var +1
+    endif
     
     if(average) then
       if( ires .eq. 1) then
@@ -304,7 +313,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
                             vpvort_v, v_rad, vpturbvisc)
         else
-          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, vpvort_v, v_rad)
+          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
+                              vpvort_v, v_rad)
         endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
@@ -372,6 +382,20 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                   'VortexRad',.true.)
           i_var = i_var +1
         endif
+        if (out_dforce) then 
+          call add_output_var(out_vars_w(i_var), force, &
+                              'Force',.true.)
+          call add_output_var(out_vars_vp(i_var), force, &
+                              'Force',.true.)
+          i_var = i_var +1
+        endif
+        if (out_dmom) then 
+          call add_output_var(out_vars_w(i_var), moment, &
+                              'Moment', .true.)
+          call add_output_var(out_vars_vp(i_var), moment, &
+                              'Moment',.true.)
+          i_var = i_var +1
+        endif 
         
         !Output the results (with wake)
         select case (trim(out_frmt))
@@ -429,7 +453,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     if (allocated(surfvel) ) deallocate(surfvel)
     if (allocated(vel    ) ) deallocate(vel  )
     if (allocated(cp     ) ) deallocate(cp   )
-
+    if (allocated(v_rad  ) ) deallocate(v_rad)
+    if (allocated(vpturbvisc)) deallocate(vpturbvisc)
+    if (allocated(force  ) ) deallocate(force)
+    if (allocated(moment)) deallocate(moment)
 
   end do ! Time loop
 

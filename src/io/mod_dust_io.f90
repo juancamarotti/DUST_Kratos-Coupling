@@ -142,7 +142,7 @@ subroutine save_status(geo, wake,  it, time, run_id)
   real(wp), allocatable             :: turbvisc(:), v_rad(:)
   real(wp), allocatable             :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
   real(wp), allocatable             :: vort_v(:,:)
-  integer, allocatable              :: conn_pe(:)
+  integer,  allocatable             :: conn_pe(:)
   real(wp), allocatable             :: ori(:,:)
   !LL data
   real(wp), allocatable             :: alpha(:), vel_2d(:), vel_outplane(:)
