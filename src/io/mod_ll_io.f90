@@ -552,7 +552,6 @@ function spacing_weights ( itype, i, n ) result(w)
 
   case default ! uniform
     w = real(i,wp) / real(n,wp)
-    write(*,*) w
   end select
 
 end function spacing_weights

@@ -805,8 +805,13 @@ subroutine init_theta(this, t)
   end if
 
   call this % update_theta( t )
-
-  this%theta_old = 0.0_wp
+  
+  if ( trim(this%input_type) .eq. 'function:const' ) then
+    this%theta_old = this%theta
+  else
+    this%theta_old = 0.0_wp
+  end if
+  !this%theta_old = 0.0_wp
 
 
 end subroutine init_theta

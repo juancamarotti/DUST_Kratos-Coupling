@@ -180,16 +180,16 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_dmom     = isInList('moment',            var_names)
 
   nprint = 0; nprint_w = 0
-  if(out_vort)  nprint = nprint+1
+  if(out_vort)      nprint = nprint+1
   if(out_vort_vec)  nprint = nprint+1
-  if(out_cp)    nprint = nprint+1
+  if(out_cp)        nprint = nprint+1
   if(out_surfvel)   nprint = nprint+1
-  if(out_vel)   nprint = nprint+1  !<--- *** TODO ***
-  if(out_press) nprint = nprint+1  !<--- *** TODO ***
-  if(out_turbvisc) nprint = nprint+1
-  if(out_vrad) nprint = nprint+1
-  if(out_dforce) nprint = nprint+1
-  if(out_dmom) nprint = nprint+1
+  if(out_vel)       nprint = nprint+1  
+  if(out_press)     nprint = nprint+1  
+  if(out_turbvisc)  nprint = nprint+1
+  if(out_vrad)      nprint = nprint+1
+  if(out_dforce)    nprint = nprint+1
+  if(out_dmom)      nprint = nprint+1 
 
   allocate(out_vars(nprint))
   if(average) allocate(ave_out_vars(nprint))
