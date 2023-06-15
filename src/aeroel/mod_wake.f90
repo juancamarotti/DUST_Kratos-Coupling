@@ -980,7 +980,7 @@ subroutine update_wake(wake, geo, elems, octree)
   do id = 1,wake%ndisks
     np = wake%rin_gen_elems(id)%p%n_ver
     points(:,ip:ip+np-1,1) = wake%rin_gen_elems(id)%p%ver
-    ip = ip+np
+    ip = ip + np
   enddo
 
   !Then store the old points of the rest of the wake (the shift forward
@@ -990,7 +990,7 @@ subroutine update_wake(wake, geo, elems, octree)
     do id = 1,wake%ndisks
       np = wake%wake_rings(id,ir)%n_ver
       points(:,ip:ip+np-1,ir+1) = wake%wake_rings(id,ir)%ver(:,:)
-      ip = ip+np
+      ip = ip + np
     enddo
   enddo
 
@@ -1021,7 +1021,7 @@ subroutine update_wake(wake, geo, elems, octree)
     do id = 1,wake%ndisks
       np = wake%wake_rings(id,ir)%n_ver
       points_end_ring(:,ip:ip+np-1) = wake%wake_rings(id,ir)%ver(:,:)
-      ip = ip+np
+      ip = ip + np
     enddo
     ! calculate velocity and evolve them
     do ip = 1,wake%np_row

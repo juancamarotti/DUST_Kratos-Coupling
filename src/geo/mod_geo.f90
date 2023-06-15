@@ -1065,9 +1065,9 @@ subroutine load_components(geo, in_file, out_file, te)
 
       !> Overwrite moving,
       !>> if n_hinges .gt. 0
-      ! *** to do *** avoid moving = .true. if hinge_input is constant
+      !  avoid moving = .true. if hinge_input is constant
       if ( n_hinges .gt. 0 )  geo%components(i_comp)%moving = .true.
-      !>> if coupling = .true.
+
       if ( comp_coupling )  geo%components(i_comp)%moving = .true.
 
       ! ====== READING =====
@@ -1172,10 +1172,17 @@ subroutine load_components(geo, in_file, out_file, te)
 
         call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, 'Hinge_Rotation_Input'    , hiloc)
 
+        if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'function:const' ) then
+          geo%components(i_comp)%moving = .false.
+        else
+          geo%components(i_comp)%moving = .true.
+        endif
+
         !> Actual input only for input_type = function:..., otherwise dummy inputs
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
+        
 
         if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
@@ -2369,20 +2376,20 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
   logical, intent(in) :: time_cycle
 
   real(wp), allocatable :: rr_hinge_contig(:,:)
-  integer :: i_comp, ie, ih
+  integer :: i_comp, ie, ih, i_el
 
   !> Update all the references
   call update_all_references(geo%refs,t)
 
   do i_comp = 1,size(geo%components)
     associate(comp => geo%components(i_comp))
-
+      
       !> Update only rigid components, or update at first timestep
       ! *** to do *** quite a dirty implementation
       if ( ( .not. comp%coupling ) .or. update_static ) then
-
+        
         if (comp%moving .or. update_static) then
-
+          
           !> store %nor at previous time step, for moving, used few lines
           ! below to evaluate unit normal time derivative dn_dt
           if ( .not. update_static ) then
@@ -2450,7 +2457,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
       ! - hinge node orientation (unit vectors h,v,n)
       ! - hinge rotation angle, theta
       ! for non-coupled components only (so far)
-      if ( .not. comp%coupling ) then
+      if ( (.not. comp%coupling) ) then
         
         !> hinge nodes, points and orientation
         call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
@@ -2461,9 +2468,13 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
         !> Allocating contiguous array to pass to %hinge_deflection procedure
         allocate(rr_hinge_contig(3,size(comp%i_points)))
         rr_hinge_contig = geo%points(:, comp%i_points)
-
-        call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
+        
+        if (comp%moving .or. update_static) then 
+          call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
+        endif
+        
         geo%points(:, comp%i_points) = rr_hinge_contig
+        
         deallocate(rr_hinge_contig)
 
       else
