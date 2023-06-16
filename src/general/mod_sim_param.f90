@@ -430,7 +430,7 @@ subroutine create_param_main(prms)
   call prms%CreateIntOption('vl_maxiter', &
                             &'Maximum number of iteration in VL algorithm', '100')
   call prms%CreateRealOption('vl_tol', 'Tolerance for the absolute error on lift coefficient in &
-                            &fixed point iteration for VL','1.0e-3' )
+                            &fixed point iteration for VL','1.0e-2' )
   call prms%CreateIntOption('vl_start_step', &
                             &'Step in which the VL correction start', '0')
   call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
@@ -442,7 +442,7 @@ subroutine create_param_main(prms)
   !> kutta correction parameters
   call prms%CreateLogicalOption('kutta_correction', 'Employ kutta condition', 'F') 
   call prms%CreateRealOption('kutta_beta', 'perturbation factor for kutta condition', '0.01') 
-  call prms%CreateRealOption('kutta_tol', 'tolerance for kutta condition', '1.0e-6') 
+  call prms%CreateRealOption('kutta_tol', 'tolerance for kutta condition', '1.0e-4') 
   call prms%CreateIntOption('kutta_maxiter', 'maximum number of iterations for kutta condition', '100')
   call prms%CreateIntOption('kutta_start_step', 'step in which the kutta condition starts', '1') 
   call prms%CreateIntOption('kutta_update_jacobian', 'step frequency where the Jacobian is updated', '1')   

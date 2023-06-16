@@ -1303,13 +1303,14 @@ end subroutine read_airfoil
 !-------------------------------------------------------------------------------
 subroutine define_division(type_mesh, nelem, division)
 
-  real(wp), intent(out) :: division(:)
-  integer, intent(in) :: nelem
+  real(wp), intent(out)        :: division(:)
+  integer, intent(in)          :: nelem
   character(len=*), intent(in) :: type_mesh
-
-  real(wp) :: step
-  integer :: iPoint
-
+  
+  real(wp)                     :: step
+  integer                      :: iPoint
+  character(len=*), parameter  :: this_sub_name = 'define_division'
+  
   division = 0.0_wp
   step = 1.0_wp/(real(nelem,wp) + 1e-12_wp)
 
@@ -1331,7 +1332,8 @@ subroutine define_division(type_mesh, nelem, division)
       division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
   case default
-    ! TODO: error in this case
+    call error(this_sub_name, this_mod_name, 'Incorrect input: &
+        & type_chord must be equal to uniform, cosine, cosineLE, cosineTE')
   end select
 
 end subroutine define_division
