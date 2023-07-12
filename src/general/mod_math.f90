@@ -176,71 +176,98 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 end subroutine linear_interp_array
 
 ! ----------------------------------------------------------------------
-subroutine invmat(A, n, nb)
+subroutine invmat(A, n)
   integer, intent(in)                     :: n   ! n is the A size 
-  integer, intent(in)                     :: nb  ! nb is the non_zero block size
   real(wp), intent(inout)                 :: A(n,n)
   
-  integer                                 :: info
+  integer                                 :: info, nb
   real(wp)                                :: work(n)
-  integer                                 :: i, j, i1, i2, j1, j2
-  real(wp), allocatable                   :: A11(:,:)
-  integer, allocatable                    :: ipiv2(:)
+  integer                                 :: i1, i2, j1, j2
+  real(wp), allocatable                   :: Anz(:,:)
+  integer, allocatable                    :: ipiv(:)
   
   character(len=max_char_len)             :: msg
   character(len=*), parameter             :: this_sub_name = 'invmat'
   !> Compute the inverse of the non-zero blocks of the matrix
-  allocate(A11(nb,nb)); A11 = 0.0_wp
-  allocate(ipiv2(nb)); ipiv2 = 0
+  !> Has to explore whole matrix because it could be banded, ex:
+  !> |0101|
+  !> |0000|
+  !> |0101|
+  !> 
   
-  do i = 1, n, nb
-    do j = 1, n, nb
-      i1 = i
-      i2 = min(i+nb-1, n)
-      j1 = j
-      j2 = min(j+nb-1, n)      
-      !> Extract the non-zero block
-      A11(:,:) = 0.0_wp
-      if (any(A(i1:i2, j1:j2) /= 0.0_wp)) then
-        A11(1:i2-i1+1, 1:j2-j1+1) = A(i1:i2, j1:j2)
-        !> Factorize the non-zero block
+  ! (i1,j1) and (i2,j2) are the extremes of the non-zero block
+  i2 = 0
+  j2 = 0
+  
+  do i1 = 1,n
+      do j1 = 1,n
+        ! check if we are still inside a previous block
+        if(j1 .gt. j2+1 .or. i1 .gt. i2+1) then
+          if (abs(A(i1,j1)) .ge. 1e-16_wp) then
+            i2 = i1
+            
+            ! find the end of the block
+            do while(abs(A(i2,j1)) .ge. 1e-16_wp .and. i2 .lt. n)
+              i2 = i2 + 1
+            enddo
+            j2 = j1
+            do while(abs(A(i2-1,j2)) .ge. 1e-16_wp .and. j2 .lt. n)
+              j2 = j2 + 1
+            enddo
+        
+            if (i2 .ne. n) i2 = i2-1
+            if (j2 .ne. n) j2 = j2-1
+            nb = i2-i1+1
+            
+            allocate(Anz(nb,nb)); Anz = 0.0_wp
+            ! extract the block
+            Anz = A(i1:i2,j1:j2)
+            allocate(ipiv(nb)); ipiv = 0
+ 
+            !> Factorize the block
 #if (DUST_PRECISION==1)
-        call sgetrf(nb, nb, A11, nb, ipiv2, info)
-        if (info /= 0) then
-          write(msg,*) 'sgetrf failed with info = ', info
-          call error(this_sub_name, this_mod_name, trim(msg))
-        end if
+            call sgetrf(nb, nb, Anz, nb, ipiv, info)
+            if (info /= 0) then
+              write(msg,*) 'sgetrf failed with info = ', info
+              call error(this_sub_name, this_mod_name, trim(msg))
+            end if
 #elif(DUST_PRECISION==2)
-        call dgetrf(nb, nb, A11, nb, ipiv2, info)
-        if (info /= 0) then
-          write(msg,*) 'dgetrf failed with info = ', info
-          call error(this_sub_name, this_mod_name, trim(msg))
-        end if
+            call dgetrf(nb, nb, Anz, nb, ipiv, info)
+            if (info /= 0) then
+              write(msg,*) 'dgetrf failed with info = ', info
+              call error(this_sub_name, this_mod_name, trim(msg))
+            end if
 #endif /*DUST_PRECISION*/
 
-      !> Compute the inverse of the non-zero block
+            !> Compute the inverse of the non-zero block
 #if (DUST_PRECISION==1)
-        call sgetri(nb, A11, nb, ipiv2, work, nb, info)
-        if (info /= 0) then
-          write(msg,*) 'sgetri failed with info = ', info
-          call error(this_sub_name, this_mod_name, trim(msg))
-        end if
+            call sgetri(nb, Anz, nb, ipiv, work, nb, info)
+            if (info /= 0) then
+              write(msg,*) 'sgetri failed with info = ', info
+              call error(this_sub_name, this_mod_name, trim(msg))
+            end if
 #elif(DUST_PRECISION==2)
-        call dgetri(nb, A11, nb, ipiv2, work, nb, info)
-        if (info /= 0) then
-          write(msg,*) 'dgetri failed with info = ', info
-          call error(this_sub_name, this_mod_name, trim(msg)) 
-        end if
+            call dgetri(nb, Anz, nb, ipiv, work, nb, info)
+            if (info /= 0) then
+              write(msg,*) 'dgetri failed with info = ', info
+              call error(this_sub_name, this_mod_name, trim(msg)) 
+            end if
 #endif /*DUST_PRECISION*/
         
-        !> Update the matrix with the inverse of the non-zero block
-        A(i1:i2, j1:j2) = A11(1:i2-i1+1, 1:j2-j1+1)
-      end if 
-    end do
-  end do
-  
-  !> Free the memory
-  deallocate(A11, ipiv2)
+            !> Update the matrix with the inverse of the non-zero block
+            A(i1:i2, j1:j2) = Anz
+            
+            deallocate(Anz)  
+            deallocate(ipiv)      
+          endif
+        
+        ! skip because still inside a previous block
+        else
+          cycle
+        endif
+          
+      enddo !j1
+  enddo !i1
 end subroutine invmat
 
 
@@ -554,14 +581,14 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   enddo  
 
   ! inverse matrix (NB the inverse is overwritten into Z_r)
-  call invmat(Z_r, size(Z_r,1), size(Z_r,1))
+  call invmat(Z_r, size(Z_r,1))
 
   allocate(Y_r(4,4))  
   
   ! inverse matrix (NB the inverse is overwritten into Y_r)
   Y_r = matmul(transpose(R_r),matmul(Z_r,R_r))
   Y_r = Y_r + 1e-6_wp
-  call invmat(Y_r, size(Y_r,1), size(Y_r,1))
+  call invmat(Y_r, size(Y_r,1))
 
   allocate(eye(n_r,n_r))
   eye = 0.0_wp

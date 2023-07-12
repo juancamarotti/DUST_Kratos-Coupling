@@ -228,7 +228,7 @@ real(wp), allocatable             :: mag_te_tmp_lower(:), mag_te_tmp_upper(:)
 real(wp), allocatable             :: rhs_tmp(:), res_tmp(:) 
 real(wp), allocatable             :: A_tmp(:,:)
 real(wp), allocatable             :: jacobi(:,:)
-integer                           :: it_pan, n_pan_te, nzero 
+integer                           :: it_pan, n_pan_te
 
 !> VL viscous correction
 integer                           :: i_el, j_el, k_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
@@ -529,13 +529,6 @@ if (sim_param%kutta_correction) then
   allocate(res_tmp(size(linsys%b))); res_tmp = 0.0_wp
   allocate(A_tmp(size(linsys%A,1),size(linsys%A,1))); A_tmp = 0.0_wp
   allocate(jacobi(n_pan_te,n_pan_te)); jacobi = 0.0_wp
-  !> get block size of the non-zero jacobian matrix
-  nzero = 0
-  do j_el = 1, n_pan_te
-    if(associated(wake%pan_gen_elems(2,j_el)%p)) then 
-      nzero = nzero + 1 
-    endif 
-  enddo
 endif 
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
@@ -979,7 +972,7 @@ end if
       endif
       enddo
       !> inverse of jacobian matrix (only the non zero part is inverted, the rest is zero) 
-      call invmat(jacobi, size(jacobi,1), nzero)
+      call invmat(jacobi, size(jacobi,1))
     endif !> update jacobi matrix
 
     !> Newton Raphson iteration to get the new circulation/pressure difference
