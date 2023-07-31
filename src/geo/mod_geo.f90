@@ -729,8 +729,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       !> build connectivity for the panel center 
       allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
 
-      do i = 1, size(geo%components(i_comp)%el) 
-        cen(:,i) = geo%components(i_comp)%el(i)%cen
+      do i = 1, size(geo%components(i_comp)%el)
+        !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+        ! to interface with coupling
+        cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+          geo%components(i_comp)%el(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
       end do 
       
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
