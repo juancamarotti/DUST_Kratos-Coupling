@@ -142,6 +142,8 @@ type t_sim_param
   real(wp) :: tol_refine
   !> Wake interpolation
   logical :: interpolate_wake
+  !> Trailing edge autoscaling
+  logical :: autoscale_te
 
   !Method parameters
   !> Multiplier for far field threshold computation on doublet
@@ -376,6 +378,9 @@ subroutine create_param_main(prms)
   call prms%CreateIntOption('k_refine','refine factor for wake subdivision with subparticles','1')
   call prms%CreateRealOption('tol_refine','tolerance for wake refinement','0.2')
   call prms%CreateLogicalOption('interpolate_wake','interpolate wake subparticles','F')
+  call prms%CreateLogicalOption('autoscale_te','Autoscale the first te panel as dx / (Vlocal*dt) & 
+                                where dx is the panel width (spanwise direction) and Vlocal is   &
+                                norm2(Vinf-vte)','F') 
 
   !> Regularisation 
   call prms%CreateRealOption('far_field_ratio_doublet', &
@@ -665,7 +670,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%k_refine              = getint(prms,      'k_refine')
   sim_param%tol_refine            = getreal(prms,      'tol_refine')
   sim_param%interpolate_wake      = getlogical(prms,  'interpolate_wake')
-
+  sim_param%autoscale_te          = getlogical(prms,  'autoscale_te')
   !> Check on wake refinement
   if (sim_param%interpolate_wake .and. .not. sim_param%refine_wake) then
         !call warning('dust', 'dust', 'Wake interpolation is selected, but wake refinement &

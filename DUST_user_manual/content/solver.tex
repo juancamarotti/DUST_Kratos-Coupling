@@ -76,6 +76,7 @@ join_te = F
 join_te_factor = 1.0
 refine_wake = T
 k_refine = 1
+autoscale_te = F 
 
 ! --- model parameters ---
 far_field_ratio_doublet = 10.0
@@ -362,7 +363,8 @@ Number of panel wake rows before converting the wake to vortex particles.
 \item \param{n\_wake\_particles}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10000 \textit{type:} integer.
 
-Number of maximum vortex particles in the wake. If the limit is reached the simulation is stopped, but can be restarted from last save with a higher value of the parameter. 
+Number of maximum vortex particles in the wake. If the limit is reached the simulation is 
+stopped, but can be restarted from last save with a higher value of the parameter. 
 
 
 \item \param{particles\_box\_min}: \textit{required:} no. \textit{multiple:} no. 
@@ -418,6 +420,17 @@ Employ trailing edge joining for close trailing edges.
 If employing joining of trailing edges, the trailing edges which are closer than 
 \param{join\_te\_factor} times the length of the adjacent trailing edge elements 
 will be joined. 
+
+\item \param{autoscale\_te}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} False. \textit{type:} logical. 
+
+Autoscale the first te panel as $dx/(V_\mathrm{local}dt)*$\param{implicit_panel_scale} 
+where $dx$ is the panel width (spanwise direction) and 
+$V_\mathrm{local} = \|V_\infty-V_\mathrm{te}\|$. 
+
+When is false, the wake panel can be scaled by the \param{implicit_panel_scale} 
+parameter at simulation level and by the \param{scale\_te} at component level.
+
 
 \item \param{far_field_ratio_doublet}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10.0 \textit{type:} real.

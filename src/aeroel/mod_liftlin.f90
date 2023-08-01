@@ -138,7 +138,7 @@ contains
   !> new routines for load computations
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_liftlin
   procedure, pass(this) :: compute_dforce_jukowski => &
-                           compute_dforce_jukowski_liftlin
+                          compute_dforce_jukowski_liftlin
 
 end type
 

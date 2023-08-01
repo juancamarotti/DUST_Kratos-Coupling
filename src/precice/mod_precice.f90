@@ -1309,13 +1309,17 @@ subroutine update_near_field_wake( this, geo, wake, te )
         vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
 
         wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
-
+        
         if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
+          wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  norm2(wind-vel_te) 
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
               dist*wake%pan_gen_scaling(ip)* &
               norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
               real(sim_param%ndt_update_wake,wp)
         else
+          wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  sim_param%min_vel_at_te 
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
               dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
               sim_param%min_vel_at_te*sim_param%dt * &
@@ -1368,14 +1372,16 @@ subroutine update_near_field_wake( this, geo, wake, te )
           wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
         
           if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
-
+            wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  norm2(wind-vel_te) 
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                                         dist*wake%pan_gen_scaling(ip)* &
                                         norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
                                         real(sim_param%ndt_update_wake,wp)
           
           else
-          
+            wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                      sim_param%min_vel_at_te
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                 dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
                 sim_param%min_vel_at_te*sim_param%dt * &

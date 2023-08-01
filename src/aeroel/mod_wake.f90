@@ -337,8 +337,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   integer, intent(in)                  :: nrings
   integer, intent(in)                  :: nparts
 
-  integer                              :: iw, ip, nsides
-  integer                              :: ic, nad, ie, npt, id, ir, nend
+  integer                              :: iw, ip, ic, i1, ie, id, ir
+  integer                              :: nad, npt, nend, nsides
   integer                              :: p1, p2
   real(wp)                             :: dist(3) , vel_te(3), wind(3)
 
@@ -444,7 +444,19 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   !end select
   !enddo
 
-  ! FIX FOR TE WITH HINGES
+  
+  !> Scaling of the first panel of the trailing edge
+  !> scale_te = dx / (Vlocal*dt): Vlocal = 1 in this case, look to mod_wake 
+  !> to get the value  
+  !> where dx is the distance between the first and the second node 
+  if (sim_param%autoscale_te) then !> automatic scaling
+    do i1 = 1, size(te%e,2) 
+      te%scaling(i1) = (norm2((te%e(1,i1)%p%ver(:,2) - te%e(1,i1)%p%ver(:,1))) &  
+                      /sim_param%dt)*sim_param%first_panel_scaling
+    enddo
+  else !> manual scaling (for retrocompatibility)
+    !> te%scaling = scale_te
+  endif 
 
   wake%pan_gen_points = te%i
   wake%pan_gen_dir = te%t_hinged
@@ -491,8 +503,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%pan_w_points(:,:,1) = wake%w_start_points
   wake%pan_w_vel(   :,:,:) = 0.0_wp
 
-  !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
-  do ip=1 , wake%n_pan_points
+  !Second row of points: first row + 0.3*scaling*|uinf|*t with t = R*t0
+  do ip = 1, wake%n_pan_points
 
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
@@ -503,7 +515,11 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
       
-      dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+      dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g, wake%pan_gen_dir(:,ip))
+      !> update velocity for scaling Scale_te = dx / (Vlocal*dt) 
+      !> dx/dt already included in mod_geo  
+      wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  norm2(wind-vel_te) 
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
@@ -514,6 +530,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
     else
 
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+      wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  sim_param%min_vel_at_te 
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
@@ -1275,6 +1293,9 @@ subroutine complete_wake(wake, geo, elems, te)
     wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)
 
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
+      wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  norm2(wind-vel_te) 
+
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
                           dist*wake%pan_gen_scaling(ip)* &
                           norm2(wind-vel_te)* &
@@ -1282,6 +1303,9 @@ subroutine complete_wake(wake, geo, elems, te)
   ! normalisation occurs here! -------------------------------------------^
 
     else
+      wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+                                  sim_param%min_vel_at_te
+
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* & ! next line may be commented
                   sim_param%min_vel_at_te* &
