@@ -1643,7 +1643,8 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
         allocate(te%icomp(  nn_te) ) ; te%icomp = i_comp
         allocate(te%scaling(  nn_te) ) 
-        te%scaling = scale_te 
+        te%scaling = scale_te*sim_param%first_panel_scaling
+
       elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
         ne_te_prev = size(te%e,2)
