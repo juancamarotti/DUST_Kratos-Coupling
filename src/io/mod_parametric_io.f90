@@ -644,7 +644,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       allocate(xyAirfoil1(size(xyAirfoil2,1),size(xyAirfoil2,2)))
 
       ! coords of prev section, back in the local normalized frame 0->1
-      xyAirfoil1(1,:) = ( rrSection1(1,:) - dx_ref ) / chord_list(iRegion) + ref_chord_fraction
+      xyAirfoil1(1,:) = ( rrSection1(1,:) - dx_ref ) / chord_list(iRegion)
       xyAirfoil1(2,:) = ( rrSection1(3,:) - dz_ref ) / chord_list(iRegion)
 
       twist_rad = twist_list(iRegion) * 4.0_wp * atan(1.0_wp) / 180.0_wp
@@ -652,6 +652,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                   reshape( (/ cos(twist_rad), sin(twist_rad) , &
                             -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                               xyAirfoil1 )
+      
+      xyAirfoil1(1,:) = xyAirfoil1(1,:)+ ref_chord_fraction
       
       ! linear interpolation, casting back to ref_chord frame
       xySection2 = ( (1-csi) * xyAirfoil1 + &
