@@ -398,7 +398,7 @@ if(sim_param%use_fmm) then
 endif
 
 call printout(nl//'====== Initializing Wake ======')
-
+write(*,*) 'dust', geo%components(1)%n_s
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
       sim_param%n_wake_panels, sim_param%n_wake_particles)
 

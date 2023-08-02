@@ -1651,7 +1651,7 @@ subroutine load_components(geo, in_file, out_file, te)
 
         allocate(e_te_tmp(2,size(te%e,2)+ne_te))
         e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-        do i1 = 1,ne_te
+        do i1 = 1,ne_te 
           e_te_tmp(1,size(te%e,2)+i1)%p => null()
           e_te_tmp(2,size(te%e,2)+i1)%p => null()
           e_te_tmp(1,size(te%e,2)+i1)%p  => &
@@ -2238,8 +2238,12 @@ subroutine create_strip_connectivity(geo)
             & spanwise stripes. There is something wrong in the geometry input&
             & file')
       end if
+      
       n_c = n_el / n_s  ! integer division to find number of chord panels
       
+      comp%n_s = n_s
+      comp%n_c = n_c  
+
       allocate(comp%stripe(n_s))
       do i_s = 1, n_s
         allocate(comp%stripe(i_s)%panels(n_c))
