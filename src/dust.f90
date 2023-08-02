@@ -398,13 +398,13 @@ if(sim_param%use_fmm) then
 endif
 
 call printout(nl//'====== Initializing Wake ======')
-write(*,*) 'dust', geo%components(1)%n_s
+
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
       sim_param%n_wake_panels, sim_param%n_wake_particles)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
-call initialize_linsys(linsys, geo, te, elems, elems_expl, wake ) 
+call initialize_linsys(linsys, geo, elems, elems_expl, wake ) 
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then

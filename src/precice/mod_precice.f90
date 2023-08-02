@@ -1312,8 +1312,8 @@ subroutine update_near_field_wake( this, geo, wake, te )
         
         if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
           
-          if (sim_param%autoscale_te) then 
-            wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+          if (sim_param%autoscale_te .and. te%id_lifting_line(ip) .ne. 1) then 
+            wake%pan_gen_scaling(ip) = te%scaling(ip) / &
                                   norm2(wind-vel_te) 
           endif 
 
@@ -1322,8 +1322,8 @@ subroutine update_near_field_wake( this, geo, wake, te )
               norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
               real(sim_param%ndt_update_wake,wp)
         else
-          if (sim_param%autoscale_te) then 
-            wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+          if (sim_param%autoscale_te .and. te%id_lifting_line(ip) .ne. 1) then 
+            wake%pan_gen_scaling(ip) = te%scaling(ip) / &
                                   sim_param%min_vel_at_te 
           endif
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
@@ -1378,8 +1378,8 @@ subroutine update_near_field_wake( this, geo, wake, te )
           wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
         
           if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
-            if (sim_param%autoscale_te) then 
-              wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+            if (sim_param%autoscale_te .and. te%id_lifting_line(ip) .ne. 1) then 
+              wake%pan_gen_scaling(ip) = te%scaling(ip) / &
                                     norm2(wind-vel_te) 
             endif
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
@@ -1388,8 +1388,8 @@ subroutine update_near_field_wake( this, geo, wake, te )
                                         real(sim_param%ndt_update_wake,wp)
           
           else
-            if (sim_param%autoscale_te) then
-              wake%pan_gen_scaling(ip) = wake%pan_gen_scaling(ip) / &
+            if (sim_param%autoscale_te .and. te%id_lifting_line(ip) .ne. 1) then
+              wake%pan_gen_scaling(ip) = te%scaling(ip) / &
                                       sim_param%min_vel_at_te
             endif
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &

@@ -365,7 +365,8 @@ type t_tedge
 
   !> Number of TE elements only for surface panels
   integer                         :: nte_surfpan 
-
+  integer, allocatable            :: id_lifting_line(:) 
+  
 end type t_tedge
 
 
