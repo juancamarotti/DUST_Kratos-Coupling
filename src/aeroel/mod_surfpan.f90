@@ -339,7 +339,8 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
       if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
         souLog = 0.0_wp
       else
-        souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
+        !> katz eqs 10.95 - 10.96 
+        souLog = log( (R1+R2 - this%edge_len(i1)) / (R1+R2 + this%edge_len(i1)) )
       endif
 
       phix = phix + this%sinTi(i1) * souLog
