@@ -312,28 +312,28 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
         indp1 = next_qua(i1)
       end if
 
-      R1 = norm2( pos - this%verp(:,i1) )
-      R2 = norm2( pos - this%verp(:,indp1) )
+      R1 = norm2(pos - this%verp(:,i1))
+      R2 = norm2(pos - this%verp(:,indp1))
 
       if(sim_param%debug_level .ge.5) then
-      if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
-        call warning(this_sub_name, this_mod_name, &
-          'too small denominator in calculation of velocity')
-        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-        call printout(message)
+        if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
+          call warning(this_sub_name, this_mod_name, &
+            'too small denominator in calculation of velocity')
+          write(message,*) 'R1, R2, this%edge_len, i1', R1, R2, this%edge_len(i1), i1
+          call printout(message)
       end if
-      if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
-        call warning(this_sub_name, this_mod_name, &
-          'too small edge length in calculation of velocity')
-        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-        call printout(message)
-      end if
-      if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
-        call warning(this_sub_name, this_mod_name, &
-          'too small numerator in calculation of velocity')
-        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-        call printout(message)
-      end if
+        if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
+          call warning(this_sub_name, this_mod_name, &
+            'too small edge length in calculation of velocity')
+          write(message,*) 'R1, R2, this%edge_len, i1', R1, R2, this%edge_len(i1), i1
+          call printout(message)
+        end if
+        if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
+          call warning(this_sub_name, this_mod_name, &
+            'too small numerator in calculation of velocity')
+          write(message,*) 'R1, R2, this%edge_len, i1', R1, R2, this%edge_len(i1), i1
+          call printout(message)
+        end if
       endif
 
       if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
@@ -356,6 +356,7 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
 
   end if
 
+
   ! vsou = (/ phix , phiy , pdou /)
   vel(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
   vel(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
@@ -368,10 +369,107 @@ end subroutine velocity_calc_sou_surfpan
 !        write this routine
 subroutine gradient_calc_sou_surfpan(this, grad, pos)
   class(t_surfpan), intent(in) :: this
-  real(wp), intent(out) :: grad(3,3)
-  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in)         :: pos(:)
+  real(wp), intent(out)        :: grad(3,3)
 
-  grad = 0.0_wp
+  real(wp)                     :: rot(3,3), grad_loc(3,3) 
+  real(wp)                     :: csi, eta, zeta, v_dou(3) 
+  real(wp)                     :: csi_1, eta_1, zeta_1
+  real(wp)                     :: csi_2, eta_2, zeta_2 
+  real(wp)                     :: phicsi_csi,  phieta_csi,  phizeta_csi 
+  real(wp)                     :: phicsi_eta,  phieta_eta,  phizeta_eta
+  real(wp)                     :: phicsi_zeta, phieta_zeta, phizeta_zeta
+  real(wp)                     :: R1, R2 
+  integer                      :: indm1, indp1 
+  integer                      :: i1
+  character(len=max_char_len)  :: message
+  character(len=*), parameter  :: this_sub_name='velocity_calc_sou_surfpan'
+
+  !> rotation matrix from local to global coordinates 
+  rot(:,1) = this%tang(:,1)
+  rot(:,2) = this%tang(:,2)
+  rot(:,3) = this%nor(:)
+  
+  !> initialization
+  grad_loc = 0.0_wp; grad = 0.0_wp 
+  !> structure of the gradient matrix (local coordinates)  
+  phicsi_csi = 0.0_wp;  phieta_csi = 0.0_wp; phizeta_csi = 0.0_wp 
+  phicsi_eta = 0.0_wp;  phieta_eta = 0.0_wp; phizeta_eta = 0.0_wp
+  phicsi_zeta = 0.0_wp; phieta_zeta = 0.0_wp; phizeta_zeta = 0.0_wp
+
+  !> TODO add far field approximation for the gradient of the source 
+  !> loop over the vertices of the panel 
+  do i1 = 1 , this%n_ver
+
+    if ( this%n_ver .eq. 3 ) then
+      indm1 = prev_tri(i1)
+      indp1 = next_tri(i1)
+    else if ( this%n_ver .eq. 4 ) then
+      indm1 = prev_qua(i1)
+      indp1 = next_qua(i1)
+    end if
+
+    R1 = norm2(pos - this%verp(:,i1))    !> R_{k}
+    R2 = norm2(pos - this%verp(:,indp1)) !> R_{k+1} 
+
+    !> R_{k} and R_{k+1} in local coordinates {csi, eta, zeta}
+    csi = dot_product(rot(:,1), pos)
+    eta = dot_product(rot(:,2), pos)
+    zeta = dot_product(rot(:,3), pos)
+
+    csi_1 = dot_product(rot(:,1), this%verp(:,i1))
+    eta_1 = dot_product(rot(:,2), this%verp(:,i1))
+    zeta_1 = dot_product(rot(:,3), this%verp(:,i1)) !> should be 0.0
+    
+    csi_2 = dot_product(rot(:,1), this%verp(:,indp1)) 
+    eta_2 = dot_product(rot(:,2), this%verp(:,indp1))
+    zeta_2 = dot_product(rot(:,3), this%verp(:,indp1)) !> should be 0.0 
+
+    !> grad(1,1) = dphicsi/dcsi
+    phicsi_csi = phicsi_csi + this%sinTi(i1) * &
+                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+                  ((csi - csi_1)/R1 + (csi - csi_2)/R2) 
+    !> grad(2,1) = dphicsi/deta
+    phicsi_eta = phicsi_eta + this%sinTi(i1) * &
+                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+                  ((eta - eta_1)/R1 + (eta - eta_2)/R2) 
+    !> grad(3,1) = dphicsi/dzeta
+    phicsi_zeta = phicsi_zeta + this%sinTi(i1) * &
+                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+                  (zeta/R1 + zeta/R2) 
+    
+    !> grad(1,2) = dphicsi/dcsi
+    phieta_csi = phieta_csi - this%cosTi(i1) * &
+                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+                  ((csi - csi_1)/R1 + (csi - csi_2)/R2) 
+    !> grad(2,2) = dphicsi/deta
+    phieta_eta = phieta_eta - this%cosTi(i1) * &
+                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+                  ((eta - eta_1)/R1 + (eta - eta_2)/R2) 
+    !> grad(3,2) = dphicsi/dzeta
+    phieta_zeta = phicsi_zeta - this%cosTi(i1) * &
+                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+                  (zeta/R1 + zeta/R2) 
+    
+  enddo
+  
+  !> the source is minus the integral of the doublet, therefore the zeta gradient components 
+  !> is the induced velocity of a doublet in the local zeta direction   
+  call velocity_calc_doublet(this, v_dou, pos) !> velocity induced by the doublet
+
+  v_dou = - matmul(transpose(rot), v_dou) !> velocity induced by the doublet in local coordinates
+
+  phizeta_csi = v_dou(1)
+  phizeta_eta = v_dou(2)
+  phizeta_zeta = v_dou(3) 
+
+  !> assembly of the gradient matrix 
+  grad_loc(1,1) = phicsi_csi;  grad_loc(1,2) = phieta_csi;  grad_loc(1,3) = phizeta_csi   
+  grad_loc(2,1) = phicsi_eta;  grad_loc(2,2) = phieta_eta;  grad_loc(2,3) = phizeta_eta  
+  grad_loc(3,1) = phicsi_zeta; grad_loc(3,2) = phieta_zeta; grad_loc(3,3) = phizeta_zeta
+  
+  !> transformation of the gradient matrix from local to global coordinates 
+  grad = matmul(transpose(rot),matmul(grad, rot)) 
 
 end subroutine gradient_calc_sou_surfpan
 
