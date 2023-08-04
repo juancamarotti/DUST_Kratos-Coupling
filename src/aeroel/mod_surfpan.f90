@@ -372,7 +372,7 @@ subroutine gradient_calc_sou_surfpan(this, grad, pos)
   real(wp), intent(in)         :: pos(:)
   real(wp), intent(out)        :: grad(3,3)
 
-  real(wp)                     :: rot(3,3), grad_loc(3,3) 
+  real(wp)                     :: rot(3,3), grad_loc(3,3), dlog
   real(wp)                     :: csi, eta, zeta, v_dou(3) 
   real(wp)                     :: csi_1, eta_1, zeta_1
   real(wp)                     :: csi_2, eta_2, zeta_2 
@@ -391,7 +391,7 @@ subroutine gradient_calc_sou_surfpan(this, grad, pos)
   rot(:,3) = this%nor(:)
   
   !> initialization
-  grad_loc = 0.0_wp; grad = 0.0_wp 
+  grad_loc = 0.0_wp; grad = 0.0_wp; dlog = 0.0_wp
   !> structure of the gradient matrix (local coordinates)  
   phicsi_csi = 0.0_wp;  phieta_csi = 0.0_wp; phizeta_csi = 0.0_wp 
   phicsi_eta = 0.0_wp;  phieta_eta = 0.0_wp; phizeta_eta = 0.0_wp
@@ -401,10 +401,10 @@ subroutine gradient_calc_sou_surfpan(this, grad, pos)
   !> loop over the vertices of the panel 
   do i1 = 1 , this%n_ver
 
-    if ( this%n_ver .eq. 3 ) then
+    if (this%n_ver .eq. 3) then
       indm1 = prev_tri(i1)
       indp1 = next_tri(i1)
-    else if ( this%n_ver .eq. 4 ) then
+    else if (this%n_ver .eq. 4) then
       indm1 = prev_qua(i1)
       indp1 = next_qua(i1)
     end if
@@ -423,41 +423,38 @@ subroutine gradient_calc_sou_surfpan(this, grad, pos)
     
     csi_2 = dot_product(rot(:,1), this%verp(:,indp1)) 
     eta_2 = dot_product(rot(:,2), this%verp(:,indp1))
-    zeta_2 = dot_product(rot(:,3), this%verp(:,indp1)) !> should be 0.0 
+    zeta_2 = dot_product(rot(:,3), this%verp(:,indp1)) !> should be 0.0
+    
+    !> log derivative first part  
+    dlog = 2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2)
 
     !> grad(1,1) = dphicsi/dcsi
-    phicsi_csi = phicsi_csi + this%sinTi(i1) * &
-                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+    phicsi_csi = phicsi_csi + this%sinTi(i1) * dlog * &
                   ((csi - csi_1)/R1 + (csi - csi_2)/R2) 
     !> grad(2,1) = dphicsi/deta
-    phicsi_eta = phicsi_eta + this%sinTi(i1) * &
-                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+    phicsi_eta = phicsi_eta + this%sinTi(i1) * dlog * &
                   ((eta - eta_1)/R1 + (eta - eta_2)/R2) 
     !> grad(3,1) = dphicsi/dzeta
-    phicsi_zeta = phicsi_zeta + this%sinTi(i1) * &
-                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+    phicsi_zeta = phicsi_zeta + this%sinTi(i1) * dlog * &
                   (zeta/R1 + zeta/R2) 
-    
     !> grad(1,2) = dphicsi/dcsi
-    phieta_csi = phieta_csi - this%cosTi(i1) * &
-                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+    phieta_csi = phieta_csi - this%cosTi(i1) * dlog * &
                   ((csi - csi_1)/R1 + (csi - csi_2)/R2) 
     !> grad(2,2) = dphicsi/deta
-    phieta_eta = phieta_eta - this%cosTi(i1) * &
-                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+    phieta_eta = phieta_eta - this%cosTi(i1) * dlog * &
                   ((eta - eta_1)/R1 + (eta - eta_2)/R2) 
     !> grad(3,2) = dphicsi/dzeta
-    phieta_zeta = phicsi_zeta - this%cosTi(i1) * &
-                  2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2) * &
+    phieta_zeta = phicsi_zeta - this%cosTi(i1) * dlog * &
                   (zeta/R1 + zeta/R2) 
     
   enddo
-  
+
   !> the source is minus the integral of the doublet, therefore the zeta gradient components 
   !> is the induced velocity of a doublet in the local zeta direction   
   call velocity_calc_doublet(this, v_dou, pos) !> velocity induced by the doublet
 
-  v_dou = - matmul(transpose(rot), v_dou) !> velocity induced by the doublet in local coordinates
+  !> velocity induced by the doublet in local coordinates
+  v_dou = -matmul(transpose(rot), v_dou) 
 
   phizeta_csi = v_dou(1)
   phizeta_eta = v_dou(2)
@@ -469,7 +466,7 @@ subroutine gradient_calc_sou_surfpan(this, grad, pos)
   grad_loc(3,1) = phicsi_zeta; grad_loc(3,2) = phieta_zeta; grad_loc(3,3) = phizeta_zeta
   
   !> transformation of the gradient matrix from local to global coordinates 
-  grad = matmul(transpose(rot),matmul(grad, rot)) 
+  grad = matmul(transpose(rot), matmul(grad_loc, rot)) 
 
 end subroutine gradient_calc_sou_surfpan
 
