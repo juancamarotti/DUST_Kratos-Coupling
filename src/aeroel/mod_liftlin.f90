@@ -1232,12 +1232,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     end if
 
-    ! elementary moment = 0.5 * rho * v^2 * A * c * cm,
-    ! - around bnorm_cen (always? TODO: check)
+    ! elementary pitching moment = 0.5 * rho * v^2 * A * c * -cm,
+    ! minus sign b/c bnorm is in -y direction
+    ! positive mom ->  nose up
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen
+                   el%chord * el%area * (-c_m(i_l,3)) * el%bnorm_cen
 
     el%alpha = a_v(i_l) * 180_wp/pi
     el%vel_2d = u_v(i_l)
