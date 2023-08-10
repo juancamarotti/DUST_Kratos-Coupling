@@ -212,7 +212,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
     e3 = this%nor
 
     ! Control point (Q)
-    zQ = sum( (pos-this%cen) * e3 )
+    zQ = dot_product((pos-this%cen) , e3)
     Qp = pos - zQ * e3
 
     do i1 = 1 , this%n_ver
@@ -250,9 +250,9 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
 
       end if
 
-      souLog = log( (R1+R2+this%edge_len(i1)) / (den) )
+      souLog = log((R1+R2+this%edge_len(i1)) / (den))
 
-      vi = - sum( cross( Qp-this%verp(:,i1), this%edge_vec(:,i1) ) * e3 ) / this%edge_len(i1)
+      vi = - dot_product(cross(Qp-this%verp(:,i1), this%edge_vec(:,i1)), e3) / this%edge_len(i1)
       sou = sou + vi * souLog
 
     end do
@@ -339,8 +339,8 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
       if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
         souLog = 0.0_wp
       else
-        !> katz eqs 10.95 - 10.96 
-        souLog = log( (R1+R2 - this%edge_len(i1)) / (R1+R2 + this%edge_len(i1)) )
+        !> katz eqs 10.95 - 10.96 (the sign wrotten in the book is wrong)
+        souLog = log( (R1+R2 + this%edge_len(i1)) / (R1+R2 - this%edge_len(i1)) )
       endif
 
       phix = phix + this%sinTi(i1) * souLog
@@ -356,8 +356,9 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
 
   end if
 
-
-  ! vsou = (/ phix , phiy , pdou /)
+  ! vsou = (/ phix , phiy , pdou /) 
+  !> Rotate the velocity vector from the local coordinate system to the global one 
+  !> rot = (tang(:,:), nor) 
   vel(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
   vel(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
   vel(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
