@@ -112,8 +112,6 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: vel_outplane
   real(wp)              :: aero_coeff(3)
   real(wp)              :: alpha_isolated
-  real(wp)              :: vel_2d_isolated
-  real(wp)              :: vel_outplane_isolated
   real(wp)              :: alpha_unsteady
   real(wp)              :: Gamma_old
   real(wp)              :: Gamma_old_old

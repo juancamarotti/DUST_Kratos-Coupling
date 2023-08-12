@@ -159,7 +159,7 @@ real(wp) , allocatable                                  :: sec_loads(:,:,:)
 real(wp) , allocatable                                  :: sec_loads_ave(:,:,:)
 integer                                                 :: is                                 
 integer, parameter                                      :: n_loads = 4   ! F and moment around an axis
-integer, parameter                                      :: n_ll_data = 12, n_vl_data = 12
+integer, parameter                                      :: n_ll_data = 9, n_vl_data = 12
 real(wp) , allocatable                                  :: ref_mat(:,:) , off_mat(:,:)
 real(wp) , allocatable                                  :: y_cen(:) , y_span(:), chord(:)
 real(wp) , parameter                                    :: tol_y_cen = 1.0e-3_wp
