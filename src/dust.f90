@@ -86,7 +86,7 @@ use mod_stripe, only: &
 use mod_liftlin, only: &
   update_liftlin, t_liftlin_p, &
   build_ll_kernel, &
-  solve_liftlin, solve_liftlin_piszkin
+  solve_liftlin
 
 use mod_actuatordisk, only: &
   update_actdisk
@@ -733,11 +733,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       endif
       call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
               (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
-
-    elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
-      call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&
-            al_kernel )
   else
     call error('dust','dust',' Wrong string for LLsolver. &
           &This parameter should have been set equal to "GammaMethod" (default) &
