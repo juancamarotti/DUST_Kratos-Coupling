@@ -256,24 +256,28 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
       ! Loads from the ic-th component in the base ref.frame
       do ie = 1 , size(comps(ic)%el)
-        
-        F_bas1 = comps(ic)%el(ie)%dforce
-        F_bas = F_bas + F_bas1
+
 #if USE_PRECICE
         if (comps(ic)%coupling) then
           call vec2mat(comps(ic)%el(ie)%ori, R_cen)
           R_cen = matmul(comps(ic)%coupling_node_rot, R_cen)
+          F_bas1 = comps(ic)%el(ie)%dforce 
+          F_bas = F_bas + matmul(transpose(R_cen) , F_bas1 )
           if (trim(comps(ic)%comp_el_type) .eq. 'l') then 
               ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
               M_bas  = M_bas + cross( matmul(transpose(R_cen), ac), F_bas1) &
                             + comps(ic)%el(ie)%dmom 
-              F_bas = F_bas + matmul(transpose(R_cen) , F_bas )
             else 
               M_bas  = M_bas + cross( matmul(transpose(R_cen), &
                               comps(ic)%el(ie)%cen) , F_bas1 )      &
                               + comps(ic)%el(ie)%dmom 
           endif          
+
         else 
+
+          F_bas1 = comps(ic)%el(ie)%dforce 
+          F_bas = F_bas +  F_bas1
+
           if (trim(comps(ic)%comp_el_type) .eq. 'l') then
             ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
             M_bas = M_bas + cross( ac   &
