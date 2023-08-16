@@ -255,7 +255,7 @@ in which they were provided in the \opt{rr.dat} file.
 
 Elements can be both quadrangular or triangular, in case of triangular elements use a 0 
 as the fourth index. The order in which the points are listed in each element defines it 
-normal, according to the right-handed screw rule. Neighbouring elements must not have opposing 
+normal, according to the right-handed screw rule. Neighboring elements must not have opposing 
 normals, and in three dimensional surface panels the normals direction should be outward from the body. 
 
 \paragraph{Two examples of basic mesh generation via scripting.}
@@ -1031,6 +1031,12 @@ An example of user prescribed airfoil shape is provided in file \ref{file:airfoi
 \end{inputfile}
 
 \subsection{Lifting lines}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=.7\textwidth]{parametric_sections_ll}
+  \caption{Generation logic of the geometry of parametric lifting lines.}
+  \label{fig:parametric_sections_ll}
+\end{figure} 
 
 The geometrical logic for the generation of lifting lines is similar to the one for surface panels 
 or vortex lattices, and differs in only few details. An example of the same geometry defined in 
@@ -1045,13 +1051,6 @@ to the \param{twist} angle set in the input. Therefore note that in case of lift
 lifting line is essentially always placed at 25\% of the ideal airfoil it should represent, 
 and that the parameter \param{reference\_chord\_fraction} is ignored. 
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=.7\textwidth]{parametric_sections_ll}
-\caption{Generation logic of the geometry of parametric lifting lines.}
-\label{fig:parametric_sections_ll}
-\end{figure}
-
 Finally it is important to stress that the reference frames introduced in the present section 
 concerning the generation of parametric components are local to those component, and are required 
 only to assign coordinates to the points generated parametrically, just as a mesh generated from 
@@ -1060,13 +1059,85 @@ The actual position of the component in space during the simulation depends on t
 frame in which the component will be introduced. Reference frames employed during the simulation 
 are discussed in section \ref{sec:Solver_ReferenceFrames}.
 
+\subsubsection{\texttt{.c81} Airfoil tables format}  
+The \texttt{.c81} file format is a format for storing aerodynamic coefficients of 2D airfoils as a function of Mach number, Angle of Attack and Reynolds number. 
+An example of such a file is provided in file \ref{file:airfoil_c81.dat}.
+\begin{inputfile}[frame=single, caption={naca0012.c81 table example}, label={file:airfoil_c81.dat}]
+  2 0 0
+  0 1
+  0.158 0.158
+  COMMENT#1
+     2500000.0    0.200
+  Vahana1                       066106610661
+              0.000      0.200      0.400      0.600      0.800      0.950
+    -180.0    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000 
+    -165.0    0.60000    0.60000    0.60000    0.60000    0.60000    0.60000 
+    ... 
+    165.0   -0.60000   -0.60000   -0.60000   -0.60000   -0.60000   -0.60000 
+    180.0   -0.00000   -0.00000   -0.00000   -0.00000   -0.00000   -0.00000 
+              0.000      0.200      0.400      0.600      0.800      0.950
+    -180.0  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000  
+    -165.0  0.1206  0.1206  0.1206  0.1206  0.1206  0.1206  
+    ...
+    165.0  0.1206  0.1206  0.1206  0.1206  0.1206  0.1206  
+    180.0  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000  
+              0.000      0.200      0.400      0.600      0.800      0.950
+    -180.0  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000  
+    -165.0  0.1035  0.1035  0.1035  0.1035  0.1035  0.1035  
+    ... 
+    165.0  -0.1035  -0.1035  -0.1035  -0.1035  -0.1035  -0.1035  
+    180.0  -0.0000  -0.0000  -0.0000  -0.0000  -0.0000  -0.0000  
+  COMMENT#1
+     5000000.0    0.200
+  Vahana1                       066106610661
+              0.000      0.200      0.400      0.600      0.800      0.950
+    -180.0    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000
+    ... 
+\end{inputfile}
+
+The first 4 lines are:
+\begin{enumerate}
+  \item number of Reynolds numbers (here 2), DUMMY, DUMMY
+  \item DUMMY LINE
+  \item DUMMY LINE
+  \item DUMMY LINE
+\end{enumerate}
+Following lines contain the tables of the aerodynamic coefficients for each Reynolds number: 
+\begin{enumerate}
+  \item $1^{st}$ Reynolds number (here 2500000), DUMMY
+  \item DUMMY <white spaces> \texttt{"\%30s\%2d\%2d\%2d\%2d\%2d\%2d"} 
+  where the first 30 chars are a title string (ignored), followed by 6 consecutive two-digit integers that indicate:
+    \begin{itemize}
+    \item the number \texttt{ML} of \emph{Mach} points for $C_l$ (here 06);
+    \item the number \texttt{NL} of angle of attack points for $C_l$ (here 61);
+    \item the number \texttt{MD} of \emph{Mach} points for $C_d$ (here 06);
+    \item the number \texttt{ND} of angle of attack points for $C_d$ (here 61);
+    \item the number \texttt{MM} of \emph{Mach} points for $C_m$ (here 06);
+    \item the number \texttt{NM} of angle of attack points for $C_m$ (here 61).
+    \end{itemize} 
+  \item tables of aerodynamic coefficients of the 2D aerodynamic airfoil as functions of Mach numbers (cols) and Angle of Attack (rows) (from $-180^\circ$ to $180^\circ$): 
+  \begin{enumerate}
+    \item first table: $C_L$
+    \item second table: $C_D$
+    \item third table: $C_M$ 
+  \end{enumerate}
+  \item DUMMY LINE
+  \item $2^{nd}$ Reynolds number (here 5000000), DUMMY
+  \item Follows the same structure as the first Reynolds number   
+\end{enumerate}
+\textit{\textcolor{red}{Remark}}: each element of the aerodynamic table is separated by a white space in free format in a single. 
+In MBDyn, the format of each following line is up to 10 fields of 7 chars each;
+records longer than 10 fields are broken on multiple lines, with the first field filled with blanks. 
+
+
+
 \subsection{Hinged Surfaces}
 \label{sec:Hinge_surfaces}
 It is possible to introduce one or more movable surfaces in the parametric definition of a wing.
 As outlined by the scheme in Fig. \ref{fig:hinge} left, in a two-dimensional problem the control 
 surface can be defined in the local reference frame of the component, by means of the hinge axis 
 position $H$, the chordwise direction $\xi$ and a blending region $[-u, u]$ 
-(defined by \param{hinge\_Offset} parameter)introduced to avoid irregular behavior of the 
+(defined by \param{hinge\_offset} parameter)introduced to avoid irregular behavior of the 
 mesh along with the rotation angle $\theta$.
 \begin{figure}[htbp]
 \vspace{-3cm}
