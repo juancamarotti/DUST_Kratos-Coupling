@@ -643,20 +643,22 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       allocate(xyAirfoil1(size(xyAirfoil2,1),size(xyAirfoil2,2)))
 
+      ! coords of prev section, back in the local normalized frame 0->1
       xyAirfoil1(1,:) = ( rrSection1(1,:) - dx_ref ) / chord_list(iRegion)
       xyAirfoil1(2,:) = ( rrSection1(3,:) - dz_ref ) / chord_list(iRegion)
-
-      xyAirfoil1(1,:) =   rrSection1(1,:) + ref_chord_fraction
 
       twist_rad = twist_list(iRegion) * 4.0_wp * atan(1.0_wp) / 180.0_wp
       xyAirfoil1 = matmul( &
                   reshape( (/ cos(twist_rad), sin(twist_rad) , &
                             -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                               xyAirfoil1 )
-
+      
+      xyAirfoil1(1,:) = xyAirfoil1(1,:)+ ref_chord_fraction
+      
+      ! linear interpolation, casting back to ref_chord frame
       xySection2 = ( (1-csi) * xyAirfoil1 + &
                         csi  * xyAirfoil2 ) * chord_list(iRegion+1)
-      xySection2(1,:) = xySection2(1,:) - ref_chord_fraction
+      xySection2(1,:) = xySection2(1,:) - ref_chord_fraction*chord_list(iRegion+1)
 
       twist_rad = twist_list(iRegion+1) * 4.0_wp * atan(1.0_wp) / 180.0_wp
       xySection2 = matmul( &
@@ -715,8 +717,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                           ( rrSection2 - rrSection1 ) * &
               cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         elseif ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then 
-            rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
-                                  (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
+            !rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
+            !                      (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
+            rr(2, ista:iend) = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))* & 
+                              (rrSection2(2,:) - rrSection1(2,:)) + rrSection1(2,:) 
             rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
                               ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
             rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
@@ -1301,13 +1305,14 @@ end subroutine read_airfoil
 !-------------------------------------------------------------------------------
 subroutine define_division(type_mesh, nelem, division)
 
-  real(wp), intent(out) :: division(:)
-  integer, intent(in) :: nelem
+  real(wp), intent(out)        :: division(:)
+  integer, intent(in)          :: nelem
   character(len=*), intent(in) :: type_mesh
-
-  real(wp) :: step
-  integer :: iPoint
-
+  
+  real(wp)                     :: step
+  integer                      :: iPoint
+  character(len=*), parameter  :: this_sub_name = 'define_division'
+  
   division = 0.0_wp
   step = 1.0_wp/(real(nelem,wp) + 1e-12_wp)
 
@@ -1329,7 +1334,8 @@ subroutine define_division(type_mesh, nelem, division)
       division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
   case default
-    ! TODO: error in this case
+    call error(this_sub_name, this_mod_name, 'Incorrect input: &
+        & type_chord must be equal to uniform, cosine, cosineLE, cosineTE')
   end select
 
 end subroutine define_division

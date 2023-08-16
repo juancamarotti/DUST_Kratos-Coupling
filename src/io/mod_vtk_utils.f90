@@ -238,7 +238,7 @@ subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
     do i_v = 1,size(out_vars)
       if(.not. out_vars(i_v)%skip) then
         if(ncells.ne.size(out_vars(i_v)%var,2)) then
-          call internal_error(this_sub_name, this_mod_name, 'Nuber of output &
+          call internal_error(this_sub_name, this_mod_name, 'Number of output &
                               &variables different from number of cells')
         end if
       end if

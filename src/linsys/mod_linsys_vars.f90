@@ -72,8 +72,11 @@ type :: t_linsys
   !> Rank of the linear system
   integer :: rank
 
-  !> Linear system matrix
+  !> Linear system matrix, will include Morino-kutta effect
   real(wp), allocatable :: A(:,:)
+
+  !> Linear system matrix, will not include Morino-kutta effect
+  real(wp), allocatable :: A_wake_free(:,:)
 
   !> Linear system right hand side
   real(wp), allocatable :: b(:)
@@ -87,7 +90,7 @@ type :: t_linsys
   !> LU solvers pivot permutation matrix (in vector form)
   integer, allocatable :: P(:)
   integer, allocatable :: P_pres(:)
-
+  integer, allocatable :: P_wake_free(:) 
   !> Static part of the right hand side
   !!
   !! The right hand side contains contributions from all the surface panels.
@@ -145,6 +148,12 @@ type :: t_linsys
 
   !> Skip dynamic update
   logical :: skip
+
+  !> TL matrix: left hand side of linear doublet 
+  real(wp), allocatable :: TL(:,:)
+
+  !> TR matrix: right hand side of linear doublet
+  real(wp), allocatable :: TR(:,:)
 
 end type t_linsys
 

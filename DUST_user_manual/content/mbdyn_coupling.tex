@@ -21,7 +21,7 @@ The DUST component input card is enriched of the following parameters:
     type of the coupling:
     \begin{itemize}
         \item \opt{rigid}: rigid component and node 
-        \item \opt{rbf}: Generic DUST component and node coupling
+        \item \opt{rbf}: generic DUST component and node coupling
     \end{itemize}
     Although three different types of are implemented, the most general one 
     is the \opt{rbf} since it can manage all DUST components and can be coupled with both rigid and flexible elements.  
@@ -218,9 +218,9 @@ The aerodynamic loads computed by DUST are introduced in the MBDyn model as an e
   force: 9, external structural,
   socket,
     create, yes,
-    path, "\$MBSOCK",
+    path, "$MBSOCK",
     no signal,
-  coupling, tight, #, loose
+  coupling, tight, 
   sorted, yes,
   orientation, orientation vector,
   accelerations, yes,
@@ -377,7 +377,7 @@ In order to map the DUST component with the MBDyn nodes two coordinates files mu
       2.0     -0.555  0.0
       3.5     -0.555  0.0
     \end{inputfile}
-    Then, since the angle of sweep, dihededral, and twist are respetively: $30\circ$, $15\circ$ and $10\circ$, by applying the rotation matrix, the \texttt{coupling_node_orientation} is: 
+    Then, since the angle of sweep, dihededral, and twist are respetively: $30^\circ$, $15^\circ$ and $10^\circ$, by applying the rotation matrix, the \texttt{coupling_node_orientation} is: 
     \begin{inputfile}[frame=single]
       coupling_node_orientation = 
       (/0.5,   0.836516303737808,   0.224143868042013, 

@@ -138,12 +138,14 @@ end subroutine load_refs
 
 !----------------------------------------------------------------------
 
-subroutine load_res(floc, comps, vort, press, t, surfvel)
+subroutine load_res(floc, comps, vort, press, t, force, moment, surfvel)
   integer(h5loc), intent(in)                   :: floc
   type(t_geo_component), intent(inout)         :: comps(:)
   real(wp), allocatable, intent(out)           :: vort(:)
   real(wp), allocatable, intent(out)           :: press(:)
   real(wp), intent(out)                        :: t
+  real(wp), allocatable, intent(out), optional :: force(:,:)
+  real(wp), allocatable, intent(out), optional :: moment(:,:)
   real(wp), allocatable, intent(out), optional :: surfvel(:,:)
 
   integer                                      :: ncomps, icomp, ie
@@ -173,6 +175,9 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
 
   call read_hdf5(t,'time',floc)
   allocate(vort(nelems), press(nelems))
+  if (present(force)) allocate(force(3,nelems)) 
+  if (present(moment)) allocate(moment(3,nelems))
+
   if(got_surfvel) allocate(surfvel(3,nelems))
   call open_hdf5_group(floc,'Components',gloc1)
   call read_hdf5(ncomps_sol,'NComponents',gloc1)
@@ -237,9 +242,20 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
       class default
         vort(offset+1:offset+nelems_comp) = vort_read
         press(offset+1:offset+nelems_comp) = pres_read
+        if (present(force)) then 
+          force(:,offset+1:offset+nelems_comp) = dforce_read
+        endif
+        if (present(moment)) then
+          if (saved_dmom) then 
+            moment(:,offset+1:offset+nelems_comp) = dmom_read
+          else
+            moment(:,offset+1:offset+nelems_comp) = 0.0_wp
+          endif 
+        endif 
       if(got_surfvel) surfvel(:,offset+1:offset+nelems_comp) = surfvel_read
+
         offset = offset + nelems_comp
-        do ie = 1,nelems_comp
+        do ie = 1, nelems_comp
           if(associated(comps(icomp)%el(ie)%mag)) &
                           comps(icomp)%el(ie)%mag = vort_read(ie)
         enddo
@@ -247,6 +263,16 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
         do ie = 1,nelems_comp
           vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
           press(offset+1:offset+el(ie)%n_ver) = pres_read(ie)
+          if (present(force)) then 
+            force(1, offset+1:offset+el(ie)%n_ver) = dforce_read(1, ie)
+            force(2, offset+1:offset+el(ie)%n_ver) = dforce_read(2, ie)
+            force(3, offset+1:offset+el(ie)%n_ver) = dforce_read(3, ie)
+          endif 
+          if (present(moment)) then
+            moment(1, offset+1:offset+el(ie)%n_ver) = dmom_read(1, ie)
+            moment(2, offset+1:offset+el(ie)%n_ver) = dmom_read(2, ie)
+            moment(3, offset+1:offset+el(ie)%n_ver) = dmom_read(3, ie)
+          endif 
           if(got_surfvel) then
             surfvel(1,offset+1:offset+el(ie)%n_ver) = surfvel_read(1,ie)
             surfvel(2,offset+1:offset+el(ie)%n_ver) = surfvel_read(2,ie)
@@ -307,20 +333,17 @@ subroutine load_ll(floc, comps, ll_data)
   do icomp = 1, ncomps
 
     nelems_comp = comps(icomp)%nelems
-    allocate(ll_data_read(nelems_comp, 12))
+    allocate(ll_data_read(nelems_comp, 9))
     write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
     call open_hdf5_group(gloc1,trim(cname),gloc2)
     call open_hdf5_group(gloc2,'Solution',gloc3)
     call read_hdf5(ll_data_read(:,1:3),'aero_coeff',gloc3)
     call read_hdf5(ll_data_read(:,4),'alpha',gloc3)
-    call read_hdf5(ll_data_read(:,5),'alpha_isolated',gloc3)
-    call read_hdf5(ll_data_read(:,6),'vel_2d',gloc3)
-    call read_hdf5(ll_data_read(:,7),'up_x',gloc3)
-    call read_hdf5(ll_data_read(:,8),'up_y',gloc3)
-    call read_hdf5(ll_data_read(:,9),'up_z',gloc3)
-    call read_hdf5(ll_data_read(:,10),'vel_2d_isolated',gloc3)
-    call read_hdf5(ll_data_read(:,11),'vel_outplane',gloc3)
-    call read_hdf5(ll_data_read(:,12),'vel_outplane_isolated',gloc3)
+    call read_hdf5(ll_data_read(:,5),'vel_2d',gloc3)
+    call read_hdf5(ll_data_read(:,6),'up_x',gloc3)
+    call read_hdf5(ll_data_read(:,7),'up_y',gloc3)
+    call read_hdf5(ll_data_read(:,8),'up_z',gloc3)
+    call read_hdf5(ll_data_read(:,9),'vel_outplane',gloc3)
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)
@@ -412,8 +435,9 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
   real(wp), allocatable, intent(out)           :: vpvort(:)
   real(wp), allocatable, intent(out)           :: vpvort_v(:,:)
   real(wp), allocatable, intent(out)           :: v_rad(:)
-  real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
 
+  real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
+  
   integer(h5loc)                               :: gloc
   logical                                      :: got_dset
   real(wp), allocatable                        :: wpoints_read(:,:,:)

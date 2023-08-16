@@ -159,7 +159,7 @@ real(wp) , allocatable                                  :: sec_loads(:,:,:)
 real(wp) , allocatable                                  :: sec_loads_ave(:,:,:)
 integer                                                 :: is                                 
 integer, parameter                                      :: n_loads = 4   ! F and moment around an axis
-integer, parameter                                      :: n_ll_data = 12, n_vl_data = 12
+integer, parameter                                      :: n_ll_data = 9, n_vl_data = 12
 real(wp) , allocatable                                  :: ref_mat(:,:) , off_mat(:,:)
 real(wp) , allocatable                                  :: y_cen(:) , y_span(:), chord(:)
 real(wp) , parameter                                    :: tol_y_cen = 1.0e-3_wp
@@ -188,6 +188,7 @@ real(wp)                                                :: b1Vec(3) , b2Vec(3)
 type(t_box_secloads) , allocatable                      :: box_secloads(:)
 real(wp)                                                :: distance(4)
 real(wp) , parameter                                    :: nCoord_relOff = 0.05_wp
+real(wp)                                                :: ac(3)
 ! "extra-param". TODO: check if they are called before #### box
 real(wp)                                                :: nCoordVert(4)   ! TRI o QUAD elements
 integer                                                 :: secVert(4)   ! TRI o QUAD elements
@@ -448,27 +449,60 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
           F_bas1 = comps(id_comp)%el(ie)%dforce
           F_bas  = F_bas + F_bas1
 #if USE_PRECICE
-          call vec2mat(comps(id_comp)%el(ie)%ori, R_cen)
-          R_cen = matmul(comps(id_comp)%coupling_node_rot, R_cen)
-          M_bas  = M_bas + cross( matmul(transpose(R_cen), &
-                          comps(id_comp)%el(ie)%cen) , F_bas1 )      &
-                        + comps(id_comp)%el(ie)%dmom !FIX axis!
-#else 
-          M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
+          if (comps(id_comp)%coupling) then 
+            call vec2mat(comps(id_comp)%el(ie)%ori, R_cen)
+            R_cen = matmul(comps(id_comp)%coupling_node_rot, R_cen)
+            if (trim(comps(id_comp)%comp_el_type) .eq. 'l') then 
+              ac = sum ( comps(id_comp)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
+              M_bas  = M_bas + cross( matmul(transpose(R_cen), ac), F_bas1) &
+                            + comps(id_comp)%el(ie)%dmom 
+            else 
+              M_bas  = M_bas + cross( matmul(transpose(R_cen), &
+                              comps(id_comp)%el(ie)%cen) , F_bas1 )      &
+                              + comps(id_comp)%el(ie)%dmom 
+            endif
+          else 
+            if (trim(comps(id_comp)%comp_el_type) .eq. 'l') then 
+              ac = sum ( comps(id_comp)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
+              M_bas  = M_bas + cross(ac - r_axis_bas(:,is) , F_bas1 )      &
+                        + comps(id_comp)%el(ie)%dmom 
+            else
+              M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
                         - r_axis_bas(:,is) , F_bas1 )      &
-                        + comps(id_comp)%el(ie)%dmom ! updated 2018-07-12
+                        + comps(id_comp)%el(ie)%dmom 
+            endif 
+          endif
+#else 
+          if (trim(comps(id_comp)%comp_el_type) .eq. 'l') then 
+            ac = sum ( comps(id_comp)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
+            M_bas  = M_bas + cross(ac - r_axis_bas(:,is) , F_bas1 ) &
+                      + comps(id_comp)%el(ie)%dmom 
+          else
+            M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
+                      - r_axis_bas(:,is) , F_bas1 )           &
+                      + comps(id_comp)%el(ie)%dmom 
+          endif 
 #endif 
         end do ! loop over chord
 
         ! From global to local coordinates of forces and moments
 #if USE_PRECICE
-        call vec2mat(comps(id_comp)%el(ie)%ori, R_cen)
-        R_cen = matmul(comps(id_comp)%coupling_node_rot, R_cen)
-        sec_loads(ires,is,1:3) = matmul( &
-            transpose( R_cen), F_bas ) / y_span(is)
-        ! moment ( only the component around the <ax_coord> )
-        M_bas = matmul( transpose(R_cen) , M_bas)
-        sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
+        if (comps(id_comp)%coupling) then 
+          call vec2mat(comps(id_comp)%el(ie)%ori, R_cen)
+          R_cen = matmul(comps(id_comp)%coupling_node_rot, R_cen)
+          sec_loads(ires,is,1:3) = matmul( &
+                transpose( R_cen), F_bas ) / y_span(is)
+          ! moment ( only the component around the <ax_coord> )
+          M_bas = matmul( transpose(R_cen) , M_bas)
+          sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
+        else
+          sec_loads(ires,is,1:3) = matmul( &
+            transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
+          ! moment ( only the component around the <ax_coord> )
+          M_bas = matmul( &
+                transpose( refs_R(:,:, ref_id) ) , M_bas )
+          sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
+        endif  
 #else 
         sec_loads(ires,is,1:3) = matmul( &
             transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)

@@ -1233,7 +1233,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, chord, &
   real(wp), intent(in), optional  :: vl_vars(:,:,:)
 
   character(len=*), parameter     :: var_names(4) = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
-  character(len=21)               :: ll_var_names(9), vl_var_names(9)
+  character(len=21)               :: ll_var_names(6), vl_var_names(9)
 
   character, parameter            :: zc = char(0)
   integer                         :: fu, ierr, i, j
@@ -1245,9 +1245,8 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, chord, &
   logical                         :: print_ll, print_vl
 
   ll_var_names(1) = 'Cl'; ll_var_names(2) = 'Cd'; ll_var_names(3) = 'Cm'
-  ll_var_names(4) =  'alpha'; ll_var_names(5) =  'alpha_isolated'
-  ll_var_names(6) = 'vel_2d'; ll_var_names(7) = 'vel_2d_isolated'
-  ll_var_names(8) = 'vel_outplane'; ll_var_names(9) = 'vel_outplane_isolated'
+  ll_var_names(4) =  'alpha'; ll_var_names(5) = 'vel_2d'; 
+  ll_var_names(6) = 'vel_outplane';
 
   vl_var_names(1) = 'Cl'; vl_var_names(2) = 'Cd'; vl_var_names(3) = 'Cm'
   vl_var_names(4) =  'alpha'; vl_var_names(5) =  'alpha_isolated'

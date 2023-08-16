@@ -186,7 +186,8 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   real(wp), allocatable                                   :: cen_ave(:,:,:,:) 
   real(wp), allocatable                                   :: pres_ave(:,:,:)      
   real(wp), allocatable                                   :: cp_ave(:,:,:)      
-  
+  logical :: bracket_found   ! Flag to indicate if chord bracketing is found
+
   character(len=max_char_len)                             :: filename
   character(len=max_char_len)                             :: comp_input
 
@@ -333,27 +334,44 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
     allocate(id_plus(n_station))
     allocate(y_cen_tras(n_sect)) 
     allocate(chord_int(n_station)) 
+
+    !> Translate centers on reference station
     do ista = 1, n_station
-      !> translate centers on reference station  
-      y_cen_tras = y_cen - span_station(ista) 
+      y_cen_tras = y_cen - span_station(ista)
+      !> Get index of the stripes across the span stripe
+      bracket_found = .false.
       do is = 1, n_sect - 1
-        !> get index of the stripes across the span stripe 
-        if (y_cen_tras(is) .le. 0.0_wp .and. y_cen_tras(is + 1) .ge. 0.0_wp)  then 
+        if (y_cen_tras(is) <= (1e-6_wp) .and. y_cen_tras(is + 1) >= (1e-6_wp)) then
           id_minus(ista) = is
           id_plus(ista) = is + 1
-        elseif (y_cen_tras(is) .le. 0.0_wp .and. y_cen_tras(is + 1) .le. 0.0_wp)  then
+          bracket_found = .true.
+          exit ! exit loop once bracket is found
+        elseif (y_cen_tras(is) <= (1e-6_wp) .and. y_cen_tras(is + 1) >= (1e-6_wp)) then
           id_minus(ista) = is - 1
-          id_plus(ista) = is          
+          id_plus(ista) = is
+          bracket_found = .true.
+          exit ! exit loop once bracket is found
         endif
-      enddo
-      
+      end do
+
+      if (.not. bracket_found) then
+        ! Chord bracketing not found for current station
+        call error(this_sub_name,this_mod_name,'Error: Chord bracketing not found for station')
+      elseif (id_minus(ista) < 1 .or. id_plus(ista) > n_sect) then
+        ! Chord segments out of range
+        call error(this_sub_name,this_mod_name,'Error: Chord segments out of range for station')
+      endif
+
       chord_minus = chord(id_minus(ista))
-      chord_plus = chord(id_plus(ista)) 
-      call linear_interp((/chord_minus, chord_plus/), & 
-                          (/y_cen(id_minus(ista)), y_cen(id_plus(ista))/),& 
-                          span_station(ista), chord_int(ista))  
-    enddo  
-    
+      chord_plus = chord(id_plus(ista))
+
+      !> Interpolate chord at current station
+      call linear_interp((/chord_minus, chord_plus/), &
+                      (/y_cen(id_minus(ista)), y_cen(id_plus(ista))/),&
+                      span_station(ista), chord_int(ista))
+    end do
+
+
     ! Find the coordinate of the reference points on the axis --------------
     !  ( with coord. y_cen )
     if ( abs(axis_dir(2)) .lt. 1e-6_wp ) then

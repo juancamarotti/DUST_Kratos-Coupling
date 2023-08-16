@@ -363,6 +363,10 @@ type t_tedge
   !> Individual scaling for each component
   real(wp), allocatable           :: scaling(:)
 
+  !> Number of TE elements only for surface panels
+  integer                         :: nte_surfpan 
+  integer, allocatable            :: id_lifting_line(:) 
+  
 end type t_tedge
 
 
@@ -726,8 +730,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       !> build connectivity for the panel center 
       allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
 
-      do i = 1, size(geo%components(i_comp)%el) 
-        cen(:,i) = geo%components(i_comp)%el(i)%cen
+      do i = 1, size(geo%components(i_comp)%el)
+        !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+        ! to interface with coupling
+        cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+          geo%components(i_comp)%el(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
       end do 
       
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
@@ -864,7 +871,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer , allocatable                 :: neigh_te(:,:) , o_te(:,:)
   real(wp), allocatable                 :: t_te(:,:)
   real(wp)                              :: scale_te
-  integer                               :: ne_te , nn_te
+  integer                               :: ne_te , nn_te, n_e_te_panel 
   !> Tmp arrays
   type(t_pot_elem_p) , allocatable      :: e_te_tmp(:,:)
   integer, allocatable                  :: i_te_tmp(:,:), ii_te_tmp(:,:)
@@ -1062,9 +1069,9 @@ subroutine load_components(geo, in_file, out_file, te)
 
       !> Overwrite moving,
       !>> if n_hinges .gt. 0
-      ! *** to do *** avoid moving = .true. if hinge_input is constant
+      !  avoid moving = .true. if hinge_input is constant
       if ( n_hinges .gt. 0 )  geo%components(i_comp)%moving = .true.
-      !>> if coupling = .true.
+
       if ( comp_coupling )  geo%components(i_comp)%moving = .true.
 
       ! ====== READING =====
@@ -1169,10 +1176,17 @@ subroutine load_components(geo, in_file, out_file, te)
 
         call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, 'Hinge_Rotation_Input'    , hiloc)
 
+        if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'function:const' ) then
+          geo%components(i_comp)%moving = .false.
+        else
+          geo%components(i_comp)%moving = .true.
+        endif
+
         !> Actual input only for input_type = function:..., otherwise dummy inputs
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
+        
 
         if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
@@ -1373,14 +1387,15 @@ subroutine load_components(geo, in_file, out_file, te)
       if( comp_el_type(1:1) .eq. 'p' .or. &
           comp_el_type(1:1) .eq. 'v' .or. &
           comp_el_type(1:1) .eq. 'l') then
-        call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
-        call read_hdf5_al(    e_te,    'e_te',te_loc)
-        call read_hdf5_al(    i_te,    'i_te',te_loc)
-        call read_hdf5_al(   ii_te,   'ii_te',te_loc)
-        call read_hdf5_al(neigh_te,'neigh_te',te_loc)
-        call read_hdf5_al(    o_te,    'o_te',te_loc)
-        call read_hdf5_al(    t_te,    't_te',te_loc)
-      
+        call open_hdf5_group(cloc,   'Trailing_Edge', te_loc)
+        call read_hdf5_al(    e_te,           'e_te', te_loc)
+        call read_hdf5(n_e_te_panel,  'n_e_te_panel', te_loc)
+        call read_hdf5_al(    i_te,           'i_te', te_loc)
+        call read_hdf5_al(   ii_te,          'ii_te', te_loc)
+        call read_hdf5_al(neigh_te,       'neigh_te', te_loc)
+        call read_hdf5_al(    o_te,           'o_te', te_loc)
+        call read_hdf5_al(    t_te,           't_te', te_loc)
+        
         if(check_dset_hdf5('scale_te',te_loc)) then
           call read_hdf5(scale_te, 'scale_te',te_loc)
         else
@@ -1502,7 +1517,8 @@ subroutine load_components(geo, in_file, out_file, te)
             comp_el_type(1:1) .eq. 'v' .or. &
             comp_el_type(1:1) .eq. 'l') then
           call new_hdf5_group(cloc2,'Trailing_Edge',te_loc)
-          call write_hdf5(    e_te,    'e_te',te_loc)
+          call write_hdf5(    e_te,     'e_te',te_loc)
+          call write_hdf5(n_e_te_panel, 'n_e_te_panel', te_loc)
           call write_hdf5(    i_te,    'i_te',te_loc)
           call write_hdf5(   ii_te,   'ii_te',te_loc)
           call write_hdf5(neigh_te,'neigh_te',te_loc)
@@ -1610,12 +1626,13 @@ subroutine load_components(geo, in_file, out_file, te)
       endif
       if (.not.allocated(te%e) ) then ! it should be enough
         allocate(te%e    (2,ne_te) )
+        te%nte_surfpan = n_e_te_panel  !> number of panels in the trailing edge 
         do i1 = 1,ne_te
           te%e(1,i1)%p => null()
           te%e(2,i1)%p => null()
           te%e(1,i1)%p  => geo%components(i_comp)%el(e_te(1,i1))
           if(e_te(2,i1) .gt. 0) &
-            te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1))
+            te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1))            
         enddo
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
@@ -1626,8 +1643,8 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(te%is_hinged    (nn_te) ) ; te%is_hinged     =     -1
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
         allocate(te%icomp(  nn_te) ) ; te%icomp = i_comp
-        allocate(te%scaling(  nn_te) )
-        te%scaling =  scale_te*sim_param%first_panel_scaling
+        allocate(te%scaling(  nn_te) ) 
+        te%scaling = scale_te*sim_param%first_panel_scaling
 
       elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
@@ -1635,7 +1652,7 @@ subroutine load_components(geo, in_file, out_file, te)
 
         allocate(e_te_tmp(2,size(te%e,2)+ne_te))
         e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-        do i1 = 1,ne_te
+        do i1 = 1,ne_te 
           e_te_tmp(1,size(te%e,2)+i1)%p => null()
           e_te_tmp(2,size(te%e,2)+i1)%p => null()
           e_te_tmp(1,size(te%e,2)+i1)%p  => &
@@ -2222,8 +2239,12 @@ subroutine create_strip_connectivity(geo)
             & spanwise stripes. There is something wrong in the geometry input&
             & file')
       end if
+      
       n_c = n_el / n_s  ! integer division to find number of chord panels
       
+      comp%n_s = n_s
+      comp%n_c = n_c  
+
       allocate(comp%stripe(n_s))
       do i_s = 1, n_s
         allocate(comp%stripe(i_s)%panels(n_c))
@@ -2363,20 +2384,20 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
   logical, intent(in) :: time_cycle
 
   real(wp), allocatable :: rr_hinge_contig(:,:)
-  integer :: i_comp, ie, ih
+  integer :: i_comp, ie, ih, i_el
 
   !> Update all the references
   call update_all_references(geo%refs,t)
 
   do i_comp = 1,size(geo%components)
     associate(comp => geo%components(i_comp))
-
+      
       !> Update only rigid components, or update at first timestep
       ! *** to do *** quite a dirty implementation
       if ( ( .not. comp%coupling ) .or. update_static ) then
-
+        
         if (comp%moving .or. update_static) then
-
+          
           !> store %nor at previous time step, for moving, used few lines
           ! below to evaluate unit normal time derivative dn_dt
           if ( .not. update_static ) then
@@ -2444,7 +2465,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
       ! - hinge node orientation (unit vectors h,v,n)
       ! - hinge rotation angle, theta
       ! for non-coupled components only (so far)
-      if ( .not. comp%coupling ) then
+      if ( (.not. comp%coupling) ) then
         
         !> hinge nodes, points and orientation
         call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
@@ -2455,9 +2476,13 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
         !> Allocating contiguous array to pass to %hinge_deflection procedure
         allocate(rr_hinge_contig(3,size(comp%i_points)))
         rr_hinge_contig = geo%points(:, comp%i_points)
-
-        call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
+        
+        if (comp%moving .or. update_static) then 
+          call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
+        endif
+        
         geo%points(:, comp%i_points) = rr_hinge_contig
+        
         deallocate(rr_hinge_contig)
 
       else

@@ -237,7 +237,7 @@ subroutine read_c81_table ( filen , coeff )
           if ( ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .ge. alMin ) .and. &
                 ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
             if ( coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa) * &
-                coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa) .le. 0.0_wp ) then
+                coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa) .le. -1e-16_wp ) then
 
               al1 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl)
               al2 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl+1)

@@ -142,13 +142,12 @@ subroutine save_status(geo, wake,  it, time, run_id)
   real(wp), allocatable             :: turbvisc(:), v_rad(:)
   real(wp), allocatable             :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
   real(wp), allocatable             :: vort_v(:,:)
-  integer, allocatable              :: conn_pe(:)
+  integer,  allocatable             :: conn_pe(:)
   real(wp), allocatable             :: ori(:,:)
   !LL data
   real(wp), allocatable             :: alpha(:), vel_2d(:), vel_outplane(:)
   real(wp), allocatable             :: up_x(:), up_y(:), up_z(:)
-  real(wp), allocatable             :: alpha_isolated(:), vel_2d_isolated(:)
-  real(wp), allocatable             :: vel_outplane_isolated(:), aero_coeff(:,:)
+  real(wp), allocatable             :: aero_coeff(:,:)
   real(wp), allocatable             :: Gamma_old(:), Gamma_old_old(:), dGamma_dt(:)
   !VL corrected data
   real(wp), allocatable             :: alpha_vl(:), vel_2d_vl(:), vel_outplane_vl(:)
@@ -227,8 +226,6 @@ subroutine save_status(geo, wake,  it, time, run_id)
     if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'l' ) then
       allocate(alpha(ne), vel_2d(ne), vel_outplane(ne))
       allocate(up_x(ne), up_y(ne), up_z(ne))
-      allocate(alpha_isolated(ne), vel_2d_isolated(ne), &
-                vel_outplane_isolated(ne))
       allocate(aero_coeff(3,ne))
       allocate(Gamma_old(ne), Gamma_old_old(ne), dGamma_dt(ne))
       
@@ -240,9 +237,6 @@ subroutine save_status(geo, wake,  it, time, run_id)
           up_y(ie) = el%up_y
           up_z(ie) = el%up_z
           vel_outplane(ie) = el%vel_outplane
-          alpha_isolated(ie) = el%alpha_isolated
-          vel_2d_isolated(ie) = el%vel_2d_isolated
-          vel_outplane_isolated(ie) = el%vel_outplane_isolated
           aero_coeff(:,ie) = el%aero_coeff
           Gamma_old(ie) = el%Gamma_old
           Gamma_old_old(ie) = el%Gamma_old_old
@@ -255,16 +249,12 @@ subroutine save_status(geo, wake,  it, time, run_id)
       call write_hdf5(up_y,                   'up_y',                   gloc3)
       call write_hdf5(up_z,                   'up_z',                   gloc3)
       call write_hdf5(vel_outplane,           'vel_outplane',           gloc3)
-      call write_hdf5(alpha_isolated,         'alpha_isolated',         gloc3)
-      call write_hdf5(vel_2d_isolated,        'vel_2d_isolated',        gloc3)
-      call write_hdf5(vel_outplane_isolated,  'vel_outplane_isolated',  gloc3)
       call write_hdf5(transpose(aero_coeff),  'aero_coeff',             gloc3)
       call write_hdf5(Gamma_old,              'Gamma_old',              gloc3)
       call write_hdf5(Gamma_old_old,          'Gamma_old_old',          gloc3)
       call write_hdf5(dGamma_dt,              'dGamma_dt',              gloc3)
       
       deallocate(alpha, vel_2d, vel_outplane, up_x, up_y, up_z)
-      deallocate(alpha_isolated, vel_2d_isolated, vel_outplane_isolated)
       deallocate(aero_coeff)
       deallocate(Gamma_old, Gamma_old_old, dGamma_dt)
       

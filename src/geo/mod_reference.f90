@@ -471,6 +471,7 @@ subroutine build_references(refs, reference_file)
   refs(0)%relative_rot_pos = 0.0_wp
   !Setup the other references
   iref = 0; n_mov = 0; n_mult = 0
+  i_ref_pitch = -1
   do iref_input = 1,n_refs_input
 
     iref = iref+1
@@ -1412,30 +1413,30 @@ subroutine build_references(refs, reference_file)
 
             ! pitch hinge: it is a special case since it is considered an input  
             ! that contains the effects of the other hinges due to the pitch-flap and pitch-lag coupling 
-            
-            do it = 1,sim_param%n_timesteps
-              if ((refs(i_ref_pitch)%Omega .ne. 0) ) then !.and. i_dof_pitch .gt. 0
-                if (harmonic_input) then ! harmonic input
-                  !> only the 1st harmonic is considered 
-                  !debug 
-                  psi_mix = refs(i_ref_pitch)%Omega*refs(i_ref_pitch)%rot_tim(it) + refs(i_ref_pitch)%psi_0 + psi_sw*180.0_wp/pi
-                  cos_npsi = cos(psi_mix)
-                  sin_npsi = sin(psi_mix) 
-
-                  refs(i_ref_pitch)%rot_pos(it) = refs(i_ref_pitch)%rot_pos(it) + & 
-                                                  collective_mbc(i_dof_pitch) + & 
-                                                  cosine_mbc(i_dof_pitch, 1)*cos_npsi + & 
-                                                  sine_mbc(i_dof_pitch, 1)*sin_npsi - & 
-                                                  tan(delta_3*pi/180.0_wp)*refs(i_ref_flap)%rot_pos(it) - & 
-                                                  tan(delta_2*pi/180.0_wp)*refs(i_ref_lag)%rot_pos(it)  
-                  
-                  refs(i_ref_pitch)%rot_vel(it) = refs(i_ref_pitch)%rot_vel(it) - & 
-                                                  cosine_mbc(i_dof_pitch, 1)*refs(i_ref_pitch)%Omega*sin(psi_mix) + & 
-                                                  sine_mbc(i_dof_pitch, 1)*refs(i_ref_pitch)%Omega*sin(psi_mix)
-                endif
-              endif 
-            enddo
-
+            if (i_ref_pitch .gt. 0) then
+              do it = 1,sim_param%n_timesteps
+                if ((refs(i_ref_pitch)%Omega .ne. 0) ) then !.and. i_dof_pitch .gt. 0
+                  if (harmonic_input) then ! harmonic input
+                    !> only the 1st harmonic is considered 
+                    !debug 
+                    psi_mix = refs(i_ref_pitch)%Omega*refs(i_ref_pitch)%rot_tim(it) + refs(i_ref_pitch)%psi_0 + psi_sw*180.0_wp/pi
+                    cos_npsi = cos(psi_mix)
+                    sin_npsi = sin(psi_mix) 
+  
+                    refs(i_ref_pitch)%rot_pos(it) = refs(i_ref_pitch)%rot_pos(it) + & 
+                                                    collective_mbc(i_dof_pitch) + & 
+                                                    cosine_mbc(i_dof_pitch, 1)*cos_npsi + & 
+                                                    sine_mbc(i_dof_pitch, 1)*sin_npsi - & 
+                                                    tan(delta_3*pi/180.0_wp)*refs(i_ref_flap)%rot_pos(it) - & 
+                                                    tan(delta_2*pi/180.0_wp)*refs(i_ref_lag)%rot_pos(it)  
+                    
+                    refs(i_ref_pitch)%rot_vel(it) = refs(i_ref_pitch)%rot_vel(it) - & 
+                                                    cosine_mbc(i_dof_pitch, 1)*refs(i_ref_pitch)%Omega*sin(psi_mix) + & 
+                                                    sine_mbc(i_dof_pitch, 1)*refs(i_ref_pitch)%Omega*sin(psi_mix)
+                  endif
+                endif 
+              enddo
+            endif
 
           end do ! loop over the blades
 

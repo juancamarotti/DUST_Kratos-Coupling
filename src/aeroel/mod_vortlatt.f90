@@ -58,7 +58,8 @@ use mod_handling, only: &
 use mod_doublet, only: &
   potential_calc_doublet , &
   velocity_calc_doublet  , &
-  gradient_calc_doublet
+  gradient_calc_doublet  , &
+  linear_potential_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -118,6 +119,7 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: compute_grad             => compute_grad_vortlatt
   procedure, pass(this) :: compute_psi              => compute_psi_vortlatt
   !> Dummy for intel workaround
+  procedure, pass(this) :: compute_linear_pot       => compute_linear_pot_vortlatt
   procedure, pass(this) :: compute_pres             => compute_pres_dummy
   procedure, pass(this) :: compute_pres_vortlatt    => compute_pres_vortlatt
   procedure, pass(this) :: compute_dforce           => compute_dforce_dummy
@@ -297,27 +299,23 @@ subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
   !Add the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
   !ones since are at the beginning of the list
-  do j1 = 1 , n_impl
-    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-
+  do j1 = 1, n_impl
+    ind1 = impl_wake_ind(1,j1) 
+    ind2 = impl_wake_ind(2,j1)
     if ((ind1.ge.ista .and. ind1.le.iend)) then
-
       call wake_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
-
       linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
-      if ( ind2 .ne. 0 ) linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
-
+      if ( ind2 .ne. 0 ) then 
+        linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
+      endif 
     endif
   end do
 
   ! Add the explicit vortex panel wake contribution to the rhs
   do j1 = n_impl+1 , size(wake_elems)
-
     call wake_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
-
-  linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
-  
-end do
+    linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
+  end do
 
 end subroutine add_wake_vortlatt
 
@@ -353,6 +351,21 @@ subroutine compute_pot_vortlatt(this, A, b, pos,i,j)
   b = 0.0_wp
 
 end subroutine compute_pot_vortlatt
+
+!> Compute the linear potential due to a vortex ring
+!! this subroutine employs doublets basic subroutines to calculate
+!! the AIC of a vortex ring on a surface panel. The contribution to its rhs
+!! is zero since there are no sources (and no b.c. enforcing)
+subroutine compute_linear_pot_vortlatt(this, TL, TR, pos,i,j)
+  class(t_vortlatt), intent(inout) :: this
+  real(wp), intent(out) :: TL
+  real(wp), intent(out) :: TR
+  real(wp), intent(in) :: pos(:)
+  integer , intent(in) :: i,j
+
+    call linear_potential_calc_doublet(this, TL, TR, pos) 
+
+end subroutine compute_linear_pot_vortlatt
 
 !----------------------------------------------------------------------
 
@@ -659,7 +672,7 @@ subroutine calc_geo_data_vortlatt(this, vert)
 
   ! unit vector
   do is = 1 , nSides
-    this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
+    this%edge_uni(:,is) = this%edge_vec(:,is) / (this%edge_len(is))
   end do
 
   !TODO: is it necessary to initialize it here?

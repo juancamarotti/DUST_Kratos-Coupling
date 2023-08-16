@@ -93,6 +93,7 @@ type, extends(c_expl_elem) :: t_actdisk
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_actdisk
+  procedure, pass(this) :: compute_linear_pot  => compute_linear_pot_actdisk
   procedure, pass(this) :: compute_vel      => compute_vel_actdisk
   procedure, pass(this) :: compute_grad     => compute_grad_actdisk
   procedure, pass(this) :: compute_psi      => compute_psi_actdisk
@@ -135,6 +136,16 @@ subroutine compute_pot_actdisk (this, A, b, pos,i,j)
   b=0.0_wp
 
 end subroutine compute_pot_actdisk
+
+subroutine compute_linear_pot_actdisk (this, TL, TR, pos,i,j)
+  class(t_actdisk), intent(inout) :: this
+  real(wp), intent(out) :: TL
+  real(wp), intent(out) :: TR
+  real(wp), intent(in) :: pos(:)
+  integer , intent(in) :: i,j
+  
+
+end subroutine compute_linear_pot_actdisk
 
 !----------------------------------------------------------------------
 

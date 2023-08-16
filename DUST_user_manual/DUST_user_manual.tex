@@ -32,18 +32,18 @@
 \usepackage{etoolbox}
 \usepackage{siunitx}
 \usepackage{%
-	array, %%An extended implementation of the array and tabular environments which extends the options for column formats, and provides "programmable" format specifications
-	booktabs, %%The package enhances the quality of tables in LATEX, providing extra commands as well as behind-the-scenes optimisation
-	dcolumn, %%
-	rotating,
-	shortvrb,
-	units,
-	url,
-	lastpage,
-	longtable,
-	lscape,
-	qtree,
-	skmath,	
+  array, %%An extended implementation of the array and tabular environments which extends the options for column formats, and provides "programmable" format specifications
+  booktabs, %%The package enhances the quality of tables in LATEX, providing extra commands as well as behind-the-scenes optimisation
+  dcolumn, %%
+  rotating,
+  shortvrb,
+  %units,
+  url,
+  lastpage,
+  longtable,
+  lscape,
+  tikz-qtree,
+  skmath, 
 }
 \usepackage{booktabs}
 \usepackage[strings]{underscore}
@@ -135,8 +135,8 @@
 %% Creating the frontpage
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \AtBeginDocument{
-	\maketitle
-	\thispagestyle{empty}
+  \maketitle
+  \thispagestyle{empty}
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -147,13 +147,13 @@
 %% Creation of page-styles
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpagestyle{long}{%
-	\sethead[\thepage][][\chaptername\ \thechapter:\ \chaptertitle]{\chaptername\ \thechapter:\ \chaptertitle}{}{\thepage}
-	\headrule
+  \sethead[\thepage][][\chaptername\ \thechapter:\ \chaptertitle]{\chaptername\ \thechapter:\ \chaptertitle}{}{\thepage}
+  \headrule
 }
 
 \newpagestyle{short}{%
-	\sethead[\thepage][][]{}{}{\thepage}
-	\headrule
+  \sethead[\thepage][][]{}{}{\thepage}
+  \headrule
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% CUSTOM COMMANDS
@@ -209,4 +209,4 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % When no use outcomment
 %\include{appendix/appendix}
-\end{document}*/***********************************************************************8	
+\end{document}*/***********************************************************************8  

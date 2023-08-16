@@ -94,7 +94,7 @@ public :: post_aeroacoustics
 
 private
 
-character(len=*), parameter :: this_mod_name='mod_post_aa'
+character(len=max_char_len), parameter :: this_mod_name='mod_post_aa'
 character(len=max_char_len) :: msg
 
 contains
@@ -105,11 +105,11 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
                       out_frmt, components_names, all_comp, an_start, an_end, &
                       an_step, average )
   type(t_parse), pointer                                   :: sbprms
-  character(len=*) , intent(in)                            :: basename
-  character(len=*) , intent(in)                            :: data_basename
-  character(len=*) , intent(in)                            :: an_name
+  character(len=max_char_len) , intent(in)                 :: basename
+  character(len=max_char_len) , intent(in)                 :: data_basename
+  character(len=max_char_len) , intent(in)                 :: an_name
   integer          , intent(in)                            :: ia
-  character(len=*) , intent(in)                            :: out_frmt
+  character(len=max_char_len) , intent(in)                 :: out_frmt
   character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
   logical , intent(in)                                     :: all_comp
   integer , intent(in)                                     :: an_start , an_end , an_step
@@ -132,7 +132,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   real(wp)                            :: t
   logical                             :: mult, isopen
   character(len=max_char_len)         :: comp_root, last_mult, compname
-  character(len=*), parameter         :: this_sub_name='post_aeroacoustics'
+  character(len=max_char_len), parameter  :: this_sub_name='post_aeroacoustics'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' aeroacoustics'//nl
   call printout(trim(msg))
@@ -253,13 +253,13 @@ end subroutine post_aeroacoustics
 ! ----------------------------------------------------------------------
 
 function is_multiple(comp_name, name_root, imult) result(ismult)
-  character(len=*), intent(in)             :: comp_name
+  character(len=max_char_len), intent(in)  :: comp_name
   character(len=max_char_len), intent(out) :: name_root
   integer, intent(out)                     :: imult
   logical                                  :: ismult
 
-  character(len=*), parameter              :: nums='0123456789'
-  character(len=*), parameter              :: underscore='_'
+  character(len=max_char_len), parameter   :: nums='0123456789'
+  character(len=max_char_len), parameter   :: underscore='_'
   integer                                  :: strlen, check
 
   ismult = .false.

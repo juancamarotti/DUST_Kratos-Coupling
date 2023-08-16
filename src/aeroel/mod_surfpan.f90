@@ -65,11 +65,11 @@ use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
-
 use mod_doublet, only: &
   potential_calc_doublet , &
   velocity_calc_doublet  , &
-  gradient_calc_doublet
+  gradient_calc_doublet  , & 
+  linear_potential_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -121,18 +121,19 @@ type, extends(c_impl_elem) :: t_surfpan
 
 contains
 
-  procedure, pass(this) ::  build_row        => build_row_surfpan
-  procedure, pass(this) ::  build_row_static => build_row_static_surfpan
-  procedure, pass(this) ::  add_wake         => add_wake_surfpan
-  procedure, pass(this) ::  add_expl         => add_expl_surfpan
-  procedure, pass(this) ::  compute_pot      => compute_pot_surfpan
-  procedure, pass(this) ::  compute_vel      => compute_vel_surfpan
-  procedure, pass(this) ::  compute_grad     => compute_grad_surfpan
-  procedure, pass(this) ::  compute_psi      => compute_psi_surfpan
-  procedure, pass(this) ::  compute_pres     => compute_pres_surfpan
-  procedure, pass(this) ::  compute_dforce   => compute_dforce_surfpan
-  procedure, pass(this) ::  calc_geo_data    => calc_geo_data_surfpan
-  procedure, pass(this) ::  get_vort_vel     => get_vort_vel_surfpan
+  procedure, pass(this) ::  build_row               => build_row_surfpan
+  procedure, pass(this) ::  build_row_static        => build_row_static_surfpan
+  procedure, pass(this) ::  add_wake                => add_wake_surfpan
+  procedure, pass(this) ::  add_expl                => add_expl_surfpan
+  procedure, pass(this) ::  compute_pot             => compute_pot_surfpan
+  procedure, pass(this) ::  compute_linear_pot      => compute_linear_pot_surfpan
+  procedure, pass(this) ::  compute_vel             => compute_vel_surfpan
+  procedure, pass(this) ::  compute_grad            => compute_grad_surfpan
+  procedure, pass(this) ::  compute_psi             => compute_psi_surfpan
+  procedure, pass(this) ::  compute_pres            => compute_pres_surfpan
+  procedure, pass(this) ::  compute_dforce          => compute_dforce_surfpan
+  procedure, pass(this) ::  calc_geo_data           => calc_geo_data_surfpan
+  procedure, pass(this) ::  get_vort_vel            => get_vort_vel_surfpan
 
   procedure, pass(this) ::  create_local_velocity_stencil => &
                             create_local_velocity_stencil_surfpan
@@ -152,7 +153,7 @@ character(len=*), parameter :: this_mod_name = 'mod_surfpan'
 contains
 !----------------------------------------------------------------------
 
-!> Subroutine to populate the module variables from input
+!> Subroutine to populate the module variables from input (TODO move to a separate module)
 !!
 subroutine initialize_surfpan()
 
@@ -211,7 +212,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
     e3 = this%nor
 
     ! Control point (Q)
-    zQ = sum( (pos-this%cen) * e3 )
+    zQ = dot_product((pos-this%cen) , e3)
     Qp = pos - zQ * e3
 
     do i1 = 1 , this%n_ver
@@ -249,9 +250,9 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
 
       end if
 
-      souLog = log( (R1+R2+this%edge_len(i1)) / (den) )
+      souLog = log((R1+R2+this%edge_len(i1)) / (den))
 
-      vi = - sum( cross( Qp-this%verp(:,i1), this%edge_vec(:,i1) ) * e3 ) / this%edge_len(i1)
+      vi = - dot_product(cross(Qp-this%verp(:,i1), this%edge_vec(:,i1)), e3) / this%edge_len(i1)
       sou = sou + vi * souLog
 
     end do
@@ -311,34 +312,35 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
         indp1 = next_qua(i1)
       end if
 
-      R1 = norm2( pos - this%verp(:,i1) )
-      R2 = norm2( pos - this%verp(:,indp1) )
+      R1 = norm2(pos - this%verp(:,i1))
+      R2 = norm2(pos - this%verp(:,indp1))
 
       if(sim_param%debug_level .ge.5) then
-      if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
-        call warning(this_sub_name, this_mod_name, &
-          'too small denominator in calculation of velocity')
-        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-        call printout(message)
+        if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
+          call warning(this_sub_name, this_mod_name, &
+            'too small denominator in calculation of velocity')
+          write(message,*) 'R1, R2, this%edge_len, i1', R1, R2, this%edge_len(i1), i1
+          call printout(message)
       end if
-      if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
-        call warning(this_sub_name, this_mod_name, &
-          'too small edge length in calculation of velocity')
-        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-        call printout(message)
-      end if
-      if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
-        call warning(this_sub_name, this_mod_name, &
-          'too small numerator in calculation of velocity')
-        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-        call printout(message)
-      end if
+        if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
+          call warning(this_sub_name, this_mod_name, &
+            'too small edge length in calculation of velocity')
+          write(message,*) 'R1, R2, this%edge_len, i1', R1, R2, this%edge_len(i1), i1
+          call printout(message)
+        end if
+        if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
+          call warning(this_sub_name, this_mod_name, &
+            'too small numerator in calculation of velocity')
+          write(message,*) 'R1, R2, this%edge_len, i1', R1, R2, this%edge_len(i1), i1
+          call printout(message)
+        end if
       endif
 
       if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
         souLog = 0.0_wp
       else
-        souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
+        !> katz eqs 10.95 - 10.96 (the sign wrotten in the book is wrong)
+        souLog = log( (R1+R2 + this%edge_len(i1)) / (R1+R2 - this%edge_len(i1)) )
       endif
 
       phix = phix + this%sinTi(i1) * souLog
@@ -354,7 +356,9 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
 
   end if
 
-  ! vsou = (/ phix , phiy , pdou /)
+  ! vsou = (/ phix , phiy , pdou /) 
+  !> Rotate the velocity vector from the local coordinate system to the global one 
+  !> rot = (tang(:,:), nor) 
   vel(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
   vel(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
   vel(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
@@ -366,10 +370,104 @@ end subroutine velocity_calc_sou_surfpan
 !        write this routine
 subroutine gradient_calc_sou_surfpan(this, grad, pos)
   class(t_surfpan), intent(in) :: this
-  real(wp), intent(out) :: grad(3,3)
-  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in)         :: pos(:)
+  real(wp), intent(out)        :: grad(3,3)
 
-  grad = 0.0_wp
+  real(wp)                     :: rot(3,3), grad_loc(3,3), dlog
+  real(wp)                     :: csi, eta, zeta, v_dou(3) 
+  real(wp)                     :: csi_1, eta_1, zeta_1
+  real(wp)                     :: csi_2, eta_2, zeta_2 
+  real(wp)                     :: phicsi_csi,  phieta_csi,  phizeta_csi 
+  real(wp)                     :: phicsi_eta,  phieta_eta,  phizeta_eta
+  real(wp)                     :: phicsi_zeta, phieta_zeta, phizeta_zeta
+  real(wp)                     :: R1, R2 
+  integer                      :: indm1, indp1 
+  integer                      :: i1
+  character(len=max_char_len)  :: message
+  character(len=*), parameter  :: this_sub_name='velocity_calc_sou_surfpan'
+
+  !> rotation matrix from local to global coordinates 
+  rot(:,1) = this%tang(:,1)
+  rot(:,2) = this%tang(:,2)
+  rot(:,3) = this%nor(:)
+  
+  !> initialization
+  grad_loc = 0.0_wp; grad = 0.0_wp; dlog = 0.0_wp
+  !> structure of the gradient matrix (local coordinates)  
+  phicsi_csi = 0.0_wp;  phieta_csi = 0.0_wp; phizeta_csi = 0.0_wp 
+  phicsi_eta = 0.0_wp;  phieta_eta = 0.0_wp; phizeta_eta = 0.0_wp
+  phicsi_zeta = 0.0_wp; phieta_zeta = 0.0_wp; phizeta_zeta = 0.0_wp
+
+  !> TODO add far field approximation for the gradient of the source 
+  !> loop over the vertices of the panel 
+  do i1 = 1 , this%n_ver
+
+    if (this%n_ver .eq. 3) then
+      indm1 = prev_tri(i1)
+      indp1 = next_tri(i1)
+    else if (this%n_ver .eq. 4) then
+      indm1 = prev_qua(i1)
+      indp1 = next_qua(i1)
+    end if
+
+    R1 = norm2(pos - this%verp(:,i1))    !> R_{k}
+    R2 = norm2(pos - this%verp(:,indp1)) !> R_{k+1} 
+
+    !> R_{k} and R_{k+1} in local coordinates {csi, eta, zeta}
+    csi = dot_product(rot(:,1), pos)
+    eta = dot_product(rot(:,2), pos)
+    zeta = dot_product(rot(:,3), pos)
+
+    csi_1 = dot_product(rot(:,1), this%verp(:,i1))
+    eta_1 = dot_product(rot(:,2), this%verp(:,i1))
+    zeta_1 = dot_product(rot(:,3), this%verp(:,i1)) !> should be 0.0
+    
+    csi_2 = dot_product(rot(:,1), this%verp(:,indp1)) 
+    eta_2 = dot_product(rot(:,2), this%verp(:,indp1))
+    zeta_2 = dot_product(rot(:,3), this%verp(:,indp1)) !> should be 0.0
+    
+    !> log derivative first part  
+    dlog = 2.0_wp*this%edge_len(i1)/((R1+R2)**2.0_wp - this%edge_len(i1)**2)
+
+    !> grad(1,1) = dphicsi/dcsi
+    phicsi_csi = phicsi_csi + this%sinTi(i1) * dlog * &
+                  ((csi - csi_1)/R1 + (csi - csi_2)/R2) 
+    !> grad(2,1) = dphicsi/deta
+    phicsi_eta = phicsi_eta + this%sinTi(i1) * dlog * &
+                  ((eta - eta_1)/R1 + (eta - eta_2)/R2) 
+    !> grad(3,1) = dphicsi/dzeta
+    phicsi_zeta = phicsi_zeta + this%sinTi(i1) * dlog * &
+                  (zeta/R1 + zeta/R2) 
+    !> grad(1,2) = dphicsi/dcsi
+    phieta_csi = phieta_csi - this%cosTi(i1) * dlog * &
+                  ((csi - csi_1)/R1 + (csi - csi_2)/R2) 
+    !> grad(2,2) = dphicsi/deta
+    phieta_eta = phieta_eta - this%cosTi(i1) * dlog * &
+                  ((eta - eta_1)/R1 + (eta - eta_2)/R2) 
+    !> grad(3,2) = dphicsi/dzeta
+    phieta_zeta = phicsi_zeta - this%cosTi(i1) * dlog * &
+                  (zeta/R1 + zeta/R2) 
+    
+  enddo
+
+  !> the source is minus the integral of the doublet, therefore the zeta gradient components 
+  !> is the induced velocity of a doublet in the local zeta direction   
+  call velocity_calc_doublet(this, v_dou, pos) !> velocity induced by the doublet
+
+  !> velocity induced by the doublet in local coordinates
+  v_dou = -matmul(transpose(rot), v_dou) 
+
+  phizeta_csi = v_dou(1)
+  phizeta_eta = v_dou(2)
+  phizeta_zeta = v_dou(3) 
+
+  !> assembly of the gradient matrix 
+  grad_loc(1,1) = phicsi_csi;  grad_loc(1,2) = phieta_csi;  grad_loc(1,3) = phizeta_csi   
+  grad_loc(2,1) = phicsi_eta;  grad_loc(2,2) = phieta_eta;  grad_loc(2,3) = phizeta_eta  
+  grad_loc(3,1) = phicsi_zeta; grad_loc(3,2) = phieta_zeta; grad_loc(3,3) = phizeta_zeta
+  
+  !> transformation of the gradient matrix from local to global coordinates 
+  grad = matmul(transpose(rot), matmul(grad_loc, rot)) 
 
 end subroutine gradient_calc_sou_surfpan
 
@@ -492,9 +590,9 @@ end subroutine build_row_static_surfpan
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of potential due to the wake
 subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
-                            ie,ista, iend)
+                            ie, ista, iend)
   class(t_surfpan), intent(inout) :: this
-  type(t_pot_elem_p), intent(in)      :: wake_elems(:)
+  type(t_pot_elem_p), intent(in)  :: wake_elems(:)
   integer, intent(in)             :: impl_wake_ind(:,:)
   type(t_linsys), intent(inout)   :: linsys
   integer, intent(in)             :: ie
@@ -504,6 +602,7 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   integer :: j1, ind1, ind2
   real(wp) :: a, b
   integer :: n_impl
+  real (wp) :: TR, TL 
 
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
@@ -511,30 +610,40 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   !Add the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
   !ones since are at the beginning of the list
-  do j1 = 1 , n_impl
-    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-    if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-        (ind2.ge.ista .and. ind2.le.iend)) then
 
-
-      !todo: find a more elegant solution to avoid i=j
-      call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
-      linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
-      linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
-
-    endif
-
-  end do
+  if (sim_param%kutta_correction) then
+    do j1 = 1 , n_impl
+      ind1 = impl_wake_ind(1,j1)
+      ind2 = impl_wake_ind(2,j1)
+      if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+          (ind2.ge.ista .and. ind2.le.iend)) then
+        !todo: find a more elegant solution to avoid i=j
+        call wake_elems(j1)%p%compute_linear_pot(TL, TR, this%cen, 1, 2 ) 
+        linsys%TL(ie, j1) = TL 
+        linsys%TR(ie, j1) = TR  
+        linsys%A(ie,ind1) = linsys%A(ie,ind1) + TL
+        linsys%A(ie,ind2) = linsys%A(ie,ind2) - TL
+      endif
+    end do
+  else !> old formulation (with constant potential)
+    do j1 = 1 , n_impl
+      ind1 = impl_wake_ind(1,j1)
+      ind2 = impl_wake_ind(2,j1)
+      if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+          (ind2.ge.ista .and. ind2.le.iend)) then
+        !todo: find a more elegant solution to avoid i=j
+        call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+        linsys%A(ie,ind1) = linsys%A(ie,ind1) + a
+        linsys%A(ie,ind2) = linsys%A(ie,ind2) - a
+      endif
+    end do
+  endif
 
   ! Add the explicit vortex panel wake contribution to the rhs
   do j1 = n_impl+1 , size(wake_elems)
-
     !todo: find a more elegant solution to avoid i=j
     call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
-
   end do
 
 end subroutine add_wake_surfpan
@@ -564,12 +673,9 @@ subroutine add_expl_surfpan(this, expl_elems, linsys, &
 
   !Dynamic part: compute the things now
   do j1 = ista , iend
-
     !todo: find a more elegant solution to avoid i=j
     call expl_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
     linsys%b(ie) = linsys%b(ie) - a*expl_elems(j1)%p%mag
-
   end do
 
 end subroutine add_expl_surfpan
@@ -603,7 +709,30 @@ subroutine compute_pot_surfpan(this, A, b, pos , i , j )
 
   b =  sou
 
-end subroutine compute_pot_surfpan
+end subroutine compute_pot_surfpan 
+
+!> Compute the potential due to a surface panel
+!!
+!! this subroutine employs doublets and sources basic subroutines to calculate
+!! the AIC of a suface panel on another surface panel, and the contribution
+!! to its rhs
+subroutine compute_linear_pot_surfpan(this, TL, TR, pos , i , j )
+  class(t_surfpan), intent(inout) :: this
+  real(wp), intent(out)           :: TL
+  real(wp), intent(out)           :: TR
+  real(wp), intent(in)            :: pos(:)
+  integer , intent(in)            :: i, j
+
+  real(wp)                        :: dou
+  
+  if ( i .ne. j ) then
+    call linear_potential_calc_doublet(this, TL, TR, pos)
+  else
+  ! AIC (doublets) = 0.0   -> dou = 0
+    dou = -2.0_wp*pi
+  end if
+
+end subroutine compute_linear_pot_surfpan 
 
 !----------------------------------------------------------------------
 
@@ -857,9 +986,12 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
 
   ! inverse Cls ----
   det_cls = Cls_tilde(1,1) * Cls_tilde(2,2) - Cls_tilde(1,2) * Cls_tilde(2,1)
-  iCls_tilde(1,1) =  Cls_tilde(2,2) / det_cls ; iCls_tilde(1,2) = -Cls_tilde(1,2) / det_cls
-  iCls_tilde(2,1) = -Cls_tilde(2,1) / det_cls ; iCls_tilde(2,2) =  Cls_tilde(1,1) / det_cls
-
+  if (det_cls .eq. 0.0_wp) then
+    iCls_tilde = 0.0_wp
+  else
+    iCls_tilde(1,1) =  Cls_tilde(2,2) / det_cls ; iCls_tilde(1,2) = -Cls_tilde(1,2) / det_cls
+    iCls_tilde(2,1) = -Cls_tilde(2,1) / det_cls ; iCls_tilde(2,2) =  Cls_tilde(1,1) / det_cls
+  endif 
   if ( .not. allocated(this%chtls_stencil) ) then
     allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
   end if
@@ -887,6 +1019,8 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
 
 
 end subroutine create_chtls_stencil_surfpan
+
+
 
 !----------------------------------------------------------------------
 

@@ -142,7 +142,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   real(wp), allocatable                                    :: rr_probes(:,:)
   logical                                                  :: probe_vel , probe_p , probe_vort, probe_cp
   integer                                                  :: fid_out , i_var , nprint
-  integer                                                  :: ie , ip , ic , it , ires, it_old, nelems_comp
+  integer                                                  :: ie , ip , ic , it , ires, nelems_comp
   integer(h5loc)                                           :: floc , ploc
   character(len=max_char_len)                              :: filename
   real(wp), allocatable                                    :: points(:,:), points_old(:,:)

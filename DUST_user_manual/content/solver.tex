@@ -76,6 +76,7 @@ join_te = F
 join_te_factor = 1.0
 refine_wake = T
 k_refine = 1
+autoscale_te = F 
 
 ! --- model parameters ---
 far_field_ratio_doublet = 10.0
@@ -143,6 +144,13 @@ vl_start_step = 0
 vl_dynstall = F
 aitken_relaxation = T 
 
+! --- Kutta Condition Correction ---
+kutta_beta = 0.01
+kutta_correction = F 
+kutta_startstep = 1
+kutta_maxiter = 20
+kutta_tol = 1.0e-6
+kutta_update_jacobian = 1
 \end{inputfile}
 
 The details of each parameter are:
@@ -357,7 +365,8 @@ Number of panel wake rows before converting the wake to vortex particles.
 \item \param{n\_wake\_particles}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10000 \textit{type:} integer.
 
-Number of maximum vortex particles in the wake. If the limit is reached the simulation is stopped, but can be restarted from last save with a higher value of the parameter. 
+Number of maximum vortex particles in the wake. If the limit is reached the simulation is 
+stopped, but can be restarted from last save with a higher value of the parameter. 
 
 
 \item \param{particles\_box\_min}: \textit{required:} no. \textit{multiple:} no. 
@@ -413,6 +422,17 @@ Employ trailing edge joining for close trailing edges.
 If employing joining of trailing edges, the trailing edges which are closer than 
 \param{join\_te\_factor} times the length of the adjacent trailing edge elements 
 will be joined. 
+
+\item \param{autoscale\_te}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} False. \textit{type:} logical. 
+
+Autoscale the first te panel as $dx/(V_\mathrm{local}dt)*$\param{implicit_panel_scale} 
+where $dx$ is the panel width (chordwise direction) and 
+$V_\mathrm{local} = \|V_\infty-V_\mathrm{te}\|$. 
+
+When is false, the wake panel can be scaled by the \param{implicit_panel_scale} 
+parameter at simulation level and by the \param{scale\_te} at component level.
+
 
 \item \param{far_field_ratio_doublet}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10.0 \textit{type:} real.
@@ -531,7 +551,7 @@ Use the fast multipole method for particles evolution.
 \textit{default:} F \textit{type:} logical.
 
 Use the fast multipole method also to compute interactions 
-of the particles on the solid bodies panels.
+of the particles on the solid bodies panels. Experimental feature, still in development.
 
 \item \param{viscosity_effects}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} F \textit{type:} logical.
@@ -687,7 +707,7 @@ line circulation as the unknown variable. It is the default method.
 \opt{alpha_method} performs a similar fixed point method but with the angle 
 of attack of the lifting line section as variable. 
 It allows for the use of regularization in case of problematic 
-partially stalled configurations. 
+partially stalled configurations. This method is not available after release 0.8.1-b.
 
 \item \param{ll_reynolds_corrections}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} False. \textit{type:} logical.
@@ -822,6 +842,25 @@ Average the solution between the iteration: this may further stabilize the solut
 \item \param{vl_average_iter}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10 \textit{type:} integer. 
 Number of iteration on which the average is computed. 
+
+\item \param{kutta_correction}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 'F' \textit{type:} logical
+    Employ kutta condition for surface panel with trailing edge. 
+
+\item \param{kutta_beta}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.01 \textit{type:} real  
+    Perturbation factor for kutta condition to compute jacobian matrix 
+
+\item \param{kutta_tol}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0e-6 \textit{type:} real
+    Tolerance in Newton scheme for Kutta condition correction  
+
+\item \param{kutta_maxiter}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 100  \textit{type:} integer
+    Maximum number of iterations Newton scheme for Kutta condition correction
+
+\item \param{kutta_start_step}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1 \textit{type:} integer 
+    Time step to start correcting the Kutta condition 
+
+\item \param{kutta_update_jacobian}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1 \textit{type:} integer 
+    Step frequency in which the jacobian matrix is updated in the Newton scheme for Kutta condition correction. When preCICE is called, 
+    the jacobian is updated only at the first preCICE iteration. 
 
 \end{itemize}
 

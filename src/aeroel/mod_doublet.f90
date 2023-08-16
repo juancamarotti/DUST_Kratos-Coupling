@@ -43,6 +43,7 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Alessandro Cocco 
 !!=========================================================================
 
 !> Module containing subroutines about doublets distributions.
@@ -56,7 +57,7 @@ use mod_param, only: &
   wp, &
   prev_tri , next_tri , &
   prev_qua , next_qua , &
-  pi
+  pi, eps
 
 use mod_aeroel, only: &
   c_pot_elem
@@ -72,7 +73,8 @@ implicit none
 public ::    initialize_doublet,  &
           potential_calc_doublet, &
           velocity_calc_doublet,  &
-          gradient_calc_doublet
+          gradient_calc_doublet,  & 
+          linear_potential_calc_doublet
 
 private
 
@@ -115,18 +117,19 @@ subroutine potential_calc_doublet(this, dou, pos)
   real(wp), intent(out)         :: dou
   real(wp), intent(in)          :: pos(:)
   real(wp), dimension(3)        :: e3
-  real(wp)                      :: zQ
-  real(wp), dimension(3) :: ei , ap1 , am1
+  real(wp)                      :: zQ, ap1nxam1n
+  real(wp), dimension(3)        :: ei , ap1 , am1
   real(wp)                      :: ap1n , am1n , sinB , cosB , beta
-  integer                       :: indm1, indp1
+  integer                       :: indm1
   ! QUAD elem as 2 TRIA elems
   real(wp) :: radius
-  integer :: i1!, i2
-  radius = norm2(pos-this%cen)
+  integer :: i1
+
+  radius = norm2(pos - this%cen)
   ! unit normal
   e3 = this%nor
   ! Control point (Q): distance (normal proj) of the point <pos> from the panel <this>
-  zQ = sum( (pos-this%cen) * e3 )
+  zQ = dot_product((pos - this%cen),e3)
 
   if ( radius .gt. ff_ratio * maxval(this%edge_len) ) then ! far-field approximation (1)
     dou = zQ * this%area / radius**3.0_wp
@@ -137,21 +140,25 @@ subroutine potential_calc_doublet(this, dou, pos)
       do i1 = 1 , this%n_ver
 
         !This is ugly but should be general and work...
-        indp1 = 1+mod(i1,this%n_ver)
         indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
 
         ! doublet  -----
         ! it is possible to use ver, instead of ver_p for the doublet
         ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
-        ap1 =   this%edge_vec(:,i1   ) - ei * sum( ei * this%edge_vec(:,i1   ) )
-        am1 = - this%edge_vec(:,indm1) + ei * sum( ei * this%edge_vec(:,indm1) )
+        ap1 =   this%edge_vec(:,i1   ) - ei * dot_product( ei, this%edge_vec(:,i1   ) )
+        am1 = - this%edge_vec(:,indm1) + ei * dot_product( ei, this%edge_vec(:,indm1) )
         ap1n= norm2(ap1)
         am1n= norm2(am1)
-        sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
-        cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
+        ap1nxam1n = ap1n*am1n
+        if (ap1nxam1n .lt. eps) then !> avoid singularities 
+          sinB = 0.0_wp
+          cosB = 1.0_wp
+        else
+          sinB = dot_product(ei, cross(am1, ap1)) / ap1nxam1n
+          cosB = dot_product(am1, ap1) / ap1nxam1n
+        end if
         beta = atan2( sinB , cosB )
         dou = dou + beta
-
       end do
 
       ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
@@ -160,7 +167,6 @@ subroutine potential_calc_doublet(this, dou, pos)
         dou = dou + real(this%n_ver-2,wp) * pi
       elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
         dou = dou - real(this%n_ver-2,wp) * pi
-      !else do nothin, add zero
       end if
 
   end if
@@ -180,7 +186,7 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
   real(wp), intent(out)         :: v_dou(3)
   real(wp), intent(in)          :: pos(:)
   real(wp)                      :: phix , phiy , pdou
-  integer                       :: indp1 , indm1
+  integer                       :: indp1 
   real(wp)                      :: av(3) , hv(3)
   real(wp)                      :: ai    , hi
   real(wp)                      :: R1 , R2
@@ -199,11 +205,11 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
   
   if ( radius .gt. ff_ratio * maxval(this%edge_len) ) then ! far-field approximation (1)
 
-    rati = 3.0_wp * this%area * sum( radius_v * this%nor ) / radius**5.0_wp
+    rati = 3.0_wp * this%area * dot_product(radius_v, this%nor) / radius**5.0_wp
 
-    phix = rati * sum(radius_v * this%tang(:,1))
-    phiy = rati * sum(radius_v * this%tang(:,2))
-    pdou = this%area * ( - radius**2.0_wp + 3.0_wp*sum(radius_v*this%nor)**2.0_wp ) / radius**5.0_wp
+    phix = rati * dot_product(radius_v, this%tang(:,1))
+    phiy = rati * dot_product(radius_v, this%tang(:,2))
+    pdou = this%area * ( - radius**2.0_wp + 3.0_wp*dot_product(radius_v, this%nor)**2.0_wp ) / radius**5.0_wp
 
     ! vdou = matmul((/tang(:,:), nor/), (/phix, phiy, pdou/)) 
     v_dou(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
@@ -217,14 +223,12 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
       !> index of next vertex (/2, 3, 4, 1/)
       indp1 = 1+mod(i1,this%n_ver)  
-      !> index of the previous vertex (/4, 1, 2, 3/)
-      indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver) 
-
+      
       !> use this%ver instead of its projection this%verp
       av = pos-this%ver(:,i1)
-      ai = sum(av*this%edge_uni(:,i1))
+      ai = dot_product(av, this%edge_uni(:,i1))
       R1 = norm2(av)
-      R2 = norm2(pos-this%ver(:,indp1))
+      R2 = norm2(pos - this%ver(:,indp1))
       hv = av - ai*this%edge_uni(:,i1)
       hi = norm2(hv)
       
@@ -257,7 +261,7 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
   real(wp), intent(out) :: grad_dou(3,3)
   real(wp), intent(in) :: pos(:)
 
-  integer :: indp1 , indm1 , i1 , i2 , i
+  integer :: indp1 , i1 , i2 , i
   real(wp) :: R1(3) , R2(3) , a1(3) , a2(3) , l(3) , a
   real(wp) :: R1v(3,1) , R2v(3,1) , a1v(3,1) , a2v(3,1) , lv(3,1)
   real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
@@ -272,7 +276,6 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
 
     !This is ugly but should be general and work...
     indp1 = 1+mod(i,this%n_ver)
-    indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
     i1 = i
     i2 = indp1
 
@@ -313,5 +316,76 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
 end subroutine gradient_calc_doublet
 
 !----------------------------------------------------------------------
+
+subroutine linear_potential_calc_doublet(this, TL, TR, pos)
+  class(c_pot_elem), intent(in) :: this
+  real(wp), intent(out)         :: TL, TR
+  real(wp), intent(in)          :: pos(:)
+
+  real(wp)                      :: radius, xQ, yQ, zQ, r0a(3), r0b(3) 
+  real(wp)                      :: xa, ya, xb, yb, theta, dab, va, ra, rb, mab
+  real(wp)                      :: ea, eb, ha, hb, AA, BB, Qn
+  real(wp)                      :: Phi, Q
+  integer                       :: i1, indp1
+
+  radius = norm2(pos-this%cen)  
+  ! Control point (Q): distance (normal proj) of the point <pos> from the panel <this>
+  xQ = dot_product(pos-this%cen, this%tang(:,1))
+  yQ = dot_product(pos-this%cen, this%tang(:,2))
+  zQ = dot_product(pos-this%cen, this%nor) 
+
+  Phi = 0.0_wp
+  Q = 0.0_wp 
+
+  do i1 = 1 , this%n_ver
+    !This is ugly but should be general and work...
+    indp1 = 1+mod(i1,this%n_ver)
+    ! doublet  -----
+    r0a = this%ver(:,i1) - this%cen
+    r0b = this%ver(:,indp1) - this%cen
+
+    xa = dot_product(r0a, this%tang(:,1))
+    ya = dot_product(r0a, this%tang(:,2))
+    
+    xb = dot_product(r0b, this%tang(:,1))
+    yb = dot_product(r0b, this%tang(:,2)) 
+
+    theta = atan2(yb - ya, xb - xa)
+    dab = this%edge_len(i1) !sqrt((xb - xa)**2 + (yb - ya)**2) (check) 
+    va = (xQ - xa) * sin(theta) - (yQ - ya) * cos(theta)
+    ra = sqrt((xQ - xa)**2.0_wp + (yQ - ya)**2.0_wp + zQ**2.0_wp)
+    rb = sqrt((xQ - xb)**2.0_wp + (yQ - yb)**2.0_wp + zQ**2.0_wp)
+    mab = (yb - ya) / (xb - xa)
+    ea = (xQ - xa)**2.0_wp + zQ**2.0_wp
+    eb = (xQ - xb)**2.0_wp + zQ**2.0_wp
+    ha = (xQ - xa) * (yQ - ya)
+    hb = (xQ - xb) * (yQ - yb)
+    AA = atan2(mab * ea - ha, zQ * ra)
+    if (abs(AA + pi) .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+        AA = pi
+    end if
+    BB = atan2(mab * eb - hb, zQ * rb)
+    if (abs(BB + pi) .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+        BB = pi
+    end if
+
+    Qn = log((ra + rb + dab) / (ra + rb - dab))
+
+    Phi = Phi + (AA - BB)
+
+    Q = Q + Qn * (yQ * sin(theta) - xQ * cos(theta) +  &
+                  va * sin(theta) * cos(theta)) - (rb - ra) * cos(theta)**2
+  enddo
+  
+  if (Phi .lt. -2.0_wp*pi) then
+    Phi = Phi + 4.0_wp*pi
+  elseif (Phi .gt. 2.0_wp*pi) then
+    Phi = Phi - 4.0_wp*pi
+  end if
+
+  TL = Phi - (Phi*xQ*yQ + zQ*Q)
+  TR = Phi*xQ*yQ + zQ*Q
+  
+end subroutine linear_potential_calc_doublet
 
 end module mod_doublet

@@ -88,7 +88,7 @@ use mod_dat_out, only: &
   dat_out_loads_header, dat_out_hinge_header
 
 use mod_math, only: &
-  cross
+  cross, vec2mat
 
 implicit none
 
@@ -127,6 +127,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   real(wp), allocatable                                    :: refs_R(:,:,:), refs_off(:,:)
   real(wp), allocatable                                    :: refs_G(:,:,:), refs_f(:,:)
   real(wp), allocatable                                    :: vort(:), cp(:)
+  real(wp)                                                 :: R_cen(3,3)
   character(len=max_char_len)                              :: ref_tag
   integer                                                  :: ref_id
   real(wp)                                                 :: F_ref(3), F_bas(3), F_bas1(3)
@@ -255,10 +256,40 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
       ! Loads from the ic-th component in the base ref.frame
       do ie = 1 , size(comps(ic)%el)
-        F_bas1 = comps(ic)%el(ie)%dforce
 
-        F_bas = F_bas + F_bas1
+#if USE_PRECICE
+        if (comps(ic)%coupling) then
+          call vec2mat(comps(ic)%el(ie)%ori, R_cen)
+          R_cen = matmul(comps(ic)%coupling_node_rot, R_cen)
+          F_bas1 = comps(ic)%el(ie)%dforce 
+          F_bas = F_bas + matmul(transpose(R_cen) , F_bas1 )
+          if (trim(comps(ic)%comp_el_type) .eq. 'l') then 
+              ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
+              M_bas  = M_bas + cross( matmul(transpose(R_cen), ac), F_bas1) &
+                            + comps(ic)%el(ie)%dmom 
+            else 
+              M_bas  = M_bas + cross( matmul(transpose(R_cen), &
+                              comps(ic)%el(ie)%cen) , F_bas1 )      &
+                              + comps(ic)%el(ie)%dmom 
+          endif          
 
+        else 
+
+          F_bas1 = comps(ic)%el(ie)%dforce 
+          F_bas = F_bas +  F_bas1
+
+          if (trim(comps(ic)%comp_el_type) .eq. 'l') then
+            ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
+            M_bas = M_bas + cross( ac   &
+                        - refs_off(:,ref_id) , F_bas1 )  &
+                        + comps(ic)%el(ie)%dmom  
+          else
+            M_bas = M_bas + cross( comps(ic)%el(ie)%cen    &
+                        - refs_off(:,ref_id) , F_bas1 )  &
+                        + comps(ic)%el(ie)%dmom  
+          endif
+        endif 
+#else   
         if (trim(comps(ic)%comp_el_type) .eq. 'l') then
           ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
           M_bas = M_bas + cross( ac   &
@@ -269,16 +300,27 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
                         - refs_off(:,ref_id) , F_bas1 )  &
                         + comps(ic)%el(ie)%dmom  
         endif
-
-
+#endif
+        
       end do !ie
 
       ! From the base ref.sys to the chosen ref.sys (offset and rotation)
+#if USE_PRECICE
+      if (comps(ic)%coupling) then 
+        F_ref = F_ref + F_bas
+        M_ref = M_ref + M_bas
+      else
+        F_ref = F_ref + matmul( &
+            transpose( refs_R(:,:, ref_id) ) , F_bas )
+        M_ref = M_ref + matmul( &
+            transpose( refs_R(:,:, ref_id) ) , M_bas )
+      endif 
+#else
       F_ref = F_ref + matmul( &
             transpose( refs_R(:,:, ref_id) ) , F_bas )
       M_ref = M_ref + matmul( &
             transpose( refs_R(:,:, ref_id) ) , M_bas )
-
+#endif
     end do !ic
 
     if(.not. average) then
