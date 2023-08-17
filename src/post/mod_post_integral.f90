@@ -290,6 +290,9 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
           endif
         endif 
 #else   
+        F_bas1 = comps(ic)%el(ie)%dforce 
+        F_bas = F_bas +  F_bas1
+        
         if (trim(comps(ic)%comp_el_type) .eq. 'l') then
           ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
           M_bas = M_bas + cross( ac   &
