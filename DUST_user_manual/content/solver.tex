@@ -524,10 +524,10 @@ Surface correction element radius multiplication factor.
 The velocity of the particles is corrected to avoid penetration through a 
 particular element if the particle hits the surface within a distance 
 (tangent to the surface) $d_t \leq P_e \max{l_i} \frac{\sqrt{2}}{2}$ 
-from the element centre, where $l_i$ are the lenght of the element sides 
+from the element centre, where $l_i$ are the length of the element sides 
 and $P_e$ is the factor. 
 A bigger factor leads to a potentially higher level of correction 
-(concurrent correction from different neighbouring elements) 
+(concurrent correction from different neighboring elements) 
 while a smaller factor may let some particles slip through the surface. 
 
 \item \param{divergence_filtering}: \textit{required:} no. \textit{multiple:} no. 
@@ -539,7 +539,7 @@ Employ the divergence filtering to keep the vorticity field divergence-free.
 \textit{default:} 40.0 \textit{type:} real.
 
 Timescale of the time filter to filter the divergence. 
-The input is not the actual timescale but the number of simulation timesteps 
+The input is not the actual timescale but the number of simulation time steps 
 of which the timescale is consisting. 
 
 \item \param{fmm}: \textit{required:} no. \textit{multiple:} no. \textit{default:} T 
@@ -563,9 +563,9 @@ on the geometry surface. Experimental feature, still in development.
 \item \param{particles_redistribution}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} F \textit{type:} logical.
 
-Redistribute the particles having a small intensity to the neighbouring ones. 
+Redistribute the particles having a small intensity to the neighboring ones. 
 Active only if \param{fmm} is active, otherwise ignored. Redistributed particles 
-are then ereased to reduce the total number of particles.
+are then erased to reduce the total number of particles.
 
 \item \param{particles_redistribution_ratio}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 3.0 \textit{type:} real.
@@ -584,7 +584,7 @@ When employing \param{particles_redistribution}, the particles too near
 to a solid boundary are not redistributed to reduce the error induced by 
 the redistribution on the solution on solid surfaces. The octree cells at 
 level \param{octree_level_solid} containing a panel (SP, VL or LL) are marked 
-as containing a solid boudary, as well as all their neighbour at that level. 
+as containing a solid boundary, as well as all their neighbor at that level. 
 All the children of cells containing a solid boundary are marked as containing 
 a solid boundary. In the cells containing a solid boundary the redistribution 
 is not performed.
@@ -691,7 +691,7 @@ that triggers the increase of the octree levels.
 \item \param{refine_wake}: \textit{required:} no. 
 \textit{multiple:} no. \textit{type:} logical. \textit{default:} T. 
 
-Allow splitting the wake panel into subparticles with a division that is sub-multiple of the shortest panel edge.   
+Allow splitting the wake panel into sub-particles with a division that is sub-multiple of the shortest panel edge.   
 
 \item \param{k_refine}: \textit{required:} no. \textit{multiple:} no. \textit{type:} integer. \textit{default:} 1. 
 
@@ -743,14 +743,14 @@ iterations, to suppress possible oscillations.
 \item \param{ll_stall_regularisation}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} True. \textit{type:} logical.
 
-During the first timesteps of simulations employing lifting lines, 
+During the first time steps of simulations employing lifting lines, 
 usually in challenging configurations such as hovering rotors, 
 it is possible that a non perfect convergence of the non-linear 
 solver leads to some few elements of the lifting line (typically one) 
 to converge on a stalled configuration among a series of completely 
-non stalled elements. This is unphysical, and usually it is solved 
+non stalled elements. This is un-physical, and usually it is solved 
 during the evolution of the simulation. It is however possible to 
-identify this behaviour and use the previous solution for these 
+identify this behavior and use the previous solution for these 
 sections to improve convergence. 
 
 \item \param{ll_stall_regularisation_nelems}: \textit{required:} no. 
@@ -762,12 +762,12 @@ stall among non stalled elements. At the moment cannot be higher than 1.
 \item \param{ll_stall_regularisation_niters}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 1. \textit{type:} integer.
 
-Number of LL iterations between two regularisation processes.
+Number of LL iterations between two regularization processes.
 
 \item \param{ll_stall_regularisation_alpha_stall} \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 15.0. \textit{type:} real.
 
-Stall angle [deg] used as a threshold for regularisation process. 
+Stall angle [deg] used as a threshold for regularization process. 
 
 \item \param{ll_loads_avl}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} F. \textit{type:} logical.
@@ -881,28 +881,28 @@ In red is highlighted the length of each cube side, \param{box_length}}
 \label{sec:Time_Stepping}
 The simulation is started from parameter \param{tstart} 
 (unless restarting from a previous solution and not resetting time) 
-and ends at \param{tend} after a certain number of timesteps. 
+and ends at \param{tend} after a certain number of time steps. 
 The user must provide the parameters \param{tstart}, \param{tend} 
-and alternatively the number of timesteps (\param{timesteps}) between 
-them or the size of the timesteps (\param{dt}). The non specified 
+and alternatively the number of time steps (\param{timesteps}) between 
+them or the size of the time steps (\param{dt}). The non specified 
 parameter is computed during the execution.
 
-When specifying the number of timesteps, the interval between the 
+When specifying the number of time steps, the interval between the 
 starting time (or re-starting time) and the end time is divided in 
 a number \param{timesteps} of equal intervals, and then \param{timesteps}+1 
 steps are executed, counting also the starting one.
 
-When specifying the timestep length \param{dt}, the smallest number of 
+When specifying the time step length \param{dt}, the smallest number of 
 steps to get to \param{tend} is executed. If the time interval cannot be 
-divided into an integer number of timesteps, all the timesteps will be 
-executed anyway with a timestep length of \param{dt}, and the last timestep 
+divided into an integer number of time steps, all the time steps will be 
+executed anyway with a time step length of \param{dt}, and the last time step 
 will be shorter to arrive precisely at \param{tend}. It must however be 
-noted that DUST is not designed at the moment to handle variable timestep 
+noted that DUST is not designed at the moment to handle variable time step 
 lengths, for this reason in few particular unsteady configurations, this 
-shorter timestep could lead to small fluctuations of the loads just in the 
-last timestep. To avoid this issue use a \param{dt} which lead to a precise 
-number of timesteps or prescribe the number of timesteps instead of the 
-timestep length (or discard the results of the last step). 
+shorter time step could lead to small fluctuations of the loads just in the 
+last time step. To avoid this issue use a \param{dt} which lead to a precise 
+number of time steps or prescribe the number of time steps instead of the 
+time step length (or discard the results of the last step). 
 
 \section{Models Parameters Choice}
 \label{sec:Solver_ParametersChoice}
@@ -973,7 +973,7 @@ inside DUST. %(more details are presented in the Theory Manual).
 
 Reference frames are defined hierarchically from a base reference frame. 
 The base reference frame is called "0" and cannot be defined, 
-is a standard right-nanded Cartesian reference frame and is defined 
+is a standard right-handed Cartesian reference frame and is defined 
 inside DUST. Starting from the base reference frame all the necessary 
 reference frames can be defined. 
 
@@ -1391,7 +1391,10 @@ required in the multiplicity are:
     \item \param{Hub\_Offset}: \textit{required:} yes if \param{mult_type} is \opt{rotor}. 
     \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} real. 
     
-    offset from the rotation pole (the origin of the multiple reference frame) of the beginning of the chain of reference frames for each blade. It is constant and does not imply any secondary motion, can be used to represent the central part of the rotor axis assembly. 
+    offset from the rotation pole (the origin of the multiple reference frame) of the beginning 
+    of the chain of reference frames for each blade. 
+    It is constant and does not imply any secondary motion, can be used to represent the 
+    central part of the rotor axis assembly. 
 
     \item \param{harmonic\_input}: \textit{required:} no, \textit{type:} logical. 
     
@@ -1516,7 +1519,7 @@ and the angular velocity will be:
                                     \big(\dot{\xi}_{ns} - n\Omega\xi_{nc}\big) \sin{n\psi_m}\Big]  +  \dot{\xi}_{N/2}(-1)^{m} \\
 \end{align}
 For the pitch degree of freedom, the motion will take into consideration the control mixing and the flap, and lag components. The input of this degree of freedom 
-are intened to be the actual swashplate input, rather than the actual pitch rotation. 
+are intended to be the actual swashplate input, rather than the actual pitch rotation. 
 
 The pitch root rotation will be then:
 \begin{align}
@@ -1579,8 +1582,8 @@ in \DUST{} will be discussed.
 
 All the equations, models, inputs, outputs etc. in the code are \textbf{dimensional}. 
 This does not mean that they are required to be in a specific dimensional unit, 
-but only that \textbf{no sort of non-dimensionalization is performed in the code}. 
-The user is fully resposible for the scaling (or not) of his inputs, and as a 
+but only that \textbf{no sort of adimensionalization is performed in the code}. 
+The user is fully responsible for the scaling (or not) of his inputs, and as a 
 consequence of the outputs. 
 
 More in detail the core of \DUST{} solves the potential equations, which are a 
@@ -1599,7 +1602,7 @@ The user can take a completely dimensional approach and insert (or build)
 the geometry in the correct size in meters, and impose a free stream velocity 
 and density corresponding to the real flight conditions. In this case the results, 
 for example in terms of loads, will be in the same units set employed in the inputs, 
-$L [N]$. To obtain the loads coefficient then the user must non-dimensionalize the 
+$L [N]$. To obtain the loads coefficient then the user must adimensionalize the 
 results employing the appropriate reference quantities used in the computations:
 \begin{equation*}
     C_L = \frac{L}{1/2 \rho U^2 b c} = \frac{L}{1/2 \cdot 1.225  \cdot 60^2 \cdot 20 \cdot 2}
@@ -1616,17 +1619,17 @@ built parametrically already scaled. The velocity might be scaled on the free
 stream one, specifying directly $U'=U/U=1$, as well as the density $\rho' = \rho/\rho = 1$. 
 
 With these parameters as input, the output would be scaled accordingly, 
-leding for example to the scaled loads $L'$. These outputs, being scaled, 
+leading for example to the scaled loads $L'$. These outputs, being scaled, 
 are not numerically equal to the ones obtained in example \ref{ex:pot-dim}, 
 however they can be on the one hand scaled back to the real ones employing 
 the inverse scaling used for the inputs, or on the other hand if only the 
-non-dimensional coefficients are sought they can be obtained using the scaled 
+adimensional coefficients are sought they can be obtained using the scaled 
 reference quantities:
 \begin{equation*}
     C_L = \frac{L'}{1/2 \rho' U'^2 b' c'} = \frac{L'}{1/2 \cdot 1  \cdot 1^2 \cdot 1 \cdot 0.1}
 \end{equation*}
-When non-dimensionalized on the appropriate reference quantities the 
-non-dimensional coefficients have always the same values.
+When adimensionalized on the appropriate reference quantities the 
+adimensional coefficients have always the same values.
 \end{example}
 
 \begin{example}[Potential case, partially scaled]
@@ -1647,10 +1650,10 @@ be retrieved using the reference quantities employed in the computation:
 \end{example}
 
 It must however be stressed that when talking about scaling of the inputs 
-and non-dimensionalization of the results, these operations are left to the 
+and adimensionalization of the results, these operations are left to the 
 user to be carried out independently before and after the execution of \DUST{}. 
 To maintain complete usage flexibility, it is not possible to introduce any 
-explicit scaling or non-dimensionalizing unit. 
+explicit scaling or adimensionalizing unit. 
 When using certain features of the code (lifting lines, 
 vorticity diffusion, separations etc.) the effects of viscosity 
 and compressibility are simulated in different manners. 
@@ -1663,7 +1666,7 @@ properties of the flow must be provided, rather than the non dimensional
 numbers Reynolds and Mach. It is responsibility of the user to insert 
 them correctly and eventually scale them to obtain similarity of Reynolds 
 and Mach with respect to the target conditions. Examples on how to achieve 
-that in different conditions are presented in example \ref{ex:rema-scaling}.
+that in different conditions are presented in example~\ref{ex:rema-scaling}.
 
 \begin{example}[Ways to determine physical properties]
 \label{ex:rema-scaling}
@@ -1707,7 +1710,7 @@ quantities employed during the simulation.
 \section{Debug Levels}
 \label{sec:Solver_DebugLevels}
 
-As discussed in section \ref{sec:Solver_InputFile} in the solver input 
+As discussed in section~\ref{sec:Solver_InputFile} in the solver input 
 file it is possible to set the parameter \param{debug\_level} which selects 
 the verbosity of the output of the code. The level is selected choosing an 
 integer number, and it is cumulative: selecting a certain value the user gets 
@@ -1715,7 +1718,7 @@ the additional output given at that value \emph{and} all the outputs at the lowe
 As a rule of thumb the debug levels up to 10 generate increasing levels of 
 verbosity in the screen outputs, while increasing levels over 10 generate 
 additional outputs saved in files, in the appropriate \param{basename\_debug} path. 
-The current effects of the debug level are presented in table \ref{tab:debug_level}. 
+The current effects of the debug level are presented in table~\ref{tab:debug_level}. 
 Be aware that the debug file output is mainly targeted for development work, and its 
 content is susceptible to sudden and undocumented changes. 
 

@@ -1,18 +1,18 @@
-\chapter{DUST Postprocessor}
+\chapter{DUST Post-processor}
 \label{ch:Post}
 
-The DUST postprocessor is used to generate meaningful data from the binary 
+The DUST post-processor is used to generate meaningful data from the binary 
 results generated during the execution of the solver. While as discussed in 
 \ref{sec:OutputFilesFormat} it is possible to look at the content of the hdf5 
 results, these being based on the singularities intensities on the surface provide 
 little insight on the solution of the solver. 
 
-The postprocessor takes the specified results and use them to obtain a variety of 
+The post-processor takes the specified results and use them to obtain a variety of 
 different processed data, from visualizations to loads. 
 
 The preprocessor is executed simply invoking the executable \texttt{dust\_post} 
-in the desired folder. The input file containing all the required informations 
-for the execution of the postprocessor must be passed as argument to the command call. 
+in the desired folder. The input file containing all the required information 
+for the execution of the post-processor must be passed as argument to the command call. 
 If not provided explicitly the preprocessor automatically tries to read the default 
 input file \texttt{dust\_post.in}.
 \begin{command}[caption={Postprocessor command looking for input file 
@@ -43,13 +43,13 @@ The different possible analysis that can be performed on the results are:
 \section{Input file}
 \label{sec:Post_InputFile}
 
-The input file of the postprocessor contains first all the information 
+The input file of the post-processor contains first all the information 
 required for retrieving the correct results and to process the data 
 (model parameters etc.) and then in separate sections all the analyses 
 that are requested. An arbitrary number of analyses can be requested in 
 a single input file, however it is also possible to group the analyses 
 in different input files then invoked multiple times as different inputs 
-for the postprocessor. 
+for the post-processor. 
 
 The format is the same as all the other input files, as already specified 
 in section\ref{sec:InputFilesFormat}.
@@ -99,7 +99,7 @@ reference_tag = RotorHub
 \begin{itemize}
 \item \param{data\_basename}: \textit{required:} yes. \textit{multiple:} no. 
 
-Base name (with path) of the data which must be analysed.
+Base name (with path) of the data which must be analyzed.
 
 \item \param{basename}: \textit{required:} yes. \textit{multiple:} no. 
 
@@ -195,11 +195,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -219,7 +219,7 @@ Output the wake in the postprocessing.
 
 Since in vtk output is difficult to separate in the visualization process the 
 different pieces of the solution, it is possible to output the wake in separate 
-files with respect to the surface solution. It affects only the vtk output and 
+files with respect to the surface solution. It affects only the \texttt{.vtk} output and 
 only if \param{wake} is set to true.
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
@@ -300,11 +300,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -313,7 +313,7 @@ Stride to employ when loading the time series of the solver results.
 \item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files output or 
-\opt{tecplot} for tecplot plt files
+\opt{tecplot} for Tecplot \texttt{.plt} files.
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
@@ -351,7 +351,7 @@ frame, given those in the local reference frame.
   4:  #  t , Fx , Fy , Fz , Mx , My , Mz , ref_mat(9) , ref_off(3) 
 \end{inputfile}
 The last lines of the file contain the actual data. As an example, for a 
-100-timestep analysis with the local reference frame \param{Wing1\_Reference} 
+100-time step analysis with the local reference frame \param{Wing1\_Reference} 
 aligned with the global reference frame (the rotation matrix is equal to the identity) 
 and the origin in $(0.0,-1.0,0.0)$, these lines read
 \begin{inputfile}
@@ -402,11 +402,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -415,7 +415,7 @@ Stride to employ when loading the time series of the solver results.
 \item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files output or 
-\opt{tecplot} for tecplot \opt{plt} files
+\opt{tecplot} for Tecplot \texttt{.plt} files
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
@@ -433,7 +433,7 @@ The tag of the control surface of the component in which the loads should be ref
 \end{itemize}
 
 \subsection{Output .dat file}
-The output file containing hinge loads measurements in \param{.dat} 
+The output file containing hinge loads measurements in \texttt{.dat} 
 format has the following structure.
 The first 4 lines of the file constitute the header of the file. 
 The first three lines contains the number of the geometrical components 
@@ -455,7 +455,7 @@ always under the column \opt{Mh}.
  4: #  t , Fv , Fh , Fn , Mv , Mh , Mn , axis_mat(9) , node_hinge(3) 
 \end{inputfile}
 The last lines of the file contain the actual data. As an example, 
-for a 20-timestep analysis with the hinge  reference frame \param{Wing1\_Aileron} 
+for a 20-time step analysis with the hinge  reference frame \param{Wing1\_Aileron} 
 aligned with the global reference frame (the rotation matrix is equal to the identity)
 and the origin of the hinge is $(0.25,-0.1,0.0)$, these lines read
 \begin{inputfile}
@@ -523,12 +523,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -539,7 +539,7 @@ Stride to employ when loading the time series of the solver results.
 \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files 
-output or \opt{tecplot} for tecplot \opt{plt} files
+output or \opt{tecplot} for Tecplot \opt{plt} files
 
 \item \param{variable}: \textit{required:} at least one for each \param{analysis}. 
 \textit{multiple:} yes.
@@ -587,7 +587,7 @@ The first field is the time,
 while \param{n\_probes} $\times$ 3 columns follow, containing the global 
 components of the velocity vectors, measured by the point probes. 
 The following lines contains the fields described for each time step 
-required for the analysis. As an example, for a 100-timestep analysis 
+required for the analysis. As an example, for a 100-time step analysis 
 these lines read
 \begin{inputfile}[frame=single]
   6: 0.000000E+000  0.465000E+002  -0.899269E-004  -0.469068E-004  0.465000E+002
@@ -640,11 +640,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -653,7 +653,7 @@ Stride to employ when loading the time series of the solver results.
 \item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 format of the processed results, can be \opt{vtk} for binary vtk files output 
-or \opt{tecplot} for tecplot plt files
+or \opt{tecplot} for Tecplot \texttt{.plt} files
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
@@ -735,12 +735,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -751,7 +751,7 @@ Stride to employ when loading the time series of the solver results.
 \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files 
-output or \opt{tecplot} for tecplot plt files
+output or \opt{tecplot} for Tecplot \texttt{.plt} files
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} False
@@ -761,7 +761,7 @@ average the results in the given time span.
 \item \param{component}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no.
 
-component (parametrically generated) to analyse. Only one component can be 
+component (parametrically generated) to analyze. Only one component can be 
 enabled for each analysis. 
 
 \item \param{axis_nod}: \textit{required:} one for each \param{analysis}. 
@@ -782,7 +782,7 @@ the distribution of moment along the span.
 \item \param{vortex_lattice_data}: \textit{required:} no. \textit{multiple:} no. 
 \textit{Default:} False
 
-Output additional informations regarding span distribution of several quantities 
+Output additional information regarding span distribution of several quantities 
 of interest for the lifting lines. It works only for parametric elements which 
 are lifting lines.
 
@@ -840,12 +840,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -856,7 +856,7 @@ Stride to employ when loading the time series of the solver results.
 \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files 
-output or \opt{tecplot} for tecplot plt files
+output or \opt{tecplot} for Tecplot \texttt{.plt} files
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} False
@@ -866,7 +866,7 @@ average the results in the given time span.
 \item \param{component}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no.
 
-component to analyse. Only one component can be enabled for each analysis. 
+component to analyze. Only one component can be enabled for each analysis. 
 
 \item \param{box_sect}: \textit{required:} one for each \param{analysis} 
 if component not parametrically generated. \textit{multiple:} no.
@@ -888,7 +888,7 @@ The bounding box is extruded between the two faces.
 \item \param{face_bas}: \textit{required:} one for each \param{box_sect}. 
 \textit{multiple:} no.
 
-Lenght of the base faces in the \param{face_vec} direction. It must have 
+Length of the base faces in the \param{face_vec} direction. It must have 
 two components, one for the first beginning face, one for the last end face. 
 
 \item \param{face_hei}: \textit{required:} one for each \param{box_sect}. 
@@ -969,7 +969,7 @@ global reference frame from those expressed in the local reference frame,
   \bm{f}^G = \bm{R} \, \bm{f}^L 
 \end{equation}
 As an example, the lines collecting the fields described above of the 
-first and the last of the 100 timesteps of the analysis reads
+first and the last of the 100 time steps of the analysis reads
 \begin{inputfile}[frame=single]
   7: 0.000000E+000  0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002
      0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002
@@ -1029,7 +1029,7 @@ are set to \param{T} the following quantities are printed:
     \item \texttt{vel\_outplane}: magnitude of the out-of-plane velocity, 
     $\mathbf{v}_{rel} \cdot \mathbf{\hat{b}}$, where 
     $\mathbf{\hat{b}} = \mathbf{\hat{n}} \times \mathbf{\hat{t}}$ 
-    is the unit vector ``in the crossflow direction''
+    is the unit vector ``in the cross-flow direction''
     \item \texttt{alpha}: angle of attack of the in plane relative 
     velocity at the control point, corrected with the 2D influence 
     needed by Piszkin and Lewinski formulation of LL elements, 
@@ -1106,12 +1106,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -1122,7 +1122,7 @@ Stride to employ when loading the time series of the solver results.
 \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files 
-output or \opt{tecplot} for tecplot plt files
+output or \opt{tecplot} for Tecplot \texttt{.plt} files
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} False
@@ -1132,7 +1132,7 @@ average the results in the given time span.
 \item \param{component}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no.
 
-component (parametrically generated) to analyse. Only one component can be 
+component (parametrically generated) to analyze. Only one component can be 
 enabled for each analysis. 
 
 \item \param{axis_nod}: \textit{required:} one for each \param{analysis}. 
@@ -1201,7 +1201,7 @@ The files generated by sectional loads contain, as sectional quantity:
   \item \texttt{Pres}: Panel pressure for 3D panels, or delta pressure for vortex lattice or 
                       lifting  line. 
   \item \texttt{Cp}: Panel pressure coefficient for 3D panels, or delta pressure 
-                    coefficent for vortex lattice or lifting line. The implemented formulation is 
+                    coefficient for vortex lattice or lifting line. The implemented formulation is 
                     \begin{equation}
                       C_p = \dfrac{P - P_\infty}{\dfrac{1}{2} \rho_\infty U_\infty^2}
                     \end{equation}
@@ -1221,7 +1221,7 @@ The files generated by sectional loads contain, as sectional quantity:
 \section{Aeroacoustics}
 The aeroacoustics postprocessing is a specific analysis used to 
 extract from results all the various data required to perform an 
-aeroacoustics analysis (with an external software) on the analysed results. 
+aeroacoustics analysis (with an external software) on the analyzed results. 
 It is available only in .dat ascii format  and it is intended rather than 
 to be directly plotted/visualized to act as input for another software.
 
@@ -1258,12 +1258,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -1298,7 +1298,7 @@ The second and third lines contain the current simulation time and parameters;
         dynamic viscosity, flow velocity 
   3: 10  0.000000000000000E+000   ... -0.280000000000000E+002
 \end{inputfile}
-The fourth line is a header file containing the fields collected in the nextlines.
+The fourth line is a header file containing the fields collected in the next lines.
 \begin{inputfile}[frame=single]
   4: # cx, cy, cz, nx, ny, nz, area, rho, pressure, rhoux, rhouy, rhouz, svx, svy, svz
 \end{inputfile}

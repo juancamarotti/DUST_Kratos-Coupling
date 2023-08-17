@@ -2,12 +2,12 @@
 \label{ch:Pre}
 
 The DUST preprocessor is used to generate the geometrical components required to model 
-the surfaces of the analysed body. It gathers the meshes of all the components required 
+the surfaces of the analyzed body. It gathers the meshes of all the components required 
 for the complete model, process them when necessary and generates all the parametrically 
 specified components. 
 
 The preprocessor is executed simply invoking the executable \texttt{dust\_pre} in the desired folder. 
-The input file containing all the required informations for the execution of the preprocessor must be 
+The input file containing all the required information for the execution of the preprocessor must be 
 passed as argument to the command call. If not provided explicitly the preprocessor automatically 
 tries to read the default input file \texttt{dust\_pre.in}.
 \begin{command}[caption={Preprocessor command looking for input file \texttt{input\_file\_name.in}}]
@@ -50,7 +50,7 @@ An example of the preprocessor input file is presented in file
 \item \param{comp_name}: \textit{required:} at least one. \textit{multiple:} yes. \textit{type} string.
 
 This is the name assigned to the geometrical component. Will be mainly used by 
-the user afterwards to specify postprocess analyses.
+the user afterwards to specify post process analyses.
 
 \item \param{geo_file}: \textit{required:} at least one. \textit{multiple:} yes. 
 \textit{position:} must be after \param{comp_name}. \textit{type:} string. 
@@ -131,7 +131,7 @@ name of the file containing the mesh.
 
 \item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
 
-type of the mesh. Valid options at the moment are \opt{cgns} for cgns, \opt{parametric} 
+type of the mesh. Valid options at the moment are \opt{cgns} for CGNS, \opt{parametric} 
 for parametrically generated meshes and \opt{basic} for ascii input meshes. 
 The last is only for development purposes. 
 
@@ -209,9 +209,9 @@ Scaling factor for the first implicit wake panel.
 
 \item \param{section_name} \textit{required:} no. \textit{multiple:} yes. \textit{type:} string 
 
-To be used only with cgns meshes: specify only a subset of all the sections (geometrical components) 
-available in the cgns file to be loaded and employed as geometry. 
-If no \param{section_name} is specified, all the sections of the cgns file will be employed.
+To be used only with CGNS meshes: specify only a subset of all the sections (geometrical components) 
+available in the CGNS file to be loaded and employed as geometry. 
+If no \param{section_name} is specified, all the sections of the CGNS file will be employed.
 
 \item \param{offset} \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
@@ -290,10 +290,10 @@ span       = 6.0 ;
 n_span_el  = 10  ;
 n_chord_el = 5   ; % n_chord_el = n. elems on the chord
 
-%> the tot. number of elems for a 3dpanel component ('p' in dust) is
+%> the tot. number of elems for a 3d panel component ('p' in dust) is
 n_elems = (n_span_el)*(2*n_chord_el) ;
 
-%> the tot. number of points for a 3dpanel component ('p' in dust) is
+%> the tot. number of points for a 3d panel component ('p' in dust) is
 n_points_per_sec = 2*n_chord_el+1 ;
 n_points         = (n_span_el+1) * n_points_per_sec ;
 
@@ -452,10 +452,10 @@ a = 5.0 ; b = 1.0 ; % major and minor semi-axis of the cylindrical ellipsoid
 n_axial_sec = 5   ; % n. cylindrical sections, excluding the tank extreme points
 n_radial_el = 8   ; % n_chord_el = n. elems on the chord
 
-%> the tot. number of elems for a 3dpanel component ('p' in dust) is
+%> the tot. number of elems for a 3d panel component ('p' in dust) is
 n_elems = n_radial_el * (n_axial_sec+1) ;
 
-%> the tot. number of points for a 3dpanel component ('p' in dust) is
+%> the tot. number of points for a 3d panel component ('p' in dust) is
 n_points_per_sec = n_radial_el ;
 n_points = ...
   n_points_per_sec*n_axial_sec + 2 ; % + 2: for the extreme points
@@ -488,7 +488,7 @@ end
 rr = [ [ 0.0, -a, 0.0 ] ; rr(1:ir,:) ; [ 0.0, a, 0.0 ] ] ; 
 
 % === ee array ===
-ee = zeros(n_elems,4) ; ie = 0 ; % Initialisation to zero
+ee = zeros(n_elems,4) ; ie = 0 ; % Initialization to zero
 
 %> first TRIA sector (last col remains equal to 0)
 for i_p = 1 : n_points_per_sec
@@ -722,7 +722,7 @@ The parametric geometry is obtained by connecting with a surface different plana
 With the planar sections the user defines the shape of the section, the chord and the twist of the section. 
 Then sections are connected by regions, with which the number of span panels, span, dihedral and sweep are defined. 
 The user can define an arbitrary number $n_s$ of sections, which must then be connected with $n_s-1$ regions. 
-A representation of sections and regions employed for the generation of a wing is presented in figure \ref{fig:parametric_wing}. 
+A representation of sections and regions employed for the generation of a wing is presented in Fig.~\ref{fig:parametric_wing}. 
 The body is generated from the first section, starting from the specified starting point, and it is extruded along the y axis, 
 with the x axis pointing from the leading edge towards the trailing edge and the z axis normal to the x-y plane. 
 The type of geometry generated depends on the type of elements required. If surface panels are required the full 
@@ -1040,8 +1040,8 @@ An example of user prescribed airfoil shape is provided in file \ref{file:airfoi
 
 The geometrical logic for the generation of lifting lines is similar to the one for surface panels 
 or vortex lattices, and differs in only few details. An example of the same geometry defined in 
-file \ref{file:parametric_example_file.in} and depicted in figure \ref{fig:parametric_sections} 
-but generated as lifting lines is presented in figure \ref{fig:parametric_sections_ll}. 
+file \ref{file:parametric_example_file.in} and depicted in Fig.~\ref{fig:parametric_sections} 
+but generated as lifting lines is presented in Fig.~\ref{fig:parametric_sections_ll}. 
 When employing lifting lines the reference line is generated starting from the 
 \param{starting\_point} exactly in the same way as in the other cases, however 
 in this case this line is the one that will become the lifting line. From the lifting 
@@ -1054,7 +1054,7 @@ and that the parameter \param{reference\_chord\_fraction} is ignored.
 Finally it is important to stress that the reference frames introduced in the present section 
 concerning the generation of parametric components are local to those component, and are required 
 only to assign coordinates to the points generated parametrically, just as a mesh generated from 
-CAD files and an external mesher will generate points in a certain reference frame. 
+CAD files and an external meshing tool will generate points in a certain reference frame. 
 The actual position of the component in space during the simulation depends on the reference 
 frame in which the component will be introduced. Reference frames employed during the simulation 
 are discussed in section \ref{sec:Solver_ReferenceFrames}.
@@ -1265,7 +1265,7 @@ All the detailed parameters of the Hinged surfaces input file are:
     
     \item \param{hinge\_Nodes\_Input}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
     
-    type of hinge nodes input: \opt{parametric} or \opt{from\_file}. (TODO add details)
+    type of hinge nodes input: \opt{parametric} or \opt{from\_file}. %(TODO add details)
     
     \item \param{node_1} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
     
@@ -1485,7 +1485,7 @@ line = {
     elements along the reference line for each \param{line}. 
     The parameter \param{flip\_section} can be set to \param{.true.} 
     in order to flip the $y$-coordinate of the airfoil, in the section 
-    reference frame: the comparison between the goemetry with 
+    reference frame: the comparison between the geometry with 
     \param{flip\_section} equal to \param{F} or \param{T}  at \param{point} with 
     \param{id} = 5, 6 is shown in the picture for a non-symmetrical airfoil.}
 \label{fig:pointwise_component}
@@ -1638,7 +1638,7 @@ The parameters of a \param{line} element are:
     \param{spline} for Hermitian splines.
 
 \item \param{end_points}  \textit{required}: yes, \textit{multiple}: no, 
-\textit{type}: integer array, lenght 2.
+\textit{type}: integer array, length 2.
 
     \param{id} numbers of the beginning and ending \param{point}s of the line. 
     For \param{straight} lines, this two numbers must be consecutive. 
@@ -1873,7 +1873,7 @@ It is meant to represent the location where the thin vortical layer leaves a lif
 body when the boundary layer is still attached. In the \DUST \ preprocessor the 
 trailing edge is identified geometrically, possibly according to a set of parameters. 
 
-In case of paranetrically generated elements, which represent extruded airfoils, 
+In case of parametrically generated elements, which represent extruded airfoils, 
 the trailing edge is simply generated connecting all the trailing edge of the two 
 (or mono) dimensional sections that compose the parametric geometry.
 
@@ -1905,13 +1905,13 @@ is decided. During the simulation the whole wake is advected according to the
 velocity generated by the singularities of the bodies and the wake, however the 
 first wake panel is geometrically pre-determined and its intensity is implicitly 
 solved alongside the rest of the singularities of the body surfaces. The first panel 
-starts from the trailing adge and its nodes, and its length is decided during the 
+starts from the trailing edge and its nodes, and its length is decided during the 
 simulation, however the direction alongside it is stretched from the trailing edge 
 is determined in the preprocessor. 
 
 If no specific indication is given, the direction of the first implicit wake 
 panel is the average of the two edges directions from the upper and lower elements 
-connected at the trailing edge node. It is however possible to alter this behaviour 
+connected at the trailing edge node. It is however possible to alter this behavior 
 by setting \param{proj_te} to true. Then the user must provide a direction 
 vector with \param{proj_te_vector}, which identifies the direction in which 
 to project the first panel direction if \param{proj_te_dir} is \opt{parallel}, 
