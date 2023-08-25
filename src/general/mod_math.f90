@@ -202,7 +202,7 @@ subroutine invmat(A, n)
   do i1 = 1,n
       do j1 = 1,n
         ! check if we are still inside a previous block
-        if(j1 .gt. j2+1 .or. i1 .gt. i2+1) then
+        if(j1 .ge. j2+1 .or. i1 .ge. i2+1) then
           if (abs(A(i1,j1)) .ge. 1e-16_wp) then
             i2 = i1
             
