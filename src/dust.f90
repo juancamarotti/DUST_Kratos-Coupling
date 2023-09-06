@@ -146,7 +146,7 @@ use mod_octree, only: &
   apply_multipole_panels
 
 use mod_math, only: & 
-  cross, dot, vec2mat, invmat
+  cross, dot, vec2mat, invmat_banded
 
 #if USE_PRECICE
   use mod_precice, only: &
@@ -967,7 +967,7 @@ end if
       endif
       enddo
       !> inverse of jacobian matrix (only the non zero part is inverted, the rest is zero) 
-      call invmat(jacobi, size(jacobi,1))
+      call invmat_banded(jacobi, size(jacobi,1))
     endif !> update jacobi matrix
 
     !> Newton Raphson iteration to get the new circulation/pressure difference

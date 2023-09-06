@@ -59,7 +59,7 @@ implicit none
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
           unique, infinite_plate_spline, tessellate, & 
-          vec2mat, mat2vec, invmat 
+          vec2mat, mat2vec, invmat, invmat_banded
 
 private
 
@@ -176,7 +176,29 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 end subroutine linear_interp_array
 
 ! ----------------------------------------------------------------------
-subroutine invmat(A, n)
+subroutine invmat(A) 
+  real(wp), intent(inout) :: A(:,:)
+  real(wp), allocatable   :: work(:)
+  integer                 :: info
+  integer, allocatable    :: ipiv(:)
+  character(len=*), parameter :: this_sub_name= 'invmat'
+
+  !> invert the A matrix
+  allocate(ipiv(size(A,1)))
+  allocate(work(size(A,1)))
+#if (DUST_PRECISION == 1)
+  call sgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
+  call sgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
+#elif(DUST_PRECISION == 2)
+  call dgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
+  call dgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
+#endif
+  deallocate(ipiv, work) 
+end subroutine invmat
+! ----------------------------------------------------------------------
+
+! ----------------------------------------------------------------------
+subroutine invmat_banded(A, n)
   integer, intent(in)                     :: n   ! n is the A size 
   real(wp), intent(inout)                 :: A(n,n)
   
@@ -198,7 +220,11 @@ subroutine invmat(A, n)
   ! (i1,j1) and (i2,j2) are the extremes of the non-zero block
   i2 = 0
   j2 = 0
-  
+
+do i1=1,n
+write(*,*) A(i1,:)
+enddo
+write(*,*) "++++"
   do i1 = 1,n
       do j1 = 1,n
         ! check if we are still inside a previous block
@@ -223,7 +249,7 @@ subroutine invmat(A, n)
             ! extract the block
             Anz = A(i1:i2,j1:j2)
             allocate(ipiv(nb)); ipiv = 0
- 
+ write(*,*) Anz
             !> Factorize the block
 #if (DUST_PRECISION==1)
             call sgetrf(nb, nb, Anz, nb, ipiv, info)
@@ -268,7 +294,7 @@ subroutine invmat(A, n)
           
       enddo !j1
   enddo !i1
-end subroutine invmat
+end subroutine invmat_banded
 
 
 ! ----------------------------------------------------------------------
@@ -581,14 +607,14 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   enddo  
 
   ! inverse matrix (NB the inverse is overwritten into Z_r)
-  call invmat(Z_r, size(Z_r,1))
+  call invmat(Z_r)
 
   allocate(Y_r(4,4))  
   
   ! inverse matrix (NB the inverse is overwritten into Y_r)
   Y_r = matmul(transpose(R_r),matmul(Z_r,R_r))
   Y_r = Y_r + 1e-6_wp
-  call invmat(Y_r, size(Y_r,1))
+  call invmat(Y_r)
 
   allocate(eye(n_r,n_r))
   eye = 0.0_wp
