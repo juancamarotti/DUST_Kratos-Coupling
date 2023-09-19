@@ -454,9 +454,9 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(te%id_lifting_line(size(te%scaling))); te%id_lifting_line = 0 
 
   if (sim_param%autoscale_te) then !> automatic scaling
-    
     i1 = 0 !> global index on the trailing edge 
     iw = 0 !> local index on the trailing edge elements (components) 
+
     do ic = 1, size(geo%components) 
       do ie = 1, geo%components(ic)%n_s
         i1 = i1 + 1 

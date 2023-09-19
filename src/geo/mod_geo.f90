@@ -1378,6 +1378,8 @@ subroutine load_components(geo, in_file, out_file, te)
           trim(comp_input) .eq. 'pointwise') then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+        geo%components(i_comp)%n_s = par_nelems_span
+        geo%components(i_comp)%n_c = par_nelems_chor         
       end if
 
       call close_hdf5_group(geo_loc)
@@ -2233,7 +2235,7 @@ subroutine create_strip_connectivity(geo)
       end do
     
       !> Allocate and fill comp%strip_elem array
-      if ( mod(n_el,n_s) .ne. 0 ) then
+      if ( mod(n_el, n_s) .ne. 0 ) then
         call error(this_sub_name, this_mod_name, ' The number of elements of&
             & a parametric element is not an exact multiple of the number of&
             & spanwise stripes. There is something wrong in the geometry input&
