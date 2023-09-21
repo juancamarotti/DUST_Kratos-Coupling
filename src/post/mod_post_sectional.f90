@@ -289,7 +289,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
   !> decide on printing lifting lines data
   print_ll = getlogical(sbprms,'lifting_line_data')
-  if (trim(comps(1)%comp_el_type) .ne. 'l')  then
+  if (print_ll .and. trim(comps(1)%comp_el_type) .ne. 'l')  then
     print_ll = .false.
     call warning(this_sub_name, this_mod_name, 'Cannot output lifting &
           &line data for a non lifting line component, output of lifting &
@@ -299,8 +299,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   !> decide on printing corrected vortex lattice data
   print_vl = getlogical(sbprms,'vortex_lattice_data')
   
-  if (trim(comps(1)%comp_el_type) .eq. 'v' .and.  &
-    trim(comps(1)%aero_correction) .ne. 'true')  then
+  if (print_vl .and. (trim(comps(1)%comp_el_type) .ne. 'v' .or.  &
+    trim(comps(1)%aero_correction) .ne. 'true'))  then
     print_vl = .false.
     call warning(this_sub_name, this_mod_name, 'Cannot output corrected &
           &vortex lattice data for a non vortex lattice component, output of vortex &
