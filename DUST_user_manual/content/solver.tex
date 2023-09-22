@@ -66,6 +66,7 @@ mu_inf = 0.00001
 ! --- wake parameters ---
 n_wake_panels = 4
 n_wake_particles = 10000
+ndt_update_wake = 1 
 particles_box_min = (/-10.0, -10.0, -10.0/)
 particles_box_max = (/10.0, 10.0, 10.0/)
 implicit_panel_scale = 0.3
@@ -366,6 +367,10 @@ Number of panel wake rows before converting the wake to vortex particles.
 Number of maximum vortex particles in the wake. If the limit is reached the simulation is 
 stopped, but can be restarted from last save with a higher value of the parameter. 
 
+\item \param{ndt\_update\_wake}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 1 \textit{type:} integer.
+
+Number of time step between two wake updates. 
 
 \item \param{particles\_box\_min}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} (/-10.0, -10.0, -10.0/) \textit{type:} real array of length 3.

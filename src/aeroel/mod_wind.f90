@@ -10,7 +10,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -65,15 +65,15 @@ contains
 
 function variable_wind(pos, time) result(wind)
 
- real(wp), intent(in) :: pos(3)
- real(wp), intent(in) :: time
+  real(wp), intent(in) :: pos(3)
+  real(wp), intent(in) :: time
 
- real(wp) :: wind(3)
+  real(wp) :: wind(3)
 
- real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
-             gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
+  real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
+              gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
 
- real(wp) :: s
+  real(wp) :: s
 
   wind = sim_param%u_inf
 
@@ -93,7 +93,7 @@ function variable_wind(pos, time) result(wind)
         ! penetration distance
         ! distance from the gust front, negative for the gust approaching
         s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*&
-                                         (time-gust_time)))*gust_front_direction)
+                      (time-gust_time)))*gust_front_direction)
 
         if (s .ge. 0.0_wp .and. s .lt. 2.0_wp*gust_gradient) then
           wind = wind + gust_u_des/2*(1.0_wp-cos(pi*s/gust_gradient))
@@ -111,9 +111,9 @@ function variable_wind(pos, time) result(wind)
         gust_time = sim_param%gust_time
 
         s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/&
-                                                           norm2(sim_param%u_inf)
+                                                            norm2(sim_param%u_inf)
 
-        wind = wind + real(pos(1),wp)*(/0.0_wp, 0.0_wp, 0.1_wp/)!s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
+        wind = wind + real(pos(1),wp)*(/0.0_wp, 0.0_wp, 0.1_wp/) !s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
       case default
     end select
   end if
