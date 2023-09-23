@@ -914,9 +914,10 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   integer, intent(in)                     :: nelem_chord
   character, intent(in)                   :: ElType
   character(len=*) , intent(in)           :: airfoil
-  real(wp),  intent(out)                 :: thickness
+  real(wp),  intent(out)                  :: thickness
   real(wp), allocatable                   :: points_mean_line(:,:)
   real(wp)                                :: twist_rad
+  integer                                 :: i, ascii
   character(len=*), parameter :: this_sub_name='define_section'
 
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
@@ -933,6 +934,17 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
     call read_airfoil ( airfoil , ElType , nelem_chord , chord_fraction, point_list, thickness)
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
+  
+    ! Check on NACA syntax, only digits and spaces are allowed
+    do i= 5, len(airfoil) 
+      ascii = iachar(airfoil(i:i))
+      if ( (ascii .gt. 57 .or. ascii .lt. 48) .and. ascii .ne. 32 ) then
+        call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
+      &NACA airfoils implemented. Check your input syntax or provide the coordinates&
+      & of the airfoil as a .dat file ')
+      end if
+    end do
+  
     if ( len_trim(airfoil) .eq. 8 ) then      ! NACA 4-digit -------
       call naca4digits(airfoil(5:8), nelem_chord, chord_fraction, &
                         points_mean_line , point_list, thickness)
@@ -952,12 +964,17 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
         allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) )
         point_list = points_mean_line
       end if
+      
+    else
+      call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
+      &NACA airfoils implemented. Check your input syntax or provide the coordinates&
+      & of the airfoil as a .dat file ')    
     end if
 
   else
     call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
-      &NACA airfoils implemented. Provide the coordinates of the airfoil as&
-      & a .dat file ')
+      &NACA airfoils implemented. Check your input syntax or provide the coordinates&
+      & of the airfoil as a .dat file ')
   end if
 
 
