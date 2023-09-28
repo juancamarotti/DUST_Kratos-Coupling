@@ -1209,19 +1209,33 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp), allocatable :: rr_tmp(:,:)
   integer :: fid, ierr
   integer :: i1 , i2
-
-      ! Read coordinates
+  character(len=*), parameter :: this_sub_name = 'read_airfoil' 
+  
+  ! Read coordinates
   call new_file_unit(fid, ierr)
   open(unit=fid,file=trim(adjustl(filen)) )
   read(fid,*) np_geo
-  allocate(rr_geo(2,np_geo))
-  allocate(st_geo(np_geo),s_geo(np_geo))
+
+  allocate(rr_geo(2,np_geo)); rr_geo = 0.0_wp 
+  allocate(st_geo(np_geo), s_geo(np_geo))
   st_geo = 0.0_wp ; s_geo = 0.0_wp
 
   do i1 = 1 , np_geo
     read(fid,*) rr_geo(:,i1)
   end do
-  close(fid)
+  close(fid)  
+  !> some checks on the input file 
+  if (rr_geo(2,2) .gt. 0.0_wp) then 
+    call error(this_sub_name, this_mod_name, & 
+              'The profile '//trim(adjustl(filen))//' is provided starting from the upper side. &  
+              Please flip the profile and retry. For further information, please refer to the manual sec 3.3.2.') 
+  endif  
+
+  if (rr_geo(1,1) .lt. 0.9_wp) then 
+    call error(this_sub_name, this_mod_name, & 
+              'The profile '//trim(adjustl(filen))//' is provided not starting from the trailing edge. &  
+              Please flip the profile and retry. For further information, please refer to the manual sec 3.3.2.') 
+  endif 
 
   do i1 = 2 , np_geo
     st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
