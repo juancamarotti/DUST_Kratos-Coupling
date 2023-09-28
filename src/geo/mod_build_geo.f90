@@ -638,7 +638,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     ! 3D section
     allocate (rr (3,nSections*(nelems_span-1)+2), &
                 ee (4,nSections*nelems_span) )
-
+    rr = 0; ee = 0
     call meshbyrev (rr_te(:,1),rr_te(:,2), nSections, rr, ee)
 
     deallocate (rr_te)
@@ -1721,6 +1721,7 @@ subroutine build_te_general ( ee , rr , ElType , &
 
   call merge_nodes_general ( rr , ee , tol_sewing , rr_m , ee_m , i_m  )
   call build_connectivity_general ( ee_m , neigh_m )
+
   call find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
                       te_proj_logical , te_proj_dir , te_proj_vec , &
                       e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te )
@@ -1864,12 +1865,13 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
   do i_e = 1 , n_el
 
     nSides = count( ee(:,i_e) .ne. 0 )
-    
+
      nor(:,i_e) = 0.5_wp * cross( rr(:,ee(     3,i_e)) - rr(:,ee(1,i_e)) , &
                                   rr(:,ee(nSides,i_e)) - rr(:,ee(2,i_e))     )
+
     area( i_e) = norm2(nor(:,i_e))
     nor(:,i_e) = nor(:,i_e) / area(i_e)
-    
+
     do i1 = 1 , nSides
       cen(:,i_e) = cen(:,i_e) + rr(:,ee(i1,i_e))
     end do
@@ -2542,7 +2544,6 @@ subroutine meshbyrev ( x, y, nphi, rr, ee )
   n    = size(x)
   nc   = n-2
   dphi = 2.0_wp*pi/dble(nphi)
-
   if ( any( y .lt. -1.0e-16_wp ) ) then
       call error(this_sub_name, this_mod_name, &
         'invalid mesh, input curve has negative points')
