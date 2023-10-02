@@ -1197,20 +1197,20 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   character(len=*), intent(in)                :: filen
   character(len=*), intent(in)                :: ElType
   integer         , intent(in)                :: nelems_chord
+  real(wp)        , intent(in)                :: csi_half(:)
   real(wp)        , allocatable, intent(out)  :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
-  real(wp)                                    :: csi_ac 
-  real(wp)        , intent(in)                :: csi_half(:)
 
+  real(wp)                                    :: csi_ac 
   integer                :: nelems_chord_tot
-  real(wp) , allocatable :: rr_geo(:,:)
+  real(wp) , allocatable :: rr_geo(:,:), rr_dat(:,:) 
   real(wp) , allocatable :: rr_up(:,:), rr_low(:,:), rr_pan(:,:)
-  real(wp) , allocatable :: y_mean(:,:), rr_geo_mean(:,:)
-  integer                :: np_geo
+  real(wp) , allocatable :: y_mean(:,:), rr_mean(:,:)
+  integer                :: np_geo, np_dat
   real(wp) , allocatable :: csi(:)
   real(wp) , allocatable :: st_geo(:) , s_geo(:)
   real(wp)               :: ds_geo
-  real(wp), allocatable  :: rr_tmp(:,:)
+  real(wp) , allocatable :: rr_tmp(:,:)
   real(wp)               :: m, p, t, radius, x_c, y_c, alpha, beta_up, beta_low
   real(wp)               :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
   real(Wp)               :: m_line, min_x
@@ -1222,64 +1222,64 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp) , allocatable :: rr2mesh_up(:,:), rr2mesh_low(:,:)
   real(wp) , allocatable :: x_up(:), x_low(:), y_up(:), y_low(:)  
   real(wp)               :: tan_le, tan_te_up, tan_te_low
-
+  integer  , parameter   :: n_circ = 200  
+  integer  , parameter   :: n_query = 1000 
   integer :: fid, ierr
-  integer :: i1 , i2, idx_m, id_up, i, idx_circ_min
+  integer :: i1 , i2, idx_m, id_le, i, idx_circ_min
   character(len=*), parameter :: this_sub_name = 'read_airfoil' 
   
   ! Read coordinates
   call new_file_unit(fid, ierr)
   open(unit=fid,file=trim(adjustl(filen)) )
-  read(fid,*) np_geo
+  read(fid,*) np_dat
 
-  allocate(rr_geo(2,np_geo)); rr_geo = 0.0_wp 
-  allocate(st_geo(np_geo), s_geo(np_geo))
-  st_geo = 0.0_wp ; s_geo = 0.0_wp
+  allocate(rr_dat(2,np_dat)); rr_dat = 0.0_wp 
 
-  do i1 = 1 , np_geo
-    read(fid,*) rr_geo(:,i1)
+  do i1 = 1 , np_dat
+    read(fid,*) rr_dat(:,i1)
   end do
   close(fid)  
 
-  id_up = floor(size(rr_geo(2,:))/2.0_wp)
-  allocate(rr_up(id_up,2));                      rr_up = 0.0_wp
-  allocate(rr_low(size(rr_geo(2,:)) - id_up,2)); rr_low = 0.0_wp 
-  allocate(rr_geo_mean(size(rr_up,2),2));            rr_geo_mean = 0.0_wp  
+  id_le = floor(real(size(rr_dat(2,:)),wp)/2.0_wp)
+  allocate(rr_up(2,   (id_le + 1)));                rr_up = 0.0_wp
+  allocate(rr_low(2,  size(rr_dat(2,:)) - id_le));  rr_low = 0.0_wp 
+  allocate(rr_mean(2, (id_le + 1)));                rr_mean = 0.0_wp  
+
   !> some checks on the input file 
-  if (rr_geo(2,2) .gt. 0.0_wp) then 
-    !>  Seilig format 
-    rr_up(:,1) = rr_geo(1:id_up + 1,1) 
-    rr_up(:,2) = rr_geo(2:id_up + 1,2)
+  if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
+    rr_up = rr_dat(:, 1:id_le + 1) 
     ! reverse rr_up 
-    rr_up(:,1) = rr_up(size(rr_up,1): -1: 1,1)
-    rr_up(:,2) = rr_up(size(rr_up,1): -1: 1,2) 
-    rr_low = rr_geo(id_up + 1: -1,:)
-    !> build middle line 
-    rr_geo_mean(:,1) = rr_low(:,1)
-    rr_geo_mean(:,2) = (rr_up(:,1) + rr_low(:,1))/2.0_wp  
+    rr_up = rr_up(:, size(rr_up, 2): 1: -1)
+    rr_low = rr_dat(:,id_le + 1: size(rr_dat, 2))
   else
-    !> DUST format 
-    !> TODO 
-  endif  
+    rr_up = rr_dat(:, id_le + 1: size(rr_dat, 2))
+    rr_low = rr_dat(:,1:id_le + 1)
+    !> reverse rr_low 
+    rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
+  endif 
+
+  !> build middle line 
+  rr_mean(1,:) = rr_low(1,:)
+  !do i = 1, size(rr_low, 2)
+  rr_mean(2,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
+  
   ! get m and p
-  m = maxval(rr_geo_mean(:,2))
-  idx_m = maxloc(rr_geo_mean(:,2),1) ! y_mean line max thickness
-  p = rr_geo_mean(idx_m,1)         ! x_mean line max thickness 
+  m = maxval(rr_mean(2,:))
+  idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
+  p = rr_mean(1, idx_m)           ! x_mean line max thickness 
 
   ! The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
   ! The expression is related NACA profile, but should be valid for all profile
   ! close to the leading edge. 
-
   !Get analytical derivative of the mean line in x = 0  
   m_line = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
   
+  !write(*,*) 'm_line', m_line
   ! calculate thickness in a simple manner 
-  !t = max(rr_up(:,2)) + min(rr_low(:,1))  
-  call define_thickness(rr_geo, t) 
-
+  t = maxval(rr_up(2,:)) - minval(rr_low(2,:))  
+  !call define_thickness(rr_geo, t) 
   ! radius of the circle at the leading edge 
   radius = 1.10_wp*t**2.0_wp 
-
   ! get center of the circle with the following conditions:
   ! 1. passing through [0 0]
   ! 2. center lying on the linearized middle line
@@ -1287,11 +1287,12 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   x_c = sqrt(radius**2.0_wp/(m_line**2.0_wp + 1.0_wp))
   y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
 
+
   ! Define the region that is approximated by a circle arc  
   ! Get point at +/- 37.5 deg (angle that works the best) 
   alpha = atan(y_c/x_c); ! angle of m 
-  beta_up = (180.0_wp-37.5_wp)*pi/180.0_wp
-  beta_low = (180.0_wp+37.5_wp)*pi/180.0_wp
+  beta_up =  (180.0_wp - 37.5_wp)*pi/180.0_wp
+  beta_low = (180.0_wp + 37.5_wp)*pi/180.0_wp
   x_plus = radius*cos(beta_up + alpha) + x_c
   y_plus = radius*sin(beta_up + alpha) + y_c
   x_minus = radius*cos(beta_low + alpha) + x_c
@@ -1305,66 +1306,75 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   ! leading edge circle sector
   theta_start = beta_up + alpha
   theta_end = beta_low + alpha
-  allocate(theta(200)); theta = 0.0_wp 
-  allocate(x_circ(200), y_circ(200)); x_circ = 0.0_wp; y_circ = 0.0_wp 
+  allocate(theta(n_circ)); theta = 0.0_wp 
+  allocate(x_circ(n_circ), y_circ(n_circ)); x_circ = 0.0_wp; y_circ = 0.0_wp 
+
   call linspace(theta_start, theta_end, theta)
   do i = 1 , size(theta)
     x_circ(i) = radius*cos(theta(i)) + x_c
     y_circ(i) = radius*sin(theta(i)) + y_c
   end do
-  x = radius*cos(theta) + x_c
-  y = radius*sin(theta) + y_c
 
   ! tangent at trailing edge: backward difference
-  tan_te_up = (rr_up(1,2) - rr_up(2, 2))/(rr_up(1,1) - rr_up(2, 1))
-  tan_te_low = (rr_low(size(rr_low,1) - 1, 2) - rr_low(size(rr_low,1), 2))/&
-                (rr_low(size(rr_low,1) - 1, 1) - rr_low(size(rr_low,1), 1))
+  tan_te_up = (rr_up(2, (size(rr_up, 2) - 1)) - rr_up(2, size(rr_up,2))) / & 
+              (rr_up(1, (size(rr_up, 2) - 1)) - rr_up(1, size(rr_up,2)))
+  tan_te_low =  (rr_low(2, (size(rr_low, 2) - 1)) - rr_low(2, size(rr_low,2))) / & 
+                (rr_low(1, (size(rr_low, 2) - 1)) - rr_low(1, size(rr_low,2)))
 
   ! spline interpolation upper part
-  allocate(point_up(size(rr_up,1),2)); point_up = 0.0_wp  
+  allocate(point_up(2, size(rr_up, 2))); point_up = 0.0_wp  
   point_up = rr_up !  point from ,dat file 
   ! replace first point with circle point 
-  point_up(1,:) = (/x_plus, y_plus/)
-  allocate(xq_up(1000), yq_up(1000)); xq_up = 0.0_wp; yq_up = 0.0_wp 
-
+  point_up(:, 1) = (/x_plus, y_plus/)
+  allocate(xq_up(n_query), yq_up(n_query)); xq_up = 0.0_wp; yq_up = 0.0_wp 
   call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
-  call hermite_spline_profile(point_up(:,1), point_up(:,2), xq_up, &
+  call hermite_spline_profile(point_up(1,:), point_up(2,:), xq_up, &
                       tan_plus, tan_te_up, yq_up) 
-  
+
   !> spline interpolation lower part
-  allocate(point_low(size(rr_low,1),2)); point_low = 0.0_wp 
+  allocate(point_low(2, size(rr_low,1))); point_low = 0.0_wp 
   point_low = rr_low ! point from .dat file
-  point_low(1,:) = (/x_minus, y_minus/)
-  allocate(xq_low(1000), yq_low(1000)); xq_low = 0.0_wp; yq_low = 0.0_wp
+  point_low(:, 1) = (/x_minus, y_minus/)
+  allocate(xq_low(n_query), yq_low(n_query)); xq_low = 0.0_wp; yq_low = 0.0_wp
   call linspace(x_minus, 1.0_wp, xq_low) 
-  call hermite_spline_profile(point_low(:,1), point_low(:,2), xq_low, &
+  call hermite_spline_profile(point_low(1, :), point_low(2, :), xq_low, &
                       tan_minus, tan_te_low, yq_low) 
   
   !> reorganize vectors to prepare mesh subdivision
   min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
   idx_circ_min = minloc(x_circ,1) 
-  allocate(circ_x_low(size(x_circ(1:idx_circ_min))), &
-          circ_y_low(size(y_circ(1:idx_circ_min))), &
-          circ_x_up(size(x_circ(idx_circ_min:-1))), &
-          circ_y_up(size(y_circ(idx_circ_min:-1)))) 
+
+  allocate(circ_x_low(idx_circ_min), &
+          circ_y_low(idx_circ_min), &
+          circ_x_up(size(x_circ) - idx_circ_min), &
+          circ_y_up(size(x_circ) - idx_circ_min)) 
   circ_x_up = x_circ(1:idx_circ_min)
   circ_y_up = y_circ(1:idx_circ_min)
-  circ_x_low = x_circ(idx_circ_min:-1)
-  circ_y_low = y_circ(idx_circ_min:-1)
+  circ_x_low = x_circ(idx_circ_min:size(x_circ))
+  circ_y_low = y_circ(idx_circ_min:size(x_circ))
   !> reverse vectors 
-  circ_x_up = x_up(size(x_up,1): -1: 1)
-  circ_y_up = y_up(size(y_up,1): -1: 1) 
-  
-  allocate(rr2mesh_up(2,size(circ_x_up))); rr2mesh_up = 0.0_wp
-  allocate(rr2mesh_low(2,size(circ_x_low))); rr2mesh_low = 0.0_wp 
+  circ_x_up = circ_x_up(size(circ_x_up):1:-1) 
+  circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
+
+  allocate(rr2mesh_up(2,(size(circ_x_up) + size(xq_up) - 1)));    rr2mesh_up = 0.0_wp
+  allocate(rr2mesh_low(2,(size(circ_x_low) + size(xq_low) - 1))); rr2mesh_low = 0.0_wp 
   ! upper
-  rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:-1)/)
-  rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:-1)/)
+  rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:size(xq_up))/)
+  rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:size(xq_up))/) 
   ! lower part 
-  rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:-1)/)
-  rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:-1)/) 
+  rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:size(xq_low))/)
+  rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:size(xq_low))/) 
+  ! flip lower part 
+  rr2mesh_low = rr2mesh_low(:, size(rr2mesh_low(1,:)):1:-1) 
 
-
+  !> reorder in dust format 
+  np_geo = size(rr2mesh_up, 2) + size(rr2mesh_low, 2) - 1 
+  allocate(rr_geo(2,np_geo)); rr_geo = 0.0_wp 
+  rr_geo(1,:) = (/rr2mesh_low(1,1:size(rr2mesh_low,2)), rr2mesh_up(1,2:size(rr2mesh_up,2))/)
+  rr_geo(2,:) = (/rr2mesh_low(2,1:size(rr2mesh_low,2)), rr2mesh_up(2,2:size(rr2mesh_up,2))/)
+  
+  allocate(st_geo(np_geo), s_geo(np_geo))
+  st_geo = 0.0_wp ; s_geo = 0.0_wp 
 
   do i1 = 2 , np_geo
     st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
@@ -1446,19 +1456,30 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   endif
   !> calculate thickness for dynstall 
   call define_thickness(rr_geo, thickness)
-  !!> get position of aerodynamic center 
-  !csi_ac = 0.75_wp ! control point for vl corrected
-  !if ( ElType .eq. 'v' ) then    
-  !  call linear_interp(rr_geo(2,:), rr_geo(1,:), csi_ac, curv_ac)
-  !else  
-  !  curv_ac = 0.0_wp
-  !endif 
   
   !> cleanup
-  if (allocated(rr_tmp)) deallocate(rr_tmp)
-  if (allocated(rr_up)) deallocate(rr_up)
-  if (allocated(rr_low)) deallocate(rr_low)
-  if (allocated(y_mean)) deallocate(y_mean)
+  if (allocated(rr_geo))      deallocate(rr_geo)
+  if (allocated(rr_dat))      deallocate(rr_dat) 
+  if (allocated(rr_tmp))      deallocate(rr_tmp)
+  if (allocated(rr_up))       deallocate(rr_up)
+  if (allocated(rr_low))      deallocate(rr_low)
+  if (allocated(rr_mean))     deallocate(rr_mean)
+  if (allocated(theta))       deallocate(theta)
+  if (allocated(x_circ))      deallocate(x_circ)
+  if (allocated(y_circ))      deallocate(y_circ) 
+  if (allocated(point_up))    deallocate(point_up)
+  if (allocated(point_low))   deallocate(point_low)
+  if (allocated(xq_up))       deallocate(xq_up)
+  if (allocated(xq_low))      deallocate(xq_low)
+  if (allocated(yq_up))       deallocate(yq_up)
+  if (allocated(yq_low))      deallocate(yq_low)
+  if (allocated(circ_x_low))  deallocate(circ_x_low)
+  if (allocated(circ_y_low))  deallocate(circ_y_low)
+  if (allocated(circ_x_up))   deallocate(circ_x_up)
+  if (allocated(circ_y_up))   deallocate(circ_y_up)
+  if (allocated(rr2mesh_up))  deallocate(rr2mesh_up)
+  if (allocated(rr2mesh_low)) deallocate(rr2mesh_low)  
+  if (allocated(y_mean))      deallocate(y_mean)
 
 end subroutine read_airfoil
 

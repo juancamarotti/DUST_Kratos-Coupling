@@ -340,11 +340,11 @@ subroutine hermite_spline_profile(x, y, xq, tang_start, tang_end, yq)
   
   ! build tangent vector using centered differences
   allocate(m(size(x))); m = 0.0_wp
-  m(1) = tang_start;
-  m(-1) = tang_end;
+  m(1)       = tang_start;
+  m(size(x)) = tang_end;
   do i = 2, size(x) - 1
-      m(i) = 0.5_wp*((y(i + 1) - y(i))/(x(i + 1) - x(i)) + &
-                  (y(i) - y(i - 1))/(x(i) - x(i - 1)))
+      m(i) = 0.5_wp*((y(i+1) - y(i))/(x(i+1) - x(i)) + &
+                    (y(i) - y(i-1))/(x(i) - x(i-1)))
   end do
   
   !allocate(yq(size(xq))); yq = 0.0_wp 
