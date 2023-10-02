@@ -139,6 +139,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp), allocatable                     :: span_list(:) 
   real(wp), allocatable                     :: sweep_list(:) 
   real(wp), allocatable                     :: dihed_list(:)
+  real(wp), allocatable                     :: division(:)
   character(len=max_char_len), allocatable  :: type_span_list(:)
   integer                                   :: n_type_span
   character                                 :: ElType
@@ -729,7 +730,25 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                               ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
             rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
                               ( rrSection2(3,:) - rrSection1(3,:) )/( rrSection2(2,:) - rrSection1(2,:) )
-        else
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
+          !! geometric series in span > todo 
+          !do j = 1, npoint_chord_tot
+          !  call geoseries_both(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 0.5_wp,& 
+          !                      1/10.0_wp, 1/10.0_wp, division)  
+          !  rr(2, ista + j - 1) = division(i1)
+          !enddo 
+          !rr(2,iend ) = division(nelem_span_list(iRegion))
+          !rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+          !                    ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
+          !rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+          !                    ( rrSection2(3,:) - rrSection1(3,:) )/( rrSection2(2,:) - rrSection1(2,:) )
+          !write(*,*) rr(1, ista:iend) 
+          !write(*,*) rr(2, ista:iend)
+          !write(*,*) rr(3, ista:iend) 
+          
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
+        else 
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Incorrect input: &
@@ -1201,7 +1220,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp)        , allocatable, intent(out)  :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
 
-  real(wp)                                    :: csi_ac 
+  real(wp)               :: csi_ac 
   integer                :: nelems_chord_tot
   real(wp) , allocatable :: rr_geo(:,:), rr_dat(:,:) 
   real(wp) , allocatable :: rr_up(:,:), rr_low(:,:), rr_pan(:,:)
@@ -1224,11 +1243,11 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp)               :: tan_le, tan_te_up, tan_te_low
   integer  , parameter   :: n_circ = 200  
   integer  , parameter   :: n_query = 1000 
-  integer :: fid, ierr
-  integer :: i1 , i2, idx_m, id_le, i, idx_circ_min
+  integer                :: fid, ierr
+  integer                :: i1 , i2, idx_m, id_le, i, idx_circ_min
   character(len=*), parameter :: this_sub_name = 'read_airfoil' 
   
-  ! Read coordinates
+  !> Read coordinates from dat file 
   call new_file_unit(fid, ierr)
   open(unit=fid,file=trim(adjustl(filen)) )
   read(fid,*) np_dat
@@ -1251,7 +1270,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     ! reverse rr_up 
     rr_up = rr_up(:, size(rr_up, 2): 1: -1)
     rr_low = rr_dat(:,id_le + 1: size(rr_dat, 2))
-  else
+  else                              !> Original DUST format 
     rr_up = rr_dat(:, id_le + 1: size(rr_dat, 2))
     rr_low = rr_dat(:,1:id_le + 1)
     !> reverse rr_low 
@@ -1260,36 +1279,33 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
 
   !> build middle line 
   rr_mean(1,:) = rr_low(1,:)
-  !do i = 1, size(rr_low, 2)
   rr_mean(2,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
   
-  ! get m and p
+  !> get m and p
   m = maxval(rr_mean(2,:))
   idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
   p = rr_mean(1, idx_m)           ! x_mean line max thickness 
 
-  ! The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
-  ! The expression is related NACA profile, but should be valid for all profile
-  ! close to the leading edge. 
-  !Get analytical derivative of the mean line in x = 0  
+  !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
+  !  The expression is related NACA profile, but should be valid for all profile
+  !  close to the leading edge. 
+  !> Get analytical derivative of the mean line in x = 0  
   m_line = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
   
-  !write(*,*) 'm_line', m_line
-  ! calculate thickness in a simple manner 
+  !> calculate thickness in a simple manner 
   t = maxval(rr_up(2,:)) - minval(rr_low(2,:))  
-  !call define_thickness(rr_geo, t) 
   ! radius of the circle at the leading edge 
   radius = 1.10_wp*t**2.0_wp 
-  ! get center of the circle with the following conditions:
-  ! 1. passing through [0 0]
-  ! 2. center lying on the linearized middle line
-  ! 3. radius given by the NACA formula
+  !> Get center of the circle with the following conditions:
+  !  1. passing through [0 0]
+  !  2. center lying on the linearized middle line
+  !  3. radius given by the NACA formula
   x_c = sqrt(radius**2.0_wp/(m_line**2.0_wp + 1.0_wp))
   y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
 
 
-  ! Define the region that is approximated by a circle arc  
-  ! Get point at +/- 37.5 deg (angle that works the best) 
+  !> Define the region that is approximated by a circle arc  
+  !  Get point at +/- 37.5 deg (angle that works the best) 
   alpha = atan(y_c/x_c); ! angle of m 
   beta_up =  (180.0_wp - 37.5_wp)*pi/180.0_wp
   beta_low = (180.0_wp + 37.5_wp)*pi/180.0_wp
@@ -1298,12 +1314,12 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   x_minus = radius*cos(beta_low + alpha) + x_c
   y_minus = radius*sin(beta_low + alpha) + y_c
 
-  ! get the derivative for tangent at leading edge (to use in the
-  ! splining process 
+  !> get the derivative for tangent at leading edge (to use in the
+  !> splining process 
   tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
   tan_minus = tan(atan(-1/tan(beta_low)) + alpha)
 
-  ! leading edge circle sector
+  !> leading edge circle sector
   theta_start = beta_up + alpha
   theta_end = beta_low + alpha
   allocate(theta(n_circ)); theta = 0.0_wp 
@@ -1315,16 +1331,16 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     y_circ(i) = radius*sin(theta(i)) + y_c
   end do
 
-  ! tangent at trailing edge: backward difference
+  !> tangent at trailing edge: backward difference
   tan_te_up = (rr_up(2, (size(rr_up, 2) - 1)) - rr_up(2, size(rr_up,2))) / & 
               (rr_up(1, (size(rr_up, 2) - 1)) - rr_up(1, size(rr_up,2)))
   tan_te_low =  (rr_low(2, (size(rr_low, 2) - 1)) - rr_low(2, size(rr_low,2))) / & 
                 (rr_low(1, (size(rr_low, 2) - 1)) - rr_low(1, size(rr_low,2)))
 
-  ! spline interpolation upper part
+  !> spline interpolation upper part
   allocate(point_up(2, size(rr_up, 2))); point_up = 0.0_wp  
   point_up = rr_up !  point from ,dat file 
-  ! replace first point with circle point 
+  !> replace first point with circle point 
   point_up(:, 1) = (/x_plus, y_plus/)
   allocate(xq_up(n_query), yq_up(n_query)); xq_up = 0.0_wp; yq_up = 0.0_wp 
   call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
@@ -1358,16 +1374,16 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
 
   allocate(rr2mesh_up(2,(size(circ_x_up) + size(xq_up) - 1)));    rr2mesh_up = 0.0_wp
   allocate(rr2mesh_low(2,(size(circ_x_low) + size(xq_low) - 1))); rr2mesh_low = 0.0_wp 
-  ! upper
+  !> upper part
   rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:size(xq_up))/)
   rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:size(xq_up))/) 
-  ! lower part 
+  !> lower part 
   rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:size(xq_low))/)
   rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:size(xq_low))/) 
-  ! flip lower part 
+  !> flip lower part 
   rr2mesh_low = rr2mesh_low(:, size(rr2mesh_low(1,:)):1:-1) 
 
-  !> reorder in dust format 
+  !> reorder in DUST format: lower to upper 
   np_geo = size(rr2mesh_up, 2) + size(rr2mesh_low, 2) - 1 
   allocate(rr_geo(2,np_geo)); rr_geo = 0.0_wp 
   rr_geo(1,:) = (/rr2mesh_low(1,1:size(rr2mesh_low,2)), rr2mesh_up(1,2:size(rr2mesh_up,2))/)
@@ -1380,7 +1396,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
   end do
   s_geo = st_geo / st_geo(np_geo)
-
   ! condition to evaluate if the airfoil.dat input contains only the mean line 
   ! coordinates (for VL), or all the section points. (necessary for retrocompatibility)
   if ((rr_geo(1,size(rr_geo(1,:))) - rr_geo(1,1)) .le. 0.5_wp) then
@@ -1486,15 +1501,24 @@ end subroutine read_airfoil
 !-------------------------------------------------------------------------------
 subroutine define_division(type_mesh, nelem, division)
 
-  real(wp), intent(out)        :: division(:)
-  integer, intent(in)          :: nelem
-  character(len=*), intent(in) :: type_mesh
+  integer, intent(in)                :: nelem
+  character(len=*), intent(in)       :: type_mesh
+  real(wp), allocatable, intent(out) :: division(:)
+
+  real(wp),        allocatable       :: division_(:)
+  real(wp),        parameter         :: r = 1/8.0_wp
+  real(wp),        parameter         :: r_le = 1/5.0_wp
+  real(wp),        parameter         :: r_te = 1/15.0_wp
+  real(wp),        parameter         :: r_le_aft = 1/5.0_wp
+  real(wp),        parameter         :: r_te_aft = 1/8.0_wp
+  real(wp),        parameter         :: r_le_fore = 1/8.0_wp
+  real(wp),        parameter         :: r_te_fore = 1/15.0_wp
+  real(wp),        parameter         :: xh = 0.5_wp
+  real(wp)                           :: step
+  integer                            :: iPoint
+  character(len=*), parameter        :: this_sub_name = 'define_division'
   
-  real(wp)                     :: step
-  integer                      :: iPoint
-  character(len=*), parameter  :: this_sub_name = 'define_division'
-  
-  division = 0.0_wp
+  if(.not. allocated(division)) allocate(division(nelem+1));  division = 0.0_wp
   step = 1.0_wp/(real(nelem,wp) + 1e-12_wp)
 
   select case (trim(type_mesh))
@@ -1514,12 +1538,127 @@ subroutine define_division(type_mesh, nelem, division)
     do iPoint = 1,nelem+1
       division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
+  case ("geoseriesLE", "geoseriesIB")
+    call geoseries(0.0_wp, 1.0_wp, nelem, r, division, division_) 
+  case ("geoseriesTE", "geoseriesOB")
+    call geoseries(0.0_wp, 1.0_wp, nelem, r, division_, division) 
+  case ("geoseries")
+    call geoseries_both(0.0_wp, 1.0_wp, nelem, xh, r_le, r_te, division)
+  case ("geoseriesHI", "geoseriesAS")
+    call geoseries_hinge(0.0_wp, 1.0_wp, nelem, xh, r_le_aft, r_te_aft, r_le_fore, r_te_fore, division)
   case default
     call error(this_sub_name, this_mod_name, 'Incorrect input: &
         & type_chord must be equal to uniform, cosine, cosineLE, cosineTE')
   end select
 
 end subroutine define_division
+
+subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te) 
+  real(wp), intent(in)               :: start_x, end_x
+  integer, intent(in)                :: n_elem
+  real(wp), intent(in)               :: r
+  real(wp), allocatable, intent(out) :: dcsi_le(:), dcsi_te(:) 
+
+  real(wp), allocatable              :: dl(:)
+  real(wp)                           :: r_d
+  integer :: i
+  character(len=*), parameter :: this_sub_name = 'geoseries' 
+
+  allocate(dl(n_elem)); dl = 0.0_wp
+  if (.not. allocated(dcsi_te)) allocate(dcsi_te(n_elem + 1)); dcsi_te = 0.0_wp 
+  if (.not. allocated(dcsi_le)) allocate(dcsi_le(n_elem + 1)); dcsi_le = 0.0_wp
+  !> check series convergence 
+  if ((r .ge. 1.0_wp) .or. (r .le. 0.0_wp)) then 
+    call error(this_mod_name, this_sub_name, 'insert a growth value between 0 and 1') 
+  end if
+  
+  r_d = 1-r; ! growth ratio (intended as decreasing ratio) 
+  ! get size of the first element knowing the sum of the geometric series
+  dl(1) = (1-r_d)/(1-r_d**real(n_elem,wp));
+  do i = 2, n_elem
+      dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
+  end do 
+  do i = 1, n_elem
+      dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
+  end do
+
+  dcsi_le = (1-dcsi_te)
+  !> flip dcsi_le
+  dcsi_le = dcsi_le(size(dcsi_le):1:-1)  
+  !> rescale in the interval 
+  dcsi_te = dcsi_te*(end_x - start_x) + start_x 
+  dcsi_le = dcsi_le*(end_x - start_x) + start_x
+
+  !> cleanup
+  if (allocated(dl)) deallocate(dl)
+
+
+end subroutine geoseries 
+
+subroutine geoseries_both(start_x, end_x, n_elem, xh, r_le, r_te, dcsi)
+  real(wp),               intent(in)    :: start_x, end_x
+  integer,                intent(in)    :: n_elem
+  real(wp),               intent(in)    :: xh
+  real(wp),               intent(in)    :: r_le, r_te
+  real(wp), allocatable,  intent(out)   :: dcsi(:) 
+
+  real(wp), allocatable                 :: dcsi_le(:), dcsi_te(:) 
+  real(wp), allocatable                 :: dcsi_le_(:), dcsi_te_(:) !> dummy
+  real(wp)                              :: mid_point, start_x_le, end_x_le, start_x_te, end_x_te 
+  integer                               :: n_elem_le, n_elem_te
+  character(len=*), parameter           :: this_sub_name = 'geoseries_both' 
+  
+  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
+
+  n_elem_le = ceiling(real(n_elem,wp)*xh) 
+  n_elem_te = n_elem - n_elem_le
+  mid_point = (start_x + end_x)*xh
+  start_x_le = start_x
+  end_x_le = mid_point
+  start_x_te = mid_point
+  end_x_te = end_x
+  call geoseries(start_x_le, end_x_le, n_elem_le, r_le, dcsi_le, dcsi_te_)
+  call geoseries(start_x_te, end_x_te, n_elem_te, r_te, dcsi_le_, dcsi_te)
+  dcsi = (/dcsi_le(1:(size(dcsi_le)-1)), dcsi_te/) 
+  !> cleanup
+  if (allocated(dcsi_le))  deallocate(dcsi_le)
+  if (allocated(dcsi_te))  deallocate(dcsi_te)
+  if (allocated(dcsi_le_)) deallocate(dcsi_le_)
+  if (allocated(dcsi_te_)) deallocate(dcsi_te_)
+
+end subroutine geoseries_both
+
+subroutine geoseries_hinge(start_x, end_x, n_elem, xh, &
+                          r_le_aft, r_te_aft, r_le_fore, r_te_fore, dcsi)
+  real(wp),               intent(in)     :: start_x, end_x
+  integer,                intent(in)     :: n_elem
+  real(wp),               intent(in)     :: xh
+  real(wp),               intent(in)     :: r_le_aft, r_te_aft, r_le_fore, r_te_fore
+  real(wp), allocatable,  intent(out)    :: dcsi(:)
+
+  real(wp), parameter                 :: x_mid = 0.5_wp !> put as input? 
+  real(wp)                            :: start_x_aft, end_x_aft, start_x_fore, end_x_fore
+  real(wp), allocatable               :: dcsi_aft(:), dcsi_fore(:) 
+  integer                             :: n_elem_aft, n_elem_fore 
+  character(len=*), parameter         :: this_sub_name = 'geoseries_hinge' 
+  
+  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
+  n_elem_aft = ceiling(real(n_elem,wp)*xh) 
+  n_elem_fore = n_elem - n_elem_aft
+  start_x_aft = start_x
+  end_x_aft = xh
+  start_x_fore = xh
+  end_x_fore = end_x
+  call geoseries_both(start_x_aft, end_x_aft, n_elem_aft, x_mid, r_le_aft, r_te_aft, dcsi_aft);
+  call geoseries_both(start_x_fore, end_x_fore, n_elem_fore, x_mid, r_le_fore, r_te_fore, dcsi_fore);
+
+  dcsi = (/dcsi_aft(1:(size(dcsi_aft)-1)), dcsi_fore/)
+
+  !> cleanup
+  if (allocated(dcsi_aft))  deallocate(dcsi_aft)
+  if (allocated(dcsi_fore)) deallocate(dcsi_fore)  
+
+end subroutine geoseries_hinge
 
 !-------------------------------------------------------------------------------
 subroutine define_thickness(rr_geo, thickness)

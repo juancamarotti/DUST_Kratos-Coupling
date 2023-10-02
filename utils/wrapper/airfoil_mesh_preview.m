@@ -102,7 +102,8 @@ p = rr_mean(idx_m,1);           % x_mean line max thickness
 m_line = 2*m/p; % need to get the center of the circle -> linearized approach
 
 % calculate thickness in a simple manner 
-t = max(rr_up(:,2)) + min(rr_low(:,1));  
+t = max(rr_up(:,2)) - min(rr_low(:,2));  
+%t = 0.12; 
 % radius of the circle at the leading edge 
 circ.radius = 1.10*t^2; 
 
@@ -131,7 +132,7 @@ circ.tan_minus = tan(atan(-cot(beta_low)) + alpha);
 % leading edge circle sector
 theta_start = beta_up + alpha;
 theta_end = beta_low + alpha;
-circ.theta = linspace(theta_start, theta_end, 200);
+circ.theta = linspace(theta_start, theta_end, 10);
 circ.x = circ.radius.*cos(circ.theta) + circ.x_c;
 circ.y = circ.radius.*sin(circ.theta) + circ.y_c;
 
@@ -145,14 +146,14 @@ tang_te_low = (rr_low(end-1, 2) - rr_low(end, 2)) / ...
 point_up = flipud(rr_up); % point from ,dat file 
 % replace first point with circle point
 point_up(1,:) = [circ.x_plus, circ.y_plus];
-xq_up = linspace(circ.x_plus, 1, 1000); % from circle_up to TE 
+xq_up = linspace(circ.x_plus, 1, 10); % from circle_up to TE 
 yq_up = hermite_spline(point_up(:,1), point_up(:,2), xq_up, ...
                        circ.tan_plus, tang_te_up);
 
 % spline interpolation lower part
 point_low = rr_low; % point from .dat file
 point_low(1,:) = [circ.x_minus, circ.y_minus];
-xq_low = linspace(circ.x_minus, 1, 1000); 
+xq_low = linspace(circ.x_minus, 1, 10); 
 yq_low = hermite_spline(point_low(:,1), point_low(:,2), xq_low, ...
                         circ.tan_minus, tang_te_low);
 
@@ -168,10 +169,10 @@ circ.y_up = fliplr(circ.y_up);
 
 % upper 
 rr2mesh_up = [circ.x_up xq_up(2:end);
-              circ.y_up yq_up(2:end)];
+                circ.y_up yq_up(2:end)];
 % lower part 
 rr2mesh_low = [circ.x_low xq_low(2:end);
-               circ.y_low yq_low(2:end)];
+                circ.y_low yq_low(2:end)];
 
 %% Mesh possibilites: 
 % uniform 
@@ -186,25 +187,25 @@ rr2mesh_low = [circ.x_low xq_low(2:end);
 
 switch mesh_type 
     case 'uniform'
-        dcsi = linspace(min_x, 1, n_elem +1);
+        dcsi = linspace(0., 1., n_elem +1);
     case 'cosineLE'
-        dcsi = linspace(min_x, 1, n_elem +1);
+        dcsi = linspace(0., 1., n_elem +1);
         dcsi = 1.0-cos(0.5*pi.*dcsi);   
     case 'cosineTE'
-        dcsi = linspace(min_x, 1, n_elem +1);
+        dcsi = linspace(0., 1., n_elem +1);
         dcsi = sin(0.5*pi.*dcsi);       
     case 'cosine'
-        dcsi = linspace(min_x,1, n_elem +1);     
+        dcsi = linspace(0., 1., n_elem +1);     
         dcsi = 1/2.0.*(1.0-cos(pi.*dcsi));   
     case 'geoseriesLE'
-        [~, dcsi] = geoseries(min_x, 1, n_elem, r); 
+        [~, dcsi] = geoseries(0., 1., n_elem, r); 
     case 'geoseriesTE'
-        [dcsi, ~] = geoseries(min_x, 1, n_elem, r); 
+        [dcsi, ~] = geoseries(0., 1., n_elem, r); 
     case 'geoseries'
-        dcsi = geoseries_both(min_x, 1, n_elem, xh, r_le, r_te);
+        dcsi = geoseries_both(0., 1., n_elem, xh, r_le, r_te);
     case 'geoseriesHI'
-        dcsi = geoseries_hinge(min_x, 1, n_elem, xh, ...
-                               r_le_aft, r_te_aft, r_le_fore, r_te_fore);
+        dcsi = geoseries_hinge(0., 1., n_elem, xh, ...
+                                r_le_aft, r_te_aft, r_le_fore, r_te_fore);
 end 
 
 % linear interpolation to get y coordinates
