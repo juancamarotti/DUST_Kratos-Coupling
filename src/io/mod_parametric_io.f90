@@ -1241,11 +1241,13 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   end do
   close(fid)  
 
-  
+  id_up = floor(size(rr_geo(2,:))/2.0_wp)
+  allocate(rr_up(id_up,2));                      rr_up = 0.0_wp
+  allocate(rr_low(size(rr_geo(2,:)) - id_up,2)); rr_low = 0.0_wp 
+  allocate(rr_geo_mean(size(rr_up,2),2));            rr_geo_mean = 0.0_wp  
   !> some checks on the input file 
   if (rr_geo(2,2) .gt. 0.0_wp) then 
     !>  Seilig format 
-    id_up = floor(size(rr_geo(2,:))/2.0_wp)
     rr_up(:,1) = rr_geo(1:id_up + 1,1) 
     rr_up(:,2) = rr_geo(2:id_up + 1,2)
     ! reverse rr_up 
@@ -1304,6 +1306,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   theta_start = beta_up + alpha
   theta_end = beta_low + alpha
   allocate(theta(200)); theta = 0.0_wp 
+  allocate(x_circ(200), y_circ(200)); x_circ = 0.0_wp; y_circ = 0.0_wp 
   call linspace(theta_start, theta_end, theta)
   do i = 1 , size(theta)
     x_circ(i) = radius*cos(theta(i)) + x_c
@@ -1318,27 +1321,32 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
                 (rr_low(size(rr_low,1) - 1, 1) - rr_low(size(rr_low,1), 1))
 
   ! spline interpolation upper part
+  allocate(point_up(size(rr_up,1),2)); point_up = 0.0_wp  
   point_up = rr_up !  point from ,dat file 
   ! replace first point with circle point 
   point_up(1,:) = (/x_plus, y_plus/)
   allocate(xq_up(1000), yq_up(1000)); xq_up = 0.0_wp; yq_up = 0.0_wp 
 
   call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
-  call hermite_spline(point_up(:,1), point_up(:,2), xq_up, &
+  call hermite_spline_profile(point_up(:,1), point_up(:,2), xq_up, &
                       tan_plus, tan_te_up, yq_up) 
   
   !> spline interpolation lower part
+  allocate(point_low(size(rr_low,1),2)); point_low = 0.0_wp 
   point_low = rr_low ! point from .dat file
   point_low(1,:) = (/x_minus, y_minus/)
   allocate(xq_low(1000), yq_low(1000)); xq_low = 0.0_wp; yq_low = 0.0_wp
   call linspace(x_minus, 1.0_wp, xq_low) 
-  call hermite_spline(point_low(:,1), point_low(:,2), xq_low, &
+  call hermite_spline_profile(point_low(:,1), point_low(:,2), xq_low, &
                       tan_minus, tan_te_low, yq_low) 
   
   !> reorganize vectors to prepare mesh subdivision
   min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
   idx_circ_min = minloc(x_circ,1) 
-
+  allocate(circ_x_low(size(x_circ(1:idx_circ_min))), &
+          circ_y_low(size(y_circ(1:idx_circ_min))), &
+          circ_x_up(size(x_circ(idx_circ_min:-1))), &
+          circ_y_up(size(y_circ(idx_circ_min:-1)))) 
   circ_x_up = x_circ(1:idx_circ_min)
   circ_y_up = y_circ(1:idx_circ_min)
   circ_x_low = x_circ(idx_circ_min:-1)
@@ -1347,7 +1355,9 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   circ_x_up = x_up(size(x_up,1): -1: 1)
   circ_y_up = y_up(size(y_up,1): -1: 1) 
   
-  ! upper 
+  allocate(rr2mesh_up(2,size(circ_x_up))); rr2mesh_up = 0.0_wp
+  allocate(rr2mesh_low(2,size(circ_x_low))); rr2mesh_low = 0.0_wp 
+  ! upper
   rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:-1)/)
   rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:-1)/)
   ! lower part 
@@ -1355,7 +1365,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:-1)/) 
 
 
-  
+
   do i1 = 2 , np_geo
     st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
   end do
