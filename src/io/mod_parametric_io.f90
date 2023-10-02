@@ -59,8 +59,11 @@ use mod_handling, only: &
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
+use mod_spline, only: & 
+  hermite_spline_profile 
+
 use mod_math, only: & 
-  linear_interp, unique
+  linear_interp, unique, linspace
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input 
@@ -187,7 +190,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%CreateLogicalOption('twist_linear_interpolation',&
                 'Linear interpolation of the twist angle, for the whole component',&
                 'F',&
-                multiple=.false.);
+                multiple=.false.); 
+
   
   ! TODO: do we really need to allow the user to define the parameter above?
   ! the reference chord fraction is a number in the range [0,1] that defines
@@ -1190,25 +1194,37 @@ endsubroutine naca5digits
 
 subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness )
 
-  character(len=*), intent(in) :: filen
-  character(len=*), intent(in) :: ElType
-  integer         , intent(in) :: nelems_chord
-  real(wp)        , allocatable , intent(out) :: rr(:,:)
-  real(wp) , intent(out)                      :: thickness
+  character(len=*), intent(in)                :: filen
+  character(len=*), intent(in)                :: ElType
+  integer         , intent(in)                :: nelems_chord
+  real(wp)        , allocatable, intent(out)  :: rr(:,:)
+  real(wp)        , intent(out)               :: thickness
   real(wp)                                    :: csi_ac 
-  real(wp),         intent(in) :: csi_half(:)
+  real(wp)        , intent(in)                :: csi_half(:)
 
-  integer :: nelems_chord_tot
+  integer                :: nelems_chord_tot
   real(wp) , allocatable :: rr_geo(:,:)
   real(wp) , allocatable :: rr_up(:,:), rr_low(:,:), rr_pan(:,:)
-  real(wp) , allocatable :: y_mean(:,:)
-  integer :: np_geo
+  real(wp) , allocatable :: y_mean(:,:), rr_geo_mean(:,:)
+  integer                :: np_geo
   real(wp) , allocatable :: csi(:)
   real(wp) , allocatable :: st_geo(:) , s_geo(:)
-  real(wp) :: ds_geo
-  real(wp), allocatable :: rr_tmp(:,:)
+  real(wp)               :: ds_geo
+  real(wp), allocatable  :: rr_tmp(:,:)
+  real(wp)               :: m, p, t, radius, x_c, y_c, alpha, beta_up, beta_low
+  real(wp)               :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
+  real(Wp)               :: m_line, min_x
+  real(wp)               :: theta_start, theta_end
+  real(wp) , allocatable :: theta(:), x(:), y(:), x_circ(:), y_circ(:)
+  real(wp) , allocatable :: point_up(:,:), point_low(:,:) 
+  real(wp) , allocatable :: xq_up(:), xq_low(:), yq_up(:), yq_low(:) 
+  real(wp) , allocatable :: circ_x_low(:), circ_y_low(:), circ_x_up(:), circ_y_up(:) 
+  real(wp) , allocatable :: rr2mesh_up(:,:), rr2mesh_low(:,:)
+  real(wp) , allocatable :: x_up(:), x_low(:), y_up(:), y_low(:)  
+  real(wp)               :: tan_le, tan_te_up, tan_te_low
+
   integer :: fid, ierr
-  integer :: i1 , i2
+  integer :: i1 , i2, idx_m, id_up, i, idx_circ_min
   character(len=*), parameter :: this_sub_name = 'read_airfoil' 
   
   ! Read coordinates
@@ -1224,19 +1240,122 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     read(fid,*) rr_geo(:,i1)
   end do
   close(fid)  
+
+  
   !> some checks on the input file 
   if (rr_geo(2,2) .gt. 0.0_wp) then 
-    call error(this_sub_name, this_mod_name, & 
-              'The profile '//trim(adjustl(filen))//' is provided starting from the upper side. &  
-              Please flip the profile and retry. For further information, please refer to the manual sec 3.3.2.') 
+    !>  Seilig format 
+    id_up = floor(size(rr_geo(2,:))/2.0_wp)
+    rr_up(:,1) = rr_geo(1:id_up + 1,1) 
+    rr_up(:,2) = rr_geo(2:id_up + 1,2)
+    ! reverse rr_up 
+    rr_up(:,1) = rr_up(size(rr_up,1): -1: 1,1)
+    rr_up(:,2) = rr_up(size(rr_up,1): -1: 1,2) 
+    rr_low = rr_geo(id_up + 1: -1,:)
+    !> build middle line 
+    rr_geo_mean(:,1) = rr_low(:,1)
+    rr_geo_mean(:,2) = (rr_up(:,1) + rr_low(:,1))/2.0_wp  
+  else
+    !> DUST format 
+    !> TODO 
   endif  
+  ! get m and p
+  m = maxval(rr_geo_mean(:,2))
+  idx_m = maxloc(rr_geo_mean(:,2),1) ! y_mean line max thickness
+  p = rr_geo_mean(idx_m,1)         ! x_mean line max thickness 
 
-  if (rr_geo(1,1) .lt. 0.9_wp) then 
-    call error(this_sub_name, this_mod_name, & 
-              'The profile '//trim(adjustl(filen))//' is provided not starting from the trailing edge. &  
-              Please flip the profile and retry. For further information, please refer to the manual sec 3.3.2.') 
-  endif 
+  ! The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
+  ! The expression is related NACA profile, but should be valid for all profile
+  ! close to the leading edge. 
 
+  !Get analytical derivative of the mean line in x = 0  
+  m_line = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+  
+  ! calculate thickness in a simple manner 
+  !t = max(rr_up(:,2)) + min(rr_low(:,1))  
+  call define_thickness(rr_geo, t) 
+
+  ! radius of the circle at the leading edge 
+  radius = 1.10_wp*t**2.0_wp 
+
+  ! get center of the circle with the following conditions:
+  ! 1. passing through [0 0]
+  ! 2. center lying on the linearized middle line
+  ! 3. radius given by the NACA formula
+  x_c = sqrt(radius**2.0_wp/(m_line**2.0_wp + 1.0_wp))
+  y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
+
+  ! Define the region that is approximated by a circle arc  
+  ! Get point at +/- 37.5 deg (angle that works the best) 
+  alpha = atan(y_c/x_c); ! angle of m 
+  beta_up = (180.0_wp-37.5_wp)*pi/180.0_wp
+  beta_low = (180.0_wp+37.5_wp)*pi/180.0_wp
+  x_plus = radius*cos(beta_up + alpha) + x_c
+  y_plus = radius*sin(beta_up + alpha) + y_c
+  x_minus = radius*cos(beta_low + alpha) + x_c
+  y_minus = radius*sin(beta_low + alpha) + y_c
+
+  ! get the derivative for tangent at leading edge (to use in the
+  ! splining process 
+  tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
+  tan_minus = tan(atan(-1/tan(beta_low)) + alpha)
+
+  ! leading edge circle sector
+  theta_start = beta_up + alpha
+  theta_end = beta_low + alpha
+  allocate(theta(200)); theta = 0.0_wp 
+  call linspace(theta_start, theta_end, theta)
+  do i = 1 , size(theta)
+    x_circ(i) = radius*cos(theta(i)) + x_c
+    y_circ(i) = radius*sin(theta(i)) + y_c
+  end do
+  x = radius*cos(theta) + x_c
+  y = radius*sin(theta) + y_c
+
+  ! tangent at trailing edge: backward difference
+  tan_te_up = (rr_up(1,2) - rr_up(2, 2))/(rr_up(1,1) - rr_up(2, 1))
+  tan_te_low = (rr_low(size(rr_low,1) - 1, 2) - rr_low(size(rr_low,1), 2))/&
+                (rr_low(size(rr_low,1) - 1, 1) - rr_low(size(rr_low,1), 1))
+
+  ! spline interpolation upper part
+  point_up = rr_up !  point from ,dat file 
+  ! replace first point with circle point 
+  point_up(1,:) = (/x_plus, y_plus/)
+  allocate(xq_up(1000), yq_up(1000)); xq_up = 0.0_wp; yq_up = 0.0_wp 
+
+  call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
+  call hermite_spline(point_up(:,1), point_up(:,2), xq_up, &
+                      tan_plus, tan_te_up, yq_up) 
+  
+  !> spline interpolation lower part
+  point_low = rr_low ! point from .dat file
+  point_low(1,:) = (/x_minus, y_minus/)
+  allocate(xq_low(1000), yq_low(1000)); xq_low = 0.0_wp; yq_low = 0.0_wp
+  call linspace(x_minus, 1.0_wp, xq_low) 
+  call hermite_spline(point_low(:,1), point_low(:,2), xq_low, &
+                      tan_minus, tan_te_low, yq_low) 
+  
+  !> reorganize vectors to prepare mesh subdivision
+  min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
+  idx_circ_min = minloc(x_circ,1) 
+
+  circ_x_up = x_circ(1:idx_circ_min)
+  circ_y_up = y_circ(1:idx_circ_min)
+  circ_x_low = x_circ(idx_circ_min:-1)
+  circ_y_low = y_circ(idx_circ_min:-1)
+  !> reverse vectors 
+  circ_x_up = x_up(size(x_up,1): -1: 1)
+  circ_y_up = y_up(size(y_up,1): -1: 1) 
+  
+  ! upper 
+  rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:-1)/)
+  rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:-1)/)
+  ! lower part 
+  rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:-1)/)
+  rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:-1)/) 
+
+
+  
   do i1 = 2 , np_geo
     st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
   end do
@@ -1324,7 +1443,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   !else  
   !  curv_ac = 0.0_wp
   !endif 
-
+  
   !> cleanup
   if (allocated(rr_tmp)) deallocate(rr_tmp)
   if (allocated(rr_up)) deallocate(rr_up)

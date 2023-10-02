@@ -59,7 +59,7 @@ implicit none
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
           unique, infinite_plate_spline, tessellate, & 
-          vec2mat, mat2vec, invmat, invmat_banded
+          vec2mat, mat2vec, invmat, invmat_banded, linspace
 
 private
 
@@ -842,6 +842,29 @@ real(wp) function circumradius(vertices)
   
 end function circumradius
 
+! ----------------------------------------------------------------------
+subroutine linspace(from, to, array)
+  real(wp), intent(in)    :: from, to
+  real(wp), intent(out)   :: array(:)
+
+  real(wp)                :: range
+  integer                 :: n, i
+  
+  n = size(array)
+  range = to - from
+
+  if (n .eq. 0) return
+
+  if (n .eq. 1) then
+      array(1) = from
+      return
+  end if
+
+  do i=1, n
+      array(i) = from + range * (i - 1) / (n - 1)
+  end do
+
+end subroutine
 ! ----------------------------------------------------------------------
 ! Modified modulo function to cycle arrays 
 ! Substitutes 0 with last element

@@ -53,7 +53,7 @@ use mod_handling, only: &
   
 implicit none
 
-public :: t_spline , hermite_spline , deallocate_spline
+public :: t_spline , hermite_spline , hermite_spline_profile, deallocate_spline
 
 private
 
@@ -315,6 +315,60 @@ subroutine hermite_spline ( mesh_file, spl, nelems , par_tension , par_bias     
 
 
 end subroutine hermite_spline
+
+subroutine hermite_spline_profile(x, y, xq, tang_start, tang_end, yq) 
+  real(wp), intent(in) :: x(:)
+  real(wp), intent(in) :: y(:)
+  real(wp), intent(in) :: xq(:)
+  real(wp), intent(in) :: tang_start
+  real(wp), intent(in) :: tang_end
+  real(wp), intent(inout) :: yq(:) 
+  
+  real(wp), allocatable :: m(:)
+  real(wp)              :: t, h00, h01, h10, h11 
+  integer               :: i, j
+
+  !Input data
+  ! x:  x database
+  ! y:  y database
+  ! xq: x query
+  ! tang_start: tangent coefficient at x(1)
+  ! tang_end:   tangent coefficient at x(end)
+  !
+  ! Output data
+  ! yq: y interpolated
+  
+  ! build tangent vector using centered differences
+  allocate(m(size(x))); m = 0.0_wp
+  m(1) = tang_start;
+  m(-1) = tang_end;
+  do i = 2, size(x) - 1
+      m(i) = 0.5_wp*((y(i + 1) - y(i))/(x(i + 1) - x(i)) + &
+                  (y(i) - y(i - 1))/(x(i) - x(i - 1)))
+  end do
+  
+  !allocate(yq(size(xq))); yq = 0.0_wp 
+  do i = 1, size(xq)
+    do j = 1, size(x) - 1
+      ! two consecutive points x for which the point xq belongs
+      if ((xq(i) .ge. x(j)) .and. (xq(i) .le. x(j + 1))) then 
+        t = (xq(i) - x(j))/(x(j + 1) - x(j)) 
+  
+        h00 = hermite_p1(t)
+        h10 = hermite_d1(t)
+        h01 = hermite_p2(t)
+        h11 = hermite_d2(t)
+  
+        yq(i) = h00*y(j) + &
+                h10*(x(j + 1) - x(j))*m(j) + &
+                h01*y(j + 1) + &
+                h11*(x(j + 1) - x(j))*m(j + 1)
+      end if
+    end do 
+  end do
+  !> cleanup
+  deallocate(m) 
+end subroutine hermite_spline_profile 
 
 ! ----------------------------------------------------------------------
 !> hermite functions
