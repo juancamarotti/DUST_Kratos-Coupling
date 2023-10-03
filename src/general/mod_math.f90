@@ -221,10 +221,10 @@ subroutine invmat_banded(A, n)
   i2 = 0
   j2 = 0
 
-do i1=1,n
-write(*,*) A(i1,:)
-enddo
-write(*,*) "++++"
+!do i1=1,n
+!write(*,*) A(i1,:)
+!enddo
+!write(*,*) "++++"
   do i1 = 1,n
       do j1 = 1,n
         ! check if we are still inside a previous block
@@ -249,7 +249,7 @@ write(*,*) "++++"
             ! extract the block
             Anz = A(i1:i2,j1:j2)
             allocate(ipiv(nb)); ipiv = 0
- write(*,*) Anz
+! write(*,*) Anz
             !> Factorize the block
 #if (DUST_PRECISION==1)
             call sgetrf(nb, nb, Anz, nb, ipiv, info)

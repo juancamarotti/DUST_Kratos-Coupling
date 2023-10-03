@@ -1247,20 +1247,15 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp)        , allocatable, intent(out)  :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
 
-  real(wp)               :: csi_ac 
-  integer                :: nelems_chord_tot
-  real(wp) , allocatable :: rr_geo(:,:), rr_dat(:,:) 
-  real(wp) , allocatable :: rr_up(:,:), rr_low(:,:), rr_pan(:,:)
+  real(wp) , allocatable :: rr_dat(:,:) 
+  real(wp) , allocatable :: rr_up(:,:), rr_low(:,:)
   real(wp) , allocatable :: y_mean(:,:), rr_mean(:,:)
-  integer                :: np_geo, np_dat
-  real(wp) , allocatable :: st_geo(:) , s_geo(:)
-  real(wp)               :: ds_geo
-  real(wp) , allocatable :: rr_tmp(:,:)
-  real(wp)               :: m, p, t, radius, x_c, y_c, alpha, beta_up, beta_low
+  integer                :: np_dat
+  real(wp)               :: m, p, radius, x_c, y_c, alpha, beta_up, beta_low
   real(wp)               :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
   real(Wp)               :: min_x
   real(wp)               :: theta_start, theta_end
-  real(wp) , allocatable :: theta(:), x(:), y(:), x_circ(:), y_circ(:)
+  real(wp) , allocatable :: theta(:), x_circ(:), y_circ(:)
   real(wp) , allocatable :: point_up(:,:), point_low(:,:) 
   real(wp) , allocatable :: xq_up(:), xq_low(:), yq_up(:), yq_low(:), xq_mean(:), yq_mean(:) 
   real(wp) , allocatable :: circ_x_low(:), circ_y_low(:), circ_x_up(:), circ_y_up(:) 
@@ -1269,14 +1264,13 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp) , allocatable :: dl_up(:), dl_low(:), dl_mean(:) 
   real(wp) , allocatable :: rr_geo_up(:,:), rr_geo_low(:,:), rr_geo_mean(:,:)
   real(wp) , allocatable :: csi_up(:), csi_low(:), csi_mean(:) 
-  real(wp) , allocatable :: x_up(:), x_low(:), y_up(:), y_low(:)  
-  real(wp)               :: tan_le, tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
+  real(wp)               :: tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
   real(wp)               :: tan_le_up, tan_le_low
   integer  , parameter   :: n_circ = 200  
   integer  , parameter   :: n_query = 1000 
   integer  , parameter   :: maxiter = 10
   integer                :: fid, ierr
-  integer                :: i1 , i2, idx_m, id_le, i, idx_circ_min, j
+  integer                :: i1 , idx_m, id_le, i, idx_circ_min, j
   character(len=*), parameter :: this_sub_name = 'read_airfoil' 
   
   !> Read coordinates from dat file 
@@ -1290,339 +1284,303 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     read(fid,*) rr_dat(:,i1)
   end do
   close(fid)  
-
-  id_le = floor(real(size(rr_dat(2,:)),wp)/2.0_wp)
-  allocate(rr_up(2,   (id_le + 1)));                rr_up = 0.0_wp
-  allocate(rr_low(2,  size(rr_dat(2,:)) - id_le));  rr_low = 0.0_wp 
-  allocate(rr_mean(2, (id_le + 1)));                rr_mean = 0.0_wp  
-
-  !> some checks on the input file 
-  if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
-    rr_up = rr_dat(:, 1:id_le + 1) 
-    ! reverse rr_up 
-    rr_up = rr_up(:, size(rr_up, 2): 1: -1)
-    rr_low = rr_dat(:,id_le + 1: size(rr_dat, 2))
-  else                              !> Original DUST format 
-    rr_up = rr_dat(:, id_le + 1: size(rr_dat, 2))
-    rr_low = rr_dat(:,1:id_le + 1)
-    !> reverse rr_low 
-    rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
-  endif 
-
-  !> build middle line 
-  rr_mean(1,:) = rr_low(1,:)
-  rr_mean(2,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
   
-  !> get m and p
-  m = maxval(rr_mean(2,:))
-  idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
-  p = rr_mean(1, idx_m)           ! x_mean line max thickness 
-
-  !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
-  !  The expression is related NACA profile, but should be valid for all profile
-  !  close to the leading edge. 
-  !> Get analytical derivative of the mean line in x = 0  
-  tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
-  tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
+  !> retro-compatibility with old vl format 
+  if ((ElType .eq. 'v') .and. (rr_dat(1, 1) .eq. 0.0_wp) .and. (rr_dat(1, np_dat) .eq. 1.0_wp)) then 
+    allocate(rr_mean(2, np_dat));                rr_mean = 0.0_wp 
+    rr_mean(1,:) = rr_dat(1, :)
+    rr_mean(2,:) = rr_dat(2, :) 
+    m = maxval(rr_mean(2,:))
+    idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
+    p = rr_mean(1, idx_m)           ! x_mean line max thickness 
+    tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+    tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
                 (rr_mean(1, size(rr_mean,2) - 1) - rr_mean(1, size(rr_mean,2)))
   
-  allocate(xq_mean(n_query)); xq_mean = 0.0_wp
-  allocate(yq_mean(n_query)); yq_mean = 0.0_wp 
-  call linspace(0.0_wp, 1.0_wp, xq_mean)  
-  !> start iterative loop to get a more precise value of tang_mean_le 
-  do i = 1, maxiter
-    call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), xq_mean, &
-                                tang_mean_le, tang_mean_te, yq_mean)
-    m = maxval(yq_mean)
-    idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
-    p = xq_mean(idx_m)           ! x_mean line max thickness
-    tang_mean_le_new = 2.0_wp*m/p
-    if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
-    tang_mean_le = tang_mean_le_new 
-  enddo 
-  
-  !> calculate thickness in a simple manner
-  call define_thickness(rr_dat, thickness) 
-  !thickness = maxval(rr_up(2,:)) - minval(rr_low(2,:))  
-  ! radius of the circle at the leading edge 
-  radius = 1.10_wp*thickness**2.0_wp 
-  !> Get center of the circle with the following conditions:
-  !  1. passing through [0 0]
-  !  2. center lying on the linearized middle line
-  !  3. radius given by the NACA formula
-  x_c = sqrt(radius**2.0_wp/(tang_mean_le**2.0_wp + 1.0_wp))
-  y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
-
-
-  !> Define the region that is approximated by a circle arc  
-  !  Get point at +/- 37.5 deg (angle that works the best) 
-  alpha = atan(y_c/x_c); ! angle of m 
-  beta_up =  (180.0_wp - 37.5_wp)*pi/180.0_wp
-  beta_low = (180.0_wp + 37.5_wp)*pi/180.0_wp
-  x_plus = radius*cos(beta_up + alpha) + x_c
-  y_plus = radius*sin(beta_up + alpha) + y_c
-  x_minus = radius*cos(beta_low + alpha) + x_c
-  y_minus = radius*sin(beta_low + alpha) + y_c
-
-  !> get the derivative for tangent at leading edge (to use in the
-  !> splining process 
-  tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
-  tan_minus = tan(atan(-1/tan(beta_low)) + alpha)
-  tan_le_up = tan(pi/2.0_wp + alpha)
-  tan_le_low = tan(-pi/2.0_wp + alpha)
-
-  !> leading edge circle sector
-  theta_start = beta_up + alpha
-  theta_end = beta_low + alpha
-  allocate(theta(n_circ)); theta = 0.0_wp 
-  allocate(x_circ(n_circ), y_circ(n_circ)); x_circ = 0.0_wp; y_circ = 0.0_wp 
-
-  call linspace(theta_start, theta_end, theta)
-  do i = 1 , size(theta)
-    x_circ(i) = radius*cos(theta(i)) + x_c
-    y_circ(i) = radius*sin(theta(i)) + y_c
-  end do
-
-  !> tangent at trailing edge: backward difference
-  tan_te_up = (rr_up(2, (size(rr_up, 2) - 1)) - rr_up(2, size(rr_up,2))) / & 
-              (rr_up(1, (size(rr_up, 2) - 1)) - rr_up(1, size(rr_up,2)))
-  tan_te_low =  (rr_low(2, (size(rr_low, 2) - 1)) - rr_low(2, size(rr_low,2))) / & 
-                (rr_low(1, (size(rr_low, 2) - 1)) - rr_low(1, size(rr_low,2)))
-
-  !> spline interpolation upper part
-  allocate(point_up(2, size(rr_up, 2))); point_up = 0.0_wp  
-  point_up = rr_up !  point from ,dat file 
-  !> replace first point with circle point 
-  point_up(:, 1) = (/x_plus, y_plus/)
-  allocate(xq_up(n_query), yq_up(n_query)); xq_up = 0.0_wp; yq_up = 0.0_wp 
-  call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
-  call hermite_spline_profile(point_up(1,:), point_up(2,:), xq_up, &
-                      tan_plus, tan_te_up, yq_up) 
-
-  !> spline interpolation lower part
-  allocate(point_low(2, size(rr_low,1))); point_low = 0.0_wp 
-  point_low = rr_low ! point from .dat file
-  point_low(:, 1) = (/x_minus, y_minus/)
-  allocate(xq_low(n_query), yq_low(n_query)); xq_low = 0.0_wp; yq_low = 0.0_wp
-  call linspace(x_minus, 1.0_wp, xq_low) 
-  call hermite_spline_profile(point_low(1, :), point_low(2, :), xq_low, &
-                      tan_minus, tan_te_low, yq_low) 
-  
-  !> reorganize vectors to prepare mesh subdivision
-  min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
-  idx_circ_min = minloc(x_circ,1) 
-
-  allocate(circ_x_low(idx_circ_min),              &
-          circ_y_low(idx_circ_min),               &
-          circ_x_up(size(x_circ) - idx_circ_min), &
-          circ_y_up(size(x_circ) - idx_circ_min)) 
-  circ_x_up = x_circ(1:idx_circ_min)
-  circ_y_up = y_circ(1:idx_circ_min)
-  circ_x_low = x_circ(idx_circ_min:size(x_circ))
-  circ_y_low = y_circ(idx_circ_min:size(x_circ))
-  !> reverse vectors 
-  circ_x_up = circ_x_up(size(circ_x_up):1:-1) 
-  circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
-
-  allocate(rr2mesh_up(2,(size(circ_x_up) + size(xq_up) - 1)));    rr2mesh_up = 0.0_wp
-  allocate(rr2mesh_low(2,(size(circ_x_low) + size(xq_low) - 1))); rr2mesh_low = 0.0_wp 
-  allocate(rr2mesh_mean(2,size(xq_mean)));                        rr2mesh_mean = 0.0_wp
-  
-  !> upper part
-  rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:size(xq_up))/)
-  rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:size(xq_up))/) 
-  !> get length and derivative (alpha) along the upper line 
-  allocate(alpha_up(size(rr2mesh_up(1,:)))); alpha_up = 0.0_wp
-  alpha_up(1) = tan_le_up 
-  allocate(dl_up(size(rr2mesh_up(1,:)))); dl_up = 0.0_wp
-  dl_up(1) = 0.0_wp 
-  do i = 2, size(rr2mesh_up(1,:))
-    dl_up(i) = dl_up(i - 1) + sqrt((rr2mesh_up(1,i) - rr2mesh_up(1,i-1))**2.0_wp + &
-                                  (rr2mesh_up(2,i) - rr2mesh_up(2,i-1))**2.0_wp)
-    alpha_up(i) = atan((rr2mesh_up(2,i) - rr2mesh_up(2,i-1))/ &
-                      (rr2mesh_up(1,i) - rr2mesh_up(1,i-1)))
-  end do
-
-  !> lower part 
-  rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:size(xq_low))/)
-  rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:size(xq_low))/) 
-  !> get length and derivative (alpha) along the lower line 
-  allocate(alpha_low(size(rr2mesh_low(1,:)))); alpha_low = 0.0_wp
-  alpha_low(1) = tan_le_low
-  allocate(dl_low(size(rr2mesh_low(1,:)))); dl_low = 0.0_wp
-  dl_low(1) = 0.0_wp
-  do i = 2, size(rr2mesh_low(1,:))
-    dl_low(i) = dl_low(i - 1) + sqrt((rr2mesh_low(1,i) - rr2mesh_low(1,i-1))**2.0_wp + &
-                                    (rr2mesh_low(2,i) - rr2mesh_low(2,i-1))**2.0_wp)
-    alpha_low(i) = atan((rr2mesh_low(2,i) - rr2mesh_low(2,i-1))/ &
-                        (rr2mesh_low(1,i) - rr2mesh_low(1,i-1)))
-  end do
-
-  !> mean line 
-  rr2mesh_mean(1,:) = xq_mean
-  rr2mesh_mean(2,:) = yq_mean
-  !> get length and derivative (alpha) along the mean line
-  allocate(alpha_mean(size(rr2mesh_mean(1,:)))); alpha_mean = 0.0_wp
-  alpha_mean(1) = tang_mean_le
-  allocate(dl_mean(size(rr2mesh_mean(1,:)))); dl_mean = 0.0_wp
-  dl_mean(1) = 0.0_wp
-  do i = 2, size(rr2mesh_mean(1,:))
-    dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
-                                      (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
-    alpha_mean(i) = atan((rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))/ &
-                        (rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)))
-  end do
-  
-  !> interpolation of the upper part 
-  !> rescale csi_half in the interval [0 dl_up(size(dl_up))] 
-  allocate(csi_up(size(csi_half))); csi_up = 0.0_wp
-  csi_up = csi_half*dl_up(size(dl_up)) 
-  allocate(rr_geo_up(2, size(csi_up))); rr_up = 0.0_wp 
-  do i = 1, size(csi_up) 
-    do j = 1, size(dl_up) - 1 
-      if ((csi_up(i) .ge. dl_up(j)) .and. (csi_up(i) .le. dl_up(j + 1))) then 
-        rr_geo_up(1,i) = rr2mesh_up(1, j) + cos(alpha_up(j))*(dl_up(j + 1) - dl_up(j)); 
-        rr_geo_up(2,i) = rr2mesh_up(2, j) + sin(alpha_up(j))*(dl_up(j + 1) - dl_up(j)); 
-      endif   
+    allocate(xq_mean(n_query)); xq_mean = 0.0_wp
+    allocate(yq_mean(n_query)); yq_mean = 0.0_wp 
+    call linspace(0.0_wp, 1.0_wp, xq_mean)  
+    !> start iterative loop to get a more precise value of tang_mean_le 
+    do i = 1, maxiter
+      call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), xq_mean, &
+                                  tang_mean_le, tang_mean_te, yq_mean)
+      m = maxval(yq_mean)
+      idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
+      p = xq_mean(idx_m)           ! x_mean line max thickness
+      tang_mean_le_new = 2.0_wp*m/p
+      if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
+      tang_mean_le = tang_mean_le_new 
+    enddo 
+    !> mean line 
+    allocate(rr2mesh_mean(2,size(xq_mean)));                        rr2mesh_mean = 0.0_wp
+    rr2mesh_mean(1,:) = xq_mean
+    rr2mesh_mean(2,:) = yq_mean
+    !> get length and derivative (alpha) along the mean line
+    allocate(alpha_mean(size(rr2mesh_mean(1,:)))); alpha_mean = 0.0_wp
+    alpha_mean(1) = tang_mean_le
+    allocate(dl_mean(size(rr2mesh_mean(1,:))));     dl_mean = 0.0_wp
+    dl_mean(1) = 0.0_wp
+    do i = 2, size(rr2mesh_mean(1,:))
+      dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
+                                        (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
+      alpha_mean(i) = atan((rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))/ &
+                          (rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)))
+    end do
+    !> interpolation of the mean line
+    !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
+    allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
+    csi_mean = csi_half*dl_mean(size(dl_mean))
+    allocate(rr_geo_mean(2, size(csi_mean))); rr_geo_mean = 0.0_wp
+    do i = 1, size(csi_mean)
+      do j = 1, size(dl_mean) - 1
+        if ((csi_mean(i) .ge. dl_mean(j)) .and. (csi_mean(i) .le. dl_mean(j + 1))) then
+          rr_geo_mean(1,i) = rr2mesh_mean(1, j) + cos(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j))
+          rr_geo_mean(2,i) = rr2mesh_mean(2, j) + sin(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j))
+        endif
+      enddo
     enddo
-  enddo
-
-  !> interpolation of the lower part 
-  !> rescale csi_half in the interval [0 dl_low(size(dl_low))]
-  allocate(csi_low(size(csi_half))); csi_low = 0.0_wp
-  csi_low = csi_half*dl_low(size(dl_low))
-  allocate(rr_geo_low(2, size(csi_low))); rr_geo_low = 0.0_wp
-  do i = 1, size(csi_low)
-    do j = 1, size(dl_low) - 1
-      if ((csi_low(i) .ge. dl_low(j)) .and. (csi_low(i) .le. dl_low(j + 1))) then
-        rr_geo_low(1,i) = rr2mesh_low(1, j) + cos(alpha_low(j))*(dl_low(j + 1) - dl_low(j));
-        rr_geo_low(2,i) = rr2mesh_low(2, j) + sin(alpha_low(j))*(dl_low(j + 1) - dl_low(j));
-      endif
-    enddo
-  enddo
-  !> flip lower part 
-  rr_geo_low = rr_geo_low(:, size(rr_geo_low(1,:)):1:-1) 
-  
-  !> interpolation of the mean line
-  !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
-  allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
-  csi_mean = csi_half*dl_mean(size(dl_mean))
-  allocate(rr_geo_mean(2, size(csi_mean))); rr_geo_mean = 0.0_wp
-  do i = 1, size(csi_mean)
-    do j = 1, size(dl_mean) - 1
-      if ((csi_mean(i) .ge. dl_mean(j)) .and. (csi_mean(i) .le. dl_mean(j + 1))) then
-        rr_geo_mean(1,i) = rr2mesh_mean(1, j) + cos(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j));
-        rr_geo_mean(2,i) = rr2mesh_mean(2, j) + sin(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j));
-      endif
-    enddo
-  enddo
-  
-  if (ElType .eq. 'p') then 
-    allocate(rr(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); rr = 0.0_wp 
-    rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)), rr_geo_up(1,2:size(rr_geo_up,2))/) 
-    rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)), rr_geo_up(2,2:size(rr_geo_up,2))/)
-  elseif (ElType .eq. 'v') then 
-    allocate(rr(2,size(rr_geo_mean, 2))); rr = 0.0_wp 
     rr(1,:) = rr_geo_mean(1,:)
     rr(2,:) = rr_geo_mean(2,:) 
-  endif 
+    thickness = 0.12_wp !> dummy value (assumed a NACA0012) 
+  else 
+    id_le = floor(real(size(rr_dat(2,:)),wp)/2.0_wp)
+    allocate(rr_up(2,   (id_le + 1)));                rr_up = 0.0_wp
+    allocate(rr_low(2,  size(rr_dat(2,:)) - id_le));  rr_low = 0.0_wp 
+    allocate(rr_mean(2, (id_le + 1)));                rr_mean = 0.0_wp  
 
-  !> reorder in DUST format: lower to upper 
-  !np_geo = size(rr2mesh_up, 2) + size(rr2mesh_low, 2) - 1 
-  !allocate(rr_geo(2,np_geo)); rr_geo = 0.0_wp 
-  !rr_geo(1,:) = (/rr2mesh_low(1,1:size(rr2mesh_low,2)), rr2mesh_up(1,2:size(rr2mesh_up,2))/)
-  !rr_geo(2,:) = (/rr2mesh_low(2,1:size(rr2mesh_low,2)), rr2mesh_up(2,2:size(rr2mesh_up,2))/)
-  
-  !allocate(st_geo(np_geo), s_geo(np_geo))
-  !st_geo = 0.0_wp ; s_geo = 0.0_wp 
-  !write(*,*) 'csi_half', csi_half
+    !> some checks on the input file 
+    if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
+      rr_up = rr_dat(:, 1:id_le + 1) 
+      ! reverse rr_up 
+      rr_up = rr_up(:, size(rr_up, 2): 1: -1)
+      rr_low = rr_dat(:,id_le + 1: size(rr_dat, 2))
+    else                              !> Original DUST format 
+      rr_up = rr_dat(:, id_le + 1: size(rr_dat, 2))
+      rr_low = rr_dat(:,1:id_le + 1)
+      !> reverse rr_low 
+      rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
+    endif 
 
+    !> build middle line 
+    rr_mean(1,:) = rr_low(1,:)
+    rr_mean(2,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
 
+    !> get m and p
+    m = maxval(rr_mean(2,:))
+    idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
+    p = rr_mean(1, idx_m)           ! x_mean line max thickness 
 
-  !do i1 = 2 , np_geo
-  !  st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
-  !end do
-  !s_geo = st_geo / st_geo(np_geo)
-  !! condition to evaluate if the airfoil.dat input contains only the mean line 
-  !! coordinates (for VL), or all the section points. (necessary for retrocompatibility)
-  !if ((rr_geo(1,size(rr_geo(1,:))) - rr_geo(1,1)) .le. 0.5_wp) then
-!
-  !  nelems_chord_tot = 2*nelems_chord+1
-  !  allocate(csi(nelems_chord_tot))
-  !  csi(1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
-  !  csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
-  !  csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
-!
-  !  allocate(rr_pan(2,nelems_chord_tot)); rr_pan = 0.0_wp
-  !  allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
-  !  rr_pan(:,1) = rr_geo(:,1)
-  !  rr_pan(:,nelems_chord_tot) = rr_geo(:,np_geo)
-  !  do i1 = 2 , nelems_chord_tot - 1
-  !    do i2 = 2 , np_geo
-  !      if ( csi(i1) .lt. s_geo(i2) ) then
-  !        ds_geo = s_geo(i2)-s_geo(i2-1)
-  !        rr_pan(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
-  !                  (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-  !        exit
-  !      end if
-  !    end do
-  !  end do
-  !  
-  !  rr_tmp = rr_pan 
-  !  !> resort rr (first pressure side then suction side)
-  !  rr_pan = rr_pan(:, size(rr_pan(1,:)):1:-1)
-  !  !> fix trailing edge 
-  !  rr_pan(:,1) = rr_tmp(:,1)
-  !  rr_pan(:,size(rr_pan,2)) = rr_tmp(:,size(rr_pan,2))     
-!
-  !  if  ( ElType .eq. 'v' ) then 
-  !    allocate(rr_up(2,nelems_chord+1));    rr_up = 0.0_wp
-  !    allocate(rr_low(2,nelems_chord+1));   rr_low = 0.0_wp
-  !    allocate(y_mean(1,nelems_chord+1));   y_mean = 0.0_wp
-  !    allocate(rr(2,nelems_chord+1));       rr = 0.0_wp
-  !    ! split suction and lower side
-  !    rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
-  !    rr_low = rr_pan(:,1:nelems_chord+1)
-!
-  !    ! y-coordinates of the mean line
-  !    y_mean(1,:) = (rr_up(2,:) + rr_low(2,size(rr_low(1,:)):1:-1))/2.0_wp
-  !    rr(1,:) = rr_up(1,:)
-  !    rr(2,:) = y_mean(1,:)
-  !    
-  !  elseif ( ElType .eq. 'p' ) then
-  !    allocate(rr(2,nelems_chord_tot));       rr = 0.0_wp 
-  !    rr = rr_pan
-  !  endif 
-!
-  !else
-!
-  !  nelems_chord_tot = nelems_chord+1
-  !  allocate(csi(nelems_chord_tot))
-  !  csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
-  !
-  !  allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
-  !  allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
-  !  rr(:,1) = rr_geo(:,1)
-  !  rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
-  !  do i1 = 2 , nelems_chord_tot - 1
-  !    do i2 = 2 , np_geo
-  !      if ( csi(i1) .lt. s_geo(i2) ) then
-  !        ds_geo = s_geo(i2)-s_geo(i2-1)
-  !        rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
-  !                   (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-  !        exit
-  !      end if
-  !    end do
-  !  end do
-!
-  !endif
-  !> calculate thickness for dynstall 
-  !call define_thickness(rr_geo, thickness)
+    !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
+    !  The expression is related NACA profile, but should be valid for all profile
+    !  close to the leading edge. 
+    !> Get analytical derivative of the mean line in x = 0  
+    tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+    tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
+                  (rr_mean(1, size(rr_mean,2) - 1) - rr_mean(1, size(rr_mean,2)))
+
+    allocate(xq_mean(n_query)); xq_mean = 0.0_wp
+    allocate(yq_mean(n_query)); yq_mean = 0.0_wp 
+    call linspace(0.0_wp, 1.0_wp, xq_mean)  
+    !> start iterative loop to get a more precise value of tang_mean_le 
+    do i = 1, maxiter
+      call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), xq_mean, &
+                                  tang_mean_le, tang_mean_te, yq_mean)
+      m = maxval(yq_mean)
+      idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
+      p = xq_mean(idx_m)           ! x_mean line max thickness
+      tang_mean_le_new = 2.0_wp*m/p
+      if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
+      tang_mean_le = tang_mean_le_new 
+    enddo 
+
+    !> calculate thickness in a simple manner
+    call define_thickness(rr_dat, thickness) 
+    !thickness = maxval(rr_up(2,:)) - minval(rr_low(2,:))  
+    ! radius of the circle at the leading edge 
+    radius = 1.10_wp*thickness**2.0_wp 
+    !> Get center of the circle with the following conditions:
+    !  1. passing through [0 0]
+    !  2. center lying on the linearized middle line
+    !  3. radius given by the NACA formula
+    x_c = sqrt(radius**2.0_wp/(tang_mean_le**2.0_wp + 1.0_wp))
+    y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
+
+    !> Define the region that is approximated by a circle arc  
+    !  Get point at +/- 37.5 deg (angle that works the best) 
+    alpha = atan(y_c/x_c); ! angle of m 
+    beta_up =  (180.0_wp - 37.5_wp)*pi/180.0_wp
+    beta_low = (180.0_wp + 37.5_wp)*pi/180.0_wp
+    x_plus = radius*cos(beta_up + alpha) + x_c
+    y_plus = radius*sin(beta_up + alpha) + y_c
+    x_minus = radius*cos(beta_low + alpha) + x_c
+    y_minus = radius*sin(beta_low + alpha) + y_c
+
+    !> get the derivative for tangent at leading edge (to use in the
+    !> splining process 
+    tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
+    tan_minus = tan(atan(-1/tan(beta_low)) + alpha)
+    tan_le_up = tan(pi/2.0_wp + alpha)
+    tan_le_low = tan(-pi/2.0_wp + alpha)
+
+    !> leading edge circle sector
+    theta_start = beta_up + alpha
+    theta_end = beta_low + alpha
+    allocate(theta(n_circ)); theta = 0.0_wp 
+    allocate(x_circ(n_circ), y_circ(n_circ)); x_circ = 0.0_wp; y_circ = 0.0_wp 
+
+    call linspace(theta_start, theta_end, theta)
+    do i = 1 , size(theta)
+      x_circ(i) = radius*cos(theta(i)) + x_c
+      y_circ(i) = radius*sin(theta(i)) + y_c
+    end do
+
+    !> tangent at trailing edge: backward difference
+    tan_te_up = (rr_up(2, (size(rr_up, 2) - 1)) - rr_up(2, size(rr_up,2))) / & 
+                (rr_up(1, (size(rr_up, 2) - 1)) - rr_up(1, size(rr_up,2)))
+    tan_te_low =  (rr_low(2, (size(rr_low, 2) - 1)) - rr_low(2, size(rr_low,2))) / & 
+                  (rr_low(1, (size(rr_low, 2) - 1)) - rr_low(1, size(rr_low,2)))
+
+    !> spline interpolation upper part
+    allocate(point_up(2, size(rr_up, 2))); point_up = 0.0_wp  
+    point_up = rr_up !  point from ,dat file 
+    !> replace first point with circle point 
+    point_up(:, 1) = (/x_plus, y_plus/)
+    allocate(xq_up(n_query), yq_up(n_query)); xq_up = 0.0_wp; yq_up = 0.0_wp 
+    call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
+    call hermite_spline_profile(point_up(1,:), point_up(2,:), xq_up, &
+                        tan_plus, tan_te_up, yq_up) 
+
+    !> spline interpolation lower part
+    allocate(point_low(2, size(rr_low,1))); point_low = 0.0_wp 
+    point_low = rr_low ! point from .dat file
+    point_low(:, 1) = (/x_minus, y_minus/)
+    allocate(xq_low(n_query), yq_low(n_query)); xq_low = 0.0_wp; yq_low = 0.0_wp
+    call linspace(x_minus, 1.0_wp, xq_low) 
+    call hermite_spline_profile(point_low(1, :), point_low(2, :), xq_low, &
+                        tan_minus, tan_te_low, yq_low) 
+
+    !> reorganize vectors to prepare mesh subdivision
+    min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
+    idx_circ_min = minloc(x_circ,1) 
+
+    allocate(circ_x_low(idx_circ_min),              &
+            circ_y_low(idx_circ_min),               &
+            circ_x_up(size(x_circ) - idx_circ_min), &
+            circ_y_up(size(x_circ) - idx_circ_min)) 
+    circ_x_up = x_circ(1:idx_circ_min)
+    circ_y_up = y_circ(1:idx_circ_min)
+    circ_x_low = x_circ(idx_circ_min:size(x_circ))
+    circ_y_low = y_circ(idx_circ_min:size(x_circ))
+    !> reverse vectors 
+    circ_x_up = circ_x_up(size(circ_x_up):1:-1) 
+    circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
+
+    allocate(rr2mesh_up(2,(size(circ_x_up) + size(xq_up) - 1)));    rr2mesh_up = 0.0_wp
+    allocate(rr2mesh_low(2,(size(circ_x_low) + size(xq_low) - 1))); rr2mesh_low = 0.0_wp 
+    allocate(rr2mesh_mean(2,size(xq_mean)));                        rr2mesh_mean = 0.0_wp
+
+    !> upper part
+    rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:size(xq_up))/)
+    rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:size(xq_up))/) 
+    !> get length and derivative (alpha) along the upper line 
+    allocate(alpha_up(size(rr2mesh_up(1,:)))); alpha_up = 0.0_wp
+    alpha_up(1) = tan_le_up 
+    allocate(dl_up(size(rr2mesh_up(1,:)))); dl_up = 0.0_wp
+    dl_up(1) = 0.0_wp 
+    do i = 2, size(rr2mesh_up(1,:))
+      dl_up(i) = dl_up(i - 1) + sqrt((rr2mesh_up(1,i) - rr2mesh_up(1,i-1))**2.0_wp + &
+                                    (rr2mesh_up(2,i) - rr2mesh_up(2,i-1))**2.0_wp)
+      alpha_up(i) = atan((rr2mesh_up(2,i) - rr2mesh_up(2,i-1))/ &
+                        (rr2mesh_up(1,i) - rr2mesh_up(1,i-1)))
+    end do
+
+    !> lower part 
+    rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:size(xq_low))/)
+    rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:size(xq_low))/) 
+    !> get length and derivative (alpha) along the lower line 
+    allocate(alpha_low(size(rr2mesh_low(1,:)))); alpha_low = 0.0_wp
+    alpha_low(1) = tan_le_low
+    allocate(dl_low(size(rr2mesh_low(1,:)))); dl_low = 0.0_wp
+    dl_low(1) = 0.0_wp
+    do i = 2, size(rr2mesh_low(1,:))
+      dl_low(i) = dl_low(i - 1) + sqrt((rr2mesh_low(1,i) - rr2mesh_low(1,i-1))**2.0_wp + &
+                                      (rr2mesh_low(2,i) - rr2mesh_low(2,i-1))**2.0_wp)
+      alpha_low(i) = atan((rr2mesh_low(2,i) - rr2mesh_low(2,i-1))/ &
+                          (rr2mesh_low(1,i) - rr2mesh_low(1,i-1)))
+    end do
+
+    !> mean line 
+    rr2mesh_mean(1,:) = xq_mean
+    rr2mesh_mean(2,:) = yq_mean
+    !> get length and derivative (alpha) along the mean line
+    allocate(alpha_mean(size(rr2mesh_mean(1,:)))); alpha_mean = 0.0_wp
+    alpha_mean(1) = tang_mean_le
+    allocate(dl_mean(size(rr2mesh_mean(1,:)))); dl_mean = 0.0_wp
+    dl_mean(1) = 0.0_wp
+    do i = 2, size(rr2mesh_mean(1,:))
+      dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
+                                        (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
+      alpha_mean(i) = atan((rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))/ &
+                          (rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)))
+    end do
+
+    !> interpolation of the upper part 
+    !> rescale csi_half in the interval [0 dl_up(size(dl_up))] 
+    allocate(csi_up(size(csi_half))); csi_up = 0.0_wp
+    csi_up = csi_half*dl_up(size(dl_up)) 
+    allocate(rr_geo_up(2, size(csi_up))); rr_up = 0.0_wp 
+    do i = 1, size(csi_up) 
+      do j = 1, size(dl_up) - 1 
+        if ((csi_up(i) .ge. dl_up(j)) .and. (csi_up(i) .le. dl_up(j + 1))) then 
+          rr_geo_up(1,i) = rr2mesh_up(1, j) + cos(alpha_up(j))*(dl_up(j + 1) - dl_up(j)) 
+          rr_geo_up(2,i) = rr2mesh_up(2, j) + sin(alpha_up(j))*(dl_up(j + 1) - dl_up(j)) 
+        endif   
+      enddo
+    enddo
+
+    !> interpolation of the lower part 
+    !> rescale csi_half in the interval [0 dl_low(size(dl_low))]
+    allocate(csi_low(size(csi_half))); csi_low = 0.0_wp
+    csi_low = csi_half*dl_low(size(dl_low))
+    allocate(rr_geo_low(2, size(csi_low))); rr_geo_low = 0.0_wp
+    do i = 1, size(csi_low)
+      do j = 1, size(dl_low) - 1
+        if ((csi_low(i) .ge. dl_low(j)) .and. (csi_low(i) .le. dl_low(j + 1))) then
+          rr_geo_low(1,i) = rr2mesh_low(1, j) + cos(alpha_low(j))*(dl_low(j + 1) - dl_low(j))
+          rr_geo_low(2,i) = rr2mesh_low(2, j) + sin(alpha_low(j))*(dl_low(j + 1) - dl_low(j))
+        endif
+      enddo
+    enddo
+    !> flip lower part 
+    rr_geo_low = rr_geo_low(:, size(rr_geo_low(1,:)):1:-1) 
+
+    !> interpolation of the mean line
+    !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
+    allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
+    csi_mean = csi_half*dl_mean(size(dl_mean))
+    allocate(rr_geo_mean(2, size(csi_mean))); rr_geo_mean = 0.0_wp
+    do i = 1, size(csi_mean)
+      do j = 1, size(dl_mean) - 1
+        if ((csi_mean(i) .ge. dl_mean(j)) .and. (csi_mean(i) .le. dl_mean(j + 1))) then
+          rr_geo_mean(1,i) = rr2mesh_mean(1, j) + cos(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j))
+          rr_geo_mean(2,i) = rr2mesh_mean(2, j) + sin(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j))
+        endif
+      enddo
+    enddo
+
+    if (ElType .eq. 'p') then 
+      allocate(rr(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); rr = 0.0_wp 
+      rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)), rr_geo_up(1,2:size(rr_geo_up,2))/) 
+      rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)), rr_geo_up(2,2:size(rr_geo_up,2))/)
+    elseif (ElType .eq. 'v') then 
+      allocate(rr(2,size(rr_geo_mean, 2))); rr = 0.0_wp 
+      rr(1,:) = rr_geo_mean(1,:)
+      rr(2,:) = rr_geo_mean(2,:) 
+    endif 
+  end if !> old format 
   
   !> cleanup
-  if (allocated(rr_geo))      deallocate(rr_geo)
   if (allocated(rr_dat))      deallocate(rr_dat) 
-  if (allocated(rr_tmp))      deallocate(rr_tmp)
   if (allocated(rr_up))       deallocate(rr_up)
   if (allocated(rr_low))      deallocate(rr_low)
   if (allocated(rr_mean))     deallocate(rr_mean)
@@ -1668,13 +1626,13 @@ subroutine define_division(type_mesh, nelem, division)
 
   real(wp),        allocatable       :: division_(:)
   real(wp),        parameter         :: r = 1/8.0_wp
-  real(wp),        parameter         :: r_le = 1/8.0_wp
+  real(wp),        parameter         :: r_le = 1/7.0_wp
   real(wp),        parameter         :: r_te = 1/15.0_wp
-  real(wp),        parameter         :: r_le_aft = 1/5.0_wp
-  real(wp),        parameter         :: r_te_aft = 1/8.0_wp
-  real(wp),        parameter         :: r_le_fore = 1/8.0_wp
-  real(wp),        parameter         :: r_te_fore = 1/15.0_wp
-  real(wp),        parameter         :: xh = 0.5_wp
+  real(wp),        parameter         :: r_le_aft = 1/8.0_wp
+  real(wp),        parameter         :: r_te_aft = 1/7.0_wp
+  real(wp),        parameter         :: r_le_fore = 1/7.0_wp
+  real(wp),        parameter         :: r_te_fore = 1/7.0_wp
+  real(wp),        parameter         :: xh = 0.75_wp
   real(wp)                           :: step
   integer                            :: iPoint
   character(len=*), parameter        :: this_sub_name = 'define_division'
