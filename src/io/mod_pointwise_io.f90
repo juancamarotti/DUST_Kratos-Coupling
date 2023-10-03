@@ -72,7 +72,7 @@ use mod_spline, only: &
   t_spline, hermite_spline , deallocate_spline
 
 use mod_parametric_io, only: &
-  define_section , define_division
+  define_section , define_division, geoseries, geoseries_both
 
 !----------------------------------------------------------------------
 
@@ -961,6 +961,7 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
   real(wp)                , intent(inout) ::nor(:,:)
   real(wp)                , intent(inout) ::  s(:)
   real(wp)                , intent(out)   :: leng
+  real(wp), allocatable                   :: division(:), divisionIB(:), divisionOB(:) 
   character(len=*), parameter             :: this_sub_name = 'straight_line'
   real(wp) :: nor_v(3)
 
@@ -993,12 +994,24 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
                 cos( 0.5_wp*real(i-1,wp)*pi/ real(nelems,wp) )
     elseif ( trim(type_span) .eq. 'equalarea' ) then 
       ! equalarea spacing in span 
-        !rr(i,2) = sqrt(r1(2)**2.0_wp + (r2(2)**2.0_wp - r1(2)**2.0_wp) * &
-        !          (real(i-1,wp))/(real(nelems,wp))) 
-        rr(i,2) = sqrt(real(i-1,wp)/real(nelems,wp))*(r2(2) - r1(2)) + r1(2) 
-            
-        rr(i,1) = r1(1) + (rr(i,2) - r1(2))*( r2(1) - r1(1) )/( r2(2) - r1(2) )
-        rr(i,3) = r1(3) + (rr(i,2) - r1(2))*( r2(3) - r1(3) )/( r2(2) - r1(2) )
+      rr(i,2) = sqrt(real(i-1,wp)/real(nelems,wp))*(r2(2) - r1(2)) + r1(2) 
+      rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
+      rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
+    elseif ( trim(type_span) .eq. 'geoseries') then 
+      call geoseries_both(r1(2), r2(2), nelems, 0.5_wp, 1/10.0_wp, 1/10.0_wp, division) 
+      rr(i,2) = division(i-1) 
+      rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
+      rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
+    elseif ( trim(type_span) .eq. 'geoseriesOB') then
+      call geoseries(r1(2), r2(2), nelems, 1/10.0_wp, divisionIB, divisionOB) 
+      rr(i,2) = divisionIB(i-1) 
+      rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
+      rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))  
+    elseif ( trim(type_span) .eq. 'geoseriesIB') then
+      call geoseries(r1(2), r2(2), nelems, 1/10.0_wp, divisionIB, divisionOB)  
+      rr(i,2) = divisionOB(i-1) 
+      rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
+      rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
     else
       write(*,*) ' Mesh file   : ' , trim(mesh_file)
       write(*,*) ' type_span   : ' , trim(type_span)
@@ -1500,9 +1513,43 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
     call pmesh_prs%CreateStringOption('type_chord', &
                   'type of chord-wise division: uniform, cosine, &
-                  &cosineLE, cosineTE', 'uniform', &
+                  &cosineLE, cosineTE, geoseries, geoseriesLE, &
+                  &geoseriesTE, geoseriesHI', 'uniform', & 
+                  multiple=.false.)
+    
+    !> geometric series parameters 
+    call pmesh_prs%CreateRealOption('ratio', &
+                  'ratio of the geometric series', '1/8', &
+                  multiple=.false.) 
+    
+    call pmesh_prs%CreateRealOption('ratioLE', &
+                  'ratio of the geometric series at leading edge', '1/8', &
+                  multiple=.false.) 
+    
+    call pmesh_prs%CreateRealOption('ratioTE', &
+                  'ratio of the geometric series at trailing edge', '1/15', &
+                  multiple=.false.)
+    
+    call pmesh_prs%CreateRealOption('ratioLE_aft', &
+                  'ratio of the geometric series at leading egde of the fixed &
+                  & part', '1/5', & 
+                  multiple=.false.)
+    
+    call pmesh_prs%CreateRealOption('ratioTE_aft', &
+                  'ratio of the geometric series at trailing egde of the fixed &
+                  & part', '1/8', &
+                  multiple=.false.) 
+    
+    call pmesh_prs%CreateRealOption('ratioLE_fore', &
+                  'ratio of the geometric series at leading egde of the fixed &
+                  & part', '1/5', & 
                   multiple=.false.)
 
+    call pmesh_prs%CreateRealOption('ratioTE_fore', &
+                  'ratio of the geometric series at leading egde of the fixed &
+                  & part', '1/5', & 
+                  multiple=.false.)   
+    
     call pmesh_prs%CreateRealOption('reference_chord_fraction',&
                   'Reference chord fraction', &
                   '0.0',&

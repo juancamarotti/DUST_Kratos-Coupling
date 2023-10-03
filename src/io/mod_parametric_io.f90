@@ -72,7 +72,7 @@ use mod_hinges, only: &
 implicit none
 
 public :: read_mesh_parametric, read_actuatordisk_parametric , &
-          define_section , define_division
+          define_section , define_division, geoseries, geoseries_both
 private
 
 character(len=*), parameter :: this_mod_name = 'mod_parametric_io'
@@ -139,7 +139,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp), allocatable                     :: span_list(:) 
   real(wp), allocatable                     :: sweep_list(:) 
   real(wp), allocatable                     :: dihed_list(:)
-  real(wp), allocatable                     :: division(:)
+  real(wp), allocatable                     :: division(:), divisionIB(:), divisionOB(:) 
+  logical                                   :: adjust_xz = .false.
   character(len=max_char_len), allocatable  :: type_span_list(:)
   integer                                   :: n_type_span
   character                                 :: ElType
@@ -706,55 +707,72 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
                             real(nelem_span_list(iRegion),wp) * &
                             ( rrSection2 - rrSection1 )
+          adjust_xz = .false.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
           ! cosine  spacing in span
           rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
                             0.5_wp * ( rrSection2 - rrSection1 ) * &
                       cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          adjust_xz = .false.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
           ! cosine  spacing in span: outboard refinement
           rr(:,ista:iend) = rrSection1 + &
                           ( rrSection2 - rrSection1 ) * &
               sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          adjust_xz = .false. 
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           ! cosine  spacing in span: inboard refinement
           rr(:,ista:iend) = rrSection2 - &
                           ( rrSection2 - rrSection1 ) * &
               cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          adjust_xz = .false.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then 
-            !rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
-            !                      (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
-            rr(2, ista:iend) = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))* & 
-                              (rrSection2(2,:) - rrSection1(2,:)) + rrSection1(2,:) 
-            rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
-                              ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
-            rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
-                              ( rrSection2(3,:) - rrSection1(3,:) )/( rrSection2(2,:) - rrSection1(2,:) )
+          rr(2, ista:iend) = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))* & 
+                            (rrSection2(2,:) - rrSection1(2,:)) + rrSection1(2,:) 
+          adjust_xz = .true.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
-          !! geometric series in span > todo 
-          !do j = 1, npoint_chord_tot
-          !  call geoseries_both(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 0.5_wp,& 
-          !                      1/10.0_wp, 1/10.0_wp, division)  
-          !  rr(2, ista + j - 1) = division(i1)
-          !enddo 
-          !rr(2,iend ) = division(nelem_span_list(iRegion))
-          !rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
-          !                    ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
-          !rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
-          !                    ( rrSection2(3,:) - rrSection1(3,:) )/( rrSection2(2,:) - rrSection1(2,:) )
-          !write(*,*) rr(1, ista:iend) 
-          !write(*,*) rr(2, ista:iend)
-          !write(*,*) rr(3, ista:iend) 
-          
+          do j = 1, npoint_chord_tot
+            call geoseries_both(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 0.5_wp,& 
+                                1/10.0_wp, 1/10.0_wp, division)  
+            rr(2, ista + j - 1) = division(i1 + 1)
+          enddo 
+          adjust_xz = .true.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
+          do j = 1, npoint_chord_tot
+            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 1/10.0_wp, &
+                          divisionIB, divisionOB)  
+            rr(2, ista + j - 1) = divisionOB(i1 + 1)
+          enddo 
+          adjust_xz = .true.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
+          do j = 1, npoint_chord_tot
+            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 1/10.0_wp, &
+                          divisionIB, divisionOB)  
+            rr(2, ista + j - 1) = divisionIB(i1 + 1)
+          enddo 
+          adjust_xz = .true.
+        
         else 
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Incorrect input: &
-                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea.')
+                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea, &
+                & geoseries, geoseriesIB, geoseriesOB.')
         end if
-
+        !> adjust the x and z coordinate 
+        if (adjust_xz) then
+          rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+                            (rrSection2(1,:) - rrSection1(1,:))/(rrSection2(2,:) - rrSection1(2,:))
+          rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+                            (rrSection2(3,:) - rrSection1(3,:))/(rrSection2(2,:) - rrSection1(2,:))
+        endif  
       else !-> linear interpolation of the twist angle
 
         allocate(rr_tw(  2,npoint_chord_tot))
@@ -779,9 +797,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         !> rotate section back ( coord. in the local ref. frame )
         twist_rad = twist_list(iRegion+1) * pi/180.0_wp
         rr_tw_2 = matmul( &
-                  reshape( (/ cos(twist_rad), sin(twist_rad) , &
-                        -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                                rr_tw_2 )
+                  reshape( (/ cos(twist_rad), sin(twist_rad), &
+                            -sin(twist_rad), cos(twist_rad)/), (/2,2/)), rr_tw_2 )
         !> Interpolation weight 
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
@@ -793,12 +810,22 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
-          interp_weight = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp)) 
+          interp_weight = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
+          call geoseries_both(0.0_wp, 1.0_wp, nelem_span_list(iRegion), 0.5_wp, 1/10.0_wp, 1/10.0_wp, division)
+          interp_weight = division(i1 + 1) 
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
+          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), 1/10.0_wp, divisionIB, divisionOB)
+          interp_weight = divisionOB(i1 + 1) 
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
+          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), 1/10.0_wp, divisionIB, divisionOB)
+          interp_weight = divisionIB(i1 + 1) 
         else
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Incorrect input: &
-                & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea, &
+                & geoseries, geoseriesIB, geoseriesOB.')
         end if
 
         ! === x,z coordinates ===
