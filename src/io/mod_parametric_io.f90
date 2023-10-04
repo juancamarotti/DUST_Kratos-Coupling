@@ -101,7 +101,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  !real(wp), allocatable, intent(out), optional :: thickness_out(:,:)
   real(wp), allocatable , intent(out), optional                    ::  thickness(:,:)
   real(wp), allocatable                     :: thickness_section1(:), thickness_section2(:) 
   real(wp)                                  :: thickness_section
@@ -208,25 +207,55 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   !                (as a fraction of the chord)',&
   !               multiple=.true.);
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil', &
-                multiple=.true.);                
+                multiple=.true.)                
   call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
-                multiple=.true.);
+                multiple=.true.)
+  !> geoseries parameters 
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '1/8', &
+                multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
+                '1/7.0', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
+                '1/15', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
+                & fixed part', '1/8', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
+                & fixed part', '1/7.0', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
+                & moving part', '1/7', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                & moving part', '1/7', multiple=.true.) 
+  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                & moving part', '1/10', multiple=.true.) 
+  call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
+                '1/2', multiple=.true.)
 
   !> Region parameters
   call pmesh_prs%CreateRealOption(    'span', 'region span',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateRealOption(   'sweep', 'region sweep angle [degrees]',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateRealOption(   'dihed', 'region dihedral angle [degrees]',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateIntOption( 'nelem_span', 'number of span-wise elements in the region',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
-                &uniform, cosine, cosineIB, cosineOB, equalarea', multiple=.true.);
+                &uniform, cosine, cosineIB, cosineOB, equalarea, geoseries, geoseriesOB, geoseriesIB',&
+                multiple=.true.)
+
+  !> geoseries parameters (region)
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
+                '1/8', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
+                '1/7', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
+                '1/15', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
+                '1/2', multiple=.true.) 
   
   !> Read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
@@ -274,9 +303,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   nelem_span_tot = 0
   do iRegion = 1,nRegions
     nelem_span_list(iRegion) = getint(pmesh_prs,'nelem_span')
-    span_list(iRegion)  = getreal(pmesh_prs,'span' )
-    sweep_list(iRegion) = getreal(pmesh_prs,'sweep')
-    dihed_list(iRegion) = getreal(pmesh_prs,'dihed')
+    span_list(iRegion)  = getreal(pmesh_prs,    'span' )
+    sweep_list(iRegion) = getreal(pmesh_prs,    'sweep')
+    dihed_list(iRegion) = getreal(pmesh_prs,    'dihed')
     nelem_span_tot = nelem_span_tot + nelem_span_list(iRegion)
   enddo
 
@@ -1110,15 +1139,6 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   enddo
 
   thick = s
-  !xac = 0.75_wp !> control point 
-  !curv_ac = 0.0_wp
-  !if (p>0) then
-  !  if (xac <= p) then
-  !    curv_ac = m/p**2 * (2.0_wp*p*xac - xac**2)
-  !  else
-  !    curv_ac = m/(1.0_wp-p)**2 * (1.0_wp-2.0_wp*p + 2.0_wp*p*xac - xac**2)
-  !  endif
-  !endif
 
   if ( allocated(points) ) deallocate(points)
   allocate(points(2,2*nelem_chord+1))
@@ -1221,12 +1241,6 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
   enddo
 
   thick = s 
-  !xac = 0.75_wp ! control point for vl corrected
-  !if (xa <= r) then
-  !  curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
-  !else
-  !  curv_ac = mult*k1*r**3/6.0_wp*(1-xac)
-  !endif
 
   if ( allocated(points) ) deallocate(points)
   allocate(points(2,2*nelem_chord+1))
@@ -1267,7 +1281,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp)               :: tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
   real(wp)               :: tan_le_up, tan_le_low
   integer  , parameter   :: n_circ = 200  
-  integer  , parameter   :: n_query = 1000 
+  integer  , parameter   :: n_query = 20000 
   integer  , parameter   :: maxiter = 10
   integer                :: fid, ierr
   integer                :: i1 , idx_m, id_le, i, idx_circ_min, j

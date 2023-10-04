@@ -59,6 +59,8 @@ use mod_handling, only: &
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
+use mod_parametric_io, only: &
+  geoseries, geoseries_both
 !----------------------------------------------------------------------
 
 implicit none
@@ -173,7 +175,15 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                                     & uniform, cosine, cosineIB, cosineOB, equalarea', &
                 multiple=.true.);
 
-
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
+                '1/8', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
+                '1/7', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
+                '1/15', multiple=.true.)
+  call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
+                '1/2', multiple=.true.) 
+  
   !read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
@@ -354,13 +364,22 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
       ispace = 4
 
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
+      ispace = 5 
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
+      ispace = 6 
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
+      ispace = 7
+
     else
       write(*,*) ' mesh_file   : ' , trim(mesh_file)
       write(*,*) ' type_span_list(',iRegion,') : ' , &
                     trim(type_span_list(iRegion))
       call error(this_sub_name, this_mod_name, 'Inconsistent input: &
             & type_span must be equal to uniform, cosine, cosineIB,&
-            & cosineOB, equalarea.')
+            & cosineOB, equalarea, geoseries, geoseriesOB, geoseriesIB.')
     end if
 
     !> save before update
@@ -529,12 +548,15 @@ end subroutine read_mesh_ll
 !!   ISPACE = 2    left cosine spacing
 !!   ISPACE = 3    right cosine spacing
 !!   ISPACE = 4    equalarea spacing
+!!   ISPACE = 5    geoseries 
+!!   ISPACE = 6    geoseriesOB
+!!   ISPACE = 7    geoseriesIB
 
 function spacing_weights ( itype, i, n ) result(w)
 
   integer,      intent(in)  :: itype, i, n
   real(wp)                  :: w
-
+  real(wp),     allocatable :: division(:), divisionIB(:), divisionOB(:)
 
   select case (itype)
 
@@ -549,6 +571,18 @@ function spacing_weights ( itype, i, n ) result(w)
 
   case(4) ! equalarea 
     w =  sqrt(real(i,wp)/real(n,wp)) 
+
+  case(5) ! geoseries
+    call geoseries_both(0.0_wp, 1.0_wp, n, 0.5_wp, 1/10.0_wp, 1/10.0_wp, division)
+    w = division(i)
+
+  case(6)  
+    call geoseries(0.0_wp, 1.0_wp, n, 1/10.0_wp, divisionIB, divisionOB) 
+    w = divisionOB(i)
+
+  case(7) 
+    call geoseries(0.0_wp, 1.0_wp, n, 1/10.0_wp, divisionIB, divisionOB) 
+    w = divisionIB(i)
 
   case default ! uniform
     w = real(i,wp) / real(n,wp)

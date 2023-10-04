@@ -1518,37 +1518,32 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                   multiple=.false.)
     
     !> geometric series parameters 
-    call pmesh_prs%CreateRealOption('ratio', &
-                  'ratio of the geometric series', '1/8', &
-                  multiple=.false.) 
-    
-    call pmesh_prs%CreateRealOption('ratioLE', &
-                  'ratio of the geometric series at leading edge', '1/8', &
-                  multiple=.false.) 
-    
-    call pmesh_prs%CreateRealOption('ratioTE', &
-                  'ratio of the geometric series at trailing edge', '1/15', &
-                  multiple=.false.)
-    
-    call pmesh_prs%CreateRealOption('ratioLE_aft', &
-                  'ratio of the geometric series at leading egde of the fixed &
-                  & part', '1/5', & 
-                  multiple=.false.)
-    
-    call pmesh_prs%CreateRealOption('ratioTE_aft', &
-                  'ratio of the geometric series at trailing egde of the fixed &
-                  & part', '1/8', &
-                  multiple=.false.) 
-    
-    call pmesh_prs%CreateRealOption('ratioLE_fore', &
-                  'ratio of the geometric series at leading egde of the fixed &
-                  & part', '1/5', & 
-                  multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '1/8', &
+                  multiple=.true.)
 
-    call pmesh_prs%CreateRealOption('ratioTE_fore', &
-                  'ratio of the geometric series at leading egde of the fixed &
-                  & part', '1/5', & 
-                  multiple=.false.)   
+  call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
+                  '1/7.0', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
+                  '1/15', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
+                  & fixed part', '1/8', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
+                  & fixed part', '1/7.0', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
+                  & moving part', '1/7', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                  & moving part', '1/7', multiple=.true.) 
+
+  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                  & moving part', '1/10', multiple=.true.) 
+
+  call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
+                  '1/2', multiple=.true.)
     
     call pmesh_prs%CreateRealOption('reference_chord_fraction',&
                   'Reference chord fraction', &
@@ -1598,17 +1593,36 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   ! --- line group ---
   call line_prs%CreateStringOption(       'type', &
                 'type of the line connecting points: Straight or Spline' )
+
   call line_prs%CreateIntArrayOption('end_points', &
                 'list of point id.s belonging to the line' )
+
   call line_prs%CreateIntOption(        'Nelems', &
                 'n. spanwise elems of the line section' )
+
   call line_prs%CreateRealOption('Tension', &
                 'tension factor of the spline', '0.0' )
+
   call line_prs%CreateRealOption('Bias', &
                 'bias factor for the spline', '0.0' )
+
   call line_prs%CreateStringOption('type_span', 'type of span-wise division: &
                 &uniform, cosine, cosineIB, cosineOB, equalarea', &
-                'uniform' ) ! defualt
+                'uniform' ) ! default
+
+  !> geo series parameters
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
+                '1/8', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
+                '1/7', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
+                '1/15', multiple=.true.)
+
+  call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
+                '1/2', multiple=.true.) 
+
   !> TangentVec1,2: in the code:
   ! straight lines: useles input -> tan vec computed
   ! spline lines  : either assigned or inherited from neighbouring lines
