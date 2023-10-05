@@ -176,13 +176,13 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                 multiple=.true.);
 
   call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
-                '1/8', multiple=.true.)
+                multiple=.true.)
   call pmesh_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
-                '1/7', multiple=.true.)
+                multiple=.true.)
   call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
-                '1/15', multiple=.true.)
+                multiple=.true.)
   call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
-                '1/2', multiple=.true.) 
+                multiple=.true.) 
   
   !read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)

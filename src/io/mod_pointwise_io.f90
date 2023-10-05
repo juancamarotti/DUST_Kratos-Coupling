@@ -1519,31 +1519,31 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
     
     !> geometric series parameters 
   call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '1/8', &
-                  multiple=.true.)
+                  multiple=.false.)
 
   call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
-                  '1/7.0', multiple=.true.)
+                  '1/7.0', multiple=.false.)
 
   call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
-                  '1/15', multiple=.true.)
+                  '1/15', multiple=.false.)
 
   call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
-                  & fixed part', '1/8', multiple=.true.)
+                  & fixed part', '1/8', multiple=.false.)
 
   call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
-                  & fixed part', '1/7.0', multiple=.true.)
+                  & fixed part', '1/7.0', multiple=.false.)
 
   call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
-                  & moving part', '1/7', multiple=.true.)
+                  & moving part', '1/7', multiple=.false.)
 
   call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                  & moving part', '1/7', multiple=.true.) 
+                  & moving part', '1/7', multiple=.false.) 
 
   call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                  & moving part', '1/10', multiple=.true.) 
+                  & moving part', '1/10', multiple=.false.) 
 
   call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
-                  '1/2', multiple=.true.)
+                  '1/2', multiple=.false.)
     
     call pmesh_prs%CreateRealOption('reference_chord_fraction',&
                   'Reference chord fraction', &
@@ -1611,17 +1611,17 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                 'uniform' ) ! default
 
   !> geo series parameters
-  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
-                '1/8', multiple=.true.)
+  call line_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
+                multiple=.true.)
 
-  call pmesh_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
-                '1/7', multiple=.true.)
+  call line_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
+                multiple=.true.)
 
-  call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
-                '1/15', multiple=.true.)
+  call line_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
+                multiple=.true.)
 
-  call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
-                '1/2', multiple=.true.) 
+  call line_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
+                multiple=.true.) 
 
   !> TangentVec1,2: in the code:
   ! straight lines: useles input -> tan vec computed
