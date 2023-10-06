@@ -267,6 +267,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                           .false.)
       i_var = i_var +1
     endif
+    if(out_vort) then
+      call add_output_var(out_vars(i_var), vort, 'Vorticity_Vector', &
+                          .false.)
+      i_var = i_var +1
+    endif    
     if(out_cp) then
       call add_output_var(out_vars(i_var), cp, 'Cp',.false.)
       i_var = i_var +1
@@ -291,6 +296,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       call add_output_var(out_vars(i_var), moment, 'Moment',.false.)
       i_var = i_var +1
     endif
+
     
     if(average) then
       if( ires .eq. 1) then
