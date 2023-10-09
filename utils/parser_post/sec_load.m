@@ -66,9 +66,7 @@ function sec_data = sec_load(file_out, short_data)
         'Fx';
         };
     else
-        field = {'vel_outplane_isolated';
-        'vel_outplane';
-        'vel_2d_isolated';
+        field = {'vel_outplane';
         'vel_2d';
         'up_x';
         'up_y';
@@ -80,7 +78,6 @@ function sec_data = sec_load(file_out, short_data)
         'Cm';
         'Cl';
         'Cd';
-        'alpha_isolated';
         'alpha'};
     end
         

@@ -1039,17 +1039,7 @@ are set to \param{T} the following quantities are printed:
     velocity at the control point, corrected with the 2D influence 
     needed by Piszkin and Lewinski formulation of LL elements, 
     in order to get the right angle of attack to be used in the 
-    aerodynamic tables
-    \item \texttt{vel\_2d\_isolated}: same as \texttt{vel\_2d} but 
-    for the relative free stream velocity $\mathbf{v}_{rel,free}$ only,
-    being the influence of the body and wake singularities neglected;
-    \item \texttt{vel\_outplane\_isolated}: same as \texttt{vel\_outplane} 
-    but for the relative free stream velocity $\mathbf{v}_{rel,free}$ only, 
-    being the influence of the body and wake singularities neglected;
-    \item \texttt{alpha\_isolated}: angle of attack of the in plane relative 
-    free stream velocity at the control point, equal to 
-    $\alpha_{is} = \text{atan2}( \mathbf{v}_{rel,free} \cdot \mathbf{\hat{n}}, 
-    \ \mathbf{v}_{rel,free} \cdot \mathbf{\hat{t}})$.
+    aerodynamic tables.
 \end{itemize}
 % While the above quantities are computed taking into account the 
 %influence from all the components and wakes, \texttt{alpha}, 
