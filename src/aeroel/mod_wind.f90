@@ -71,45 +71,37 @@ function variable_wind(pos, time) result(wind)
   real(wp) :: wind(3)
 
   real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
-              gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
+              gust_u_des, gust_perturb_direction(3), gust_gradient, &
+              gust_time, gust_perturbation(3)
 
   real(wp) :: s
 
   wind = sim_param%u_inf
 
   if (sim_param%use_gust) then
+    gust_origin = sim_param%gust_origin
+    gust_front_direction = sim_param%gust_front_direction/ &
+                                        norm2(sim_param%gust_front_direction)
+    gust_front_speed = sim_param%gust_front_speed
+    gust_u_des = sim_param%gust_u_des
+    gust_perturb_direction = sim_param%gust_perturb_direction/&
+                                        norm2(sim_param%gust_perturb_direction)
+    gust_perturbation = gust_perturb_direction * gust_u_des
+    gust_gradient = sim_param%gust_gradient
+    gust_time = sim_param%gust_time
+
     select case(trim(sim_param%GustType))
       case('ACM')
-        gust_origin = sim_param%gust_origin
-        gust_front_direction = sim_param%gust_front_direction/ &
-                                            norm2(sim_param%gust_front_direction)
-        gust_front_speed = sim_param%gust_front_speed
-        gust_u_des = sim_param%gust_u_des
-        gust_perturb_direction = sim_param%gust_perturb_direction/&
-                                          norm2(sim_param%gust_perturb_direction)
-        gust_gradient = sim_param%gust_gradient
-        gust_time = sim_param%gust_time
-
         ! penetration distance
         ! distance from the gust front, negative for the gust approaching
         s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*&
                       (time-gust_time)))*gust_front_direction)
 
         if (s .ge. 0.0_wp .and. s .lt. 2.0_wp*gust_gradient) then
-          wind = wind + gust_u_des/2*(1.0_wp-cos(pi*s/gust_gradient))
+          wind = wind + gust_perturbation/2*(1.0_wp-cos(pi*s/gust_gradient))
         end if
 
       case('linear') ! for testing
-        gust_origin = sim_param%gust_origin
-        gust_front_direction = sim_param%gust_front_direction/&
-                                            norm2(sim_param%gust_front_direction)
-        gust_front_speed = sim_param%gust_front_speed
-        gust_u_des = sim_param%gust_u_des
-        gust_perturb_direction = sim_param%gust_perturb_direction/&
-                                          norm2(sim_param%gust_perturb_direction)
-        gust_gradient = sim_param%gust_gradient
-        gust_time = sim_param%gust_time
-
         s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/&
                                                             norm2(sim_param%u_inf)
 
