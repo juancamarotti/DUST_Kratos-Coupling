@@ -498,7 +498,7 @@ subroutine create_param_main(prms)
   
   !> Variable wind
   call prms%CreateLogicalOption('gust','Gust perturbation','F')
-  call prms%CreateStringOption('gust_type','Gust model','AMC')
+  call prms%CreateStringOption('gust_type','Gust model','ACM')
   call prms%CreateRealArrayOption('gust_origin','Gust origin point')
   call prms%CreateRealArrayOption('gust_front_direction','Gust front direction vector')
   call prms%CreateRealOption('gust_front_speed','Gust front speed')
