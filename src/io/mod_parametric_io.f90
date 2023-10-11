@@ -60,10 +60,10 @@ use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
 use mod_spline, only: & 
-  hermite_spline_profile 
+  hermite_spline_profile, catmull_rom_chain
 
 use mod_math, only: & 
-  linear_interp, unique, linspace
+  linear_interp, unique, unique_row, linspace, sort_vector_real
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input 
@@ -1261,30 +1261,34 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp)        , allocatable, intent(out)  :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
 
-  real(wp) , allocatable :: rr_dat(:,:) 
-  real(wp) , allocatable :: rr_up(:,:), rr_low(:,:)
-  real(wp) , allocatable :: y_mean(:,:), rr_mean(:,:)
-  integer                :: np_dat
-  real(wp)               :: m, p, radius, x_c, y_c, alpha, beta_up, beta_low
-  real(wp)               :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
-  real(Wp)               :: min_x
-  real(wp)               :: theta_start, theta_end
-  real(wp) , allocatable :: theta(:), x_circ(:), y_circ(:)
-  real(wp) , allocatable :: point_up(:,:), point_low(:,:) 
-  real(wp) , allocatable :: xq_up(:), xq_low(:), yq_up(:), yq_low(:), xq_mean(:), yq_mean(:) 
-  real(wp) , allocatable :: circ_x_low(:), circ_y_low(:), circ_x_up(:), circ_y_up(:) 
-  real(wp) , allocatable :: rr2mesh_up(:,:), rr2mesh_low(:,:), rr2mesh_mean(:,:)
-  real(wp) , allocatable :: alpha_up(:), alpha_low(:), alpha_mean(:)
-  real(wp) , allocatable :: dl_up(:), dl_low(:), dl_mean(:) 
-  real(wp) , allocatable :: rr_geo_up(:,:), rr_geo_low(:,:), rr_geo_mean(:,:)
-  real(wp) , allocatable :: csi_up(:), csi_low(:), csi_mean(:) 
-  real(wp)               :: tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
-  real(wp)               :: tan_le_up, tan_le_low
-  integer  , parameter   :: n_circ = 200  
-  integer  , parameter   :: n_query = 20000 
-  integer  , parameter   :: maxiter = 10
-  integer                :: fid, ierr
-  integer                :: i1 , idx_m, id_le, i, idx_circ_min, j
+  real(wp) , allocatable      :: rr_dat(:,:) 
+  real(wp) , allocatable      :: rr_up(:,:), rr_low(:,:)
+  real(wp) , allocatable      :: y_mean(:,:), rr_mean(:,:)
+  integer                     :: np_dat
+  real(wp)                    :: m, p, radius, x_c, y_c, alpha, beta_up, beta_low
+  real(wp)                    :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
+  real(Wp)                    :: min_x
+  real(wp)                    :: theta_start, theta_end
+  real(wp) , allocatable      :: theta(:), x_circ(:), y_circ(:)
+  real(wp) , allocatable      :: point_up(:,:), point_low(:,:) 
+  real(wp) , allocatable      :: xq_up(:), xq_low(:), yq_up(:), yq_low(:), xq_mean(:), yq_mean(:) 
+  real(wp) , allocatable      :: circ_x_low(:), circ_y_low(:), circ_x_up(:), circ_y_up(:) 
+  real(wp) , allocatable      :: rr2mesh_up(:,:), rr2mesh_low(:,:), rr2mesh_mean(:,:)
+  real(wp) , allocatable      :: alpha_up(:), alpha_low(:), alpha_mean(:)
+  real(wp) , allocatable      :: dl_up(:), dl_low(:), dl_mean(:) 
+  real(wp) , allocatable      :: rr_geo_up(:,:), rr_geo_low(:,:), rr_geo_mean(:,:)
+  real(wp) , allocatable      :: rr_sort(:,:), x_sort(:), x_unique(:), ylow_unique(:), yup_unique(:)
+  real(wp) , allocatable      :: csi_up(:), csi_low(:), csi_mean(:) 
+  real(wp) , allocatable      :: rr_unique(:,:), rr_unique_up(:,:), rr_unique_low(:,:)
+  real(wp) , allocatable      :: xmean(:), ymean(:), rr_mean_dat(:,:)
+  real(wp)                    :: tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
+  real(wp)                    :: tan_le_up, tan_le_low
+  integer  , parameter        :: n_circ = 200  
+  integer  , parameter        :: n_query = 20000 
+  integer  , parameter        :: maxiter = 10
+  integer                     :: fid, ierr
+  integer                     :: i1 , idx_m, id_le, i, idx_circ_min, j 
+  integer  , allocatable      :: ind_sort(:)
   character(len=*), parameter :: this_sub_name = 'read_airfoil' 
   
   !> Read coordinates from dat file 
@@ -1357,11 +1361,18 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     rr(2,:) = rr_geo_mean(2,:) 
     thickness = 0.12_wp !> dummy value (assumed a NACA0012) 
   else 
-    id_le = floor(real(size(rr_dat(2,:)),wp)/2.0_wp)
-    allocate(rr_up(2,   (id_le + 1)));                rr_up = 0.0_wp
-    allocate(rr_low(2,  size(rr_dat(2,:)) - id_le));  rr_low = 0.0_wp 
-    allocate(rr_mean(2, (id_le + 1)));                rr_mean = 0.0_wp  
 
+    !> x sort elements 
+    allocate(rr_sort(2, size(rr_dat,2))); rr_sort = 0.0_wp 
+
+    call sort_vector_real(rr_dat(1,:), size(rr_dat,2), x_sort, ind_sort) 
+    !> y sort elements
+    rr_sort(1,:) = rr_dat(1,ind_sort)
+    rr_sort(2,:) = rr_dat(2,ind_sort) 
+    !> remouve double elements 
+    call unique(rr_sort(1,:), x_unique, 1e-6_wp)
+    
+    id_le = minloc(rr_dat(1,:),1)  
     !> some checks on the input file 
     if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
       rr_up = rr_dat(:, 1:id_le + 1) 
@@ -1375,9 +1386,34 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
     endif 
 
+    !> linear interpolation of the upper and lower surface with rr_unique 
+    allocate(yup_unique(size(x_unique))); yup_unique = 0.0_wp
+    allocate(ylow_unique(size(x_unique))); ylow_unique = 0.0_wp
+    do i = 1, size(x_unique)
+      call linear_interp(rr_up(1,:), rr_up(2,:),   x_unique(i), yup_unique(i)) 
+      call linear_interp(rr_low(1,:), rr_low(2,:), x_unique(i), ylow_unique(i)) 
+    end do
+    
+    !> build upper and lower surface
+    allocate(rr_unique_up(2, size(x_unique))); rr_unique_up = 0.0_wp
+    allocate(rr_unique_low(2, size(x_unique))); rr_unique_low = 0.0_wp
+    
+    rr_unique_up = reshape((/ x_unique, yup_unique /), (/2, size(x_unique)/))
+    rr_unique_low = reshape((/ x_unique, ylow_unique /), (/2, size(x_unique)/))
+
     !> build middle line 
-    rr_mean(1,:) = rr_low(1,:)
-    rr_mean(2,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
+    rr_mean_dat(1,:) = rr_unique_low(1,:)
+    rr_mean_dat(2,:) = (rr_unique_up(2,:) + rr_unique_low(2,:))/2.0_wp
+    !>  get read of weird behaviuor 
+    allocate(xmean(10)) ; xmean = 0.0_wp
+    call linspace(0.0_wp, 1.0_wp, xmean) 
+    allocate(ymean(10)) ; ymean = 0.0_wp 
+    do i = 1, size(xmean)
+      call linear_interp(rr_mean_dat(1,:), rr_mean_dat(2,:), xmean(i), ymean(i))
+    enddo  
+
+    rr_mean(1,:) = xmean
+    rr_mean(2,:) = ymean 
 
     !> get m and p
     m = maxval(rr_mean(2,:))
