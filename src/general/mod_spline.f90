@@ -403,6 +403,8 @@ subroutine catmull_rom_chain(points, num_points, chain_points)
                                                               num_points)
     j = j + num_points 
   end do 
+  !> cleanup
+  deallocate(points_quadruples)
 
 end subroutine catmull_rom_chain 
 
@@ -418,31 +420,34 @@ function catmull_rom_spline(P0, P1, P2, P3, num_points) result(spline_points)
   real(wp)             :: t0, t1, t2, t3
   real(wp), allocatable :: A1(:,:), A2(:,:), A3(:,:), B1(:,:), B2(:,:) 
   real(wp), allocatable :: spline_points(:,:), t(:)
-  integer               :: i
+  integer               :: i, j
+  
+
   t0 = 0.0_wp
   t1 = tj(t0, P0, P1)
   t2 = tj(t1, P1, P2)
   t3 = tj(t2, P2, P3)
   
   allocate(t(num_points)); t = 0.0_wp 
-  allocate(A1(num_points,2)); A1 = 0.0_wp
-  allocate(A2(num_points,2)); A2 = 0.0_wp
-  allocate(A3(num_points,2)); A3 = 0.0_wp
-  allocate(B1(num_points,2)); B1 = 0.0_wp
-  allocate(B2(num_points,2)); B2 = 0.0_wp
-  allocate(spline_points(num_points,2)); spline_points = 0.0_wp
+  allocate(A1(2,num_points)); A1 = 0.0_wp
+  allocate(A2(2,num_points)); A2 = 0.0_wp
+  allocate(A3(2,num_points)); A3 = 0.0_wp
+  allocate(B1(2,num_points)); B1 = 0.0_wp
+  allocate(B2(2,num_points)); B2 = 0.0_wp
+  allocate(spline_points(2,num_points)); spline_points = 0.0_wp
   
   call linspace(t1, t2, t) 
-
+  
   do i = 1, 2
-    A1(:,i) = (t1 - t)/(t1 - t0)*P0(i) + (t - t0)/(t1 - t0)*P1(i) 
-    A2(:,i) = (t2 - t)/(t2 - t1)*P1(i) + (t - t1)/(t2 - t1)*P2(i)
-    A3(:,i) = (t3 - t)/(t3 - t2)*P2(i) + (t - t2)/(t3 - t2)*P3(i)
-    B1(:,i) = ((t2 - t)/(t2 - t0))*A1(:,i) + ((t - t0)/(t2 - t0))*A2(:,i) 
-    B2(:,i) = ((t3 - t)/(t3 - t1))*A2(:,i) + ((t - t1)/(t3 - t1))*A3(:,i) 
-    spline_points(:,i) = (t2 - t)/(t2 - t1)*B1(:,i) + (t - t1)/(t2 - t1)*B2(:,i) 
-  enddo   
-
+    do j = 1, num_points
+    A1(i,j) = (t1 - t(j))/(t1 - t0)*P0(i)   + (t(j) - t0)/(t1 - t0)*P1(i) 
+    A2(i,j) = (t2 - t(j))/(t2 - t1)*P1(i)   + (t(j) - t1)/(t2 - t1)*P2(i)
+    A3(i,j) = (t3 - t(j))/(t3 - t2)*P2(i)   + (t(j) - t2)/(t3 - t2)*P3(i)
+    B1(i,j) = (t2 - t(j))/(t2 - t0)*A1(i,j) + (t(j) - t0)/(t2 - t0)*A2(i,j) 
+    B2(i,j) = (t3 - t(j))/(t3 - t1)*A2(i,j) + (t(j) - t1)/(t3 - t1)*A3(i,j) 
+    spline_points(i,j) = (t2 - t(j))/(t2 - t1)*B1(i,j) + (t(j) - t1)/(t2 - t1)*B2(i,j) 
+    enddo 
+  enddo 
   !> cleanup
   deallocate(A1, A2, A3, B1, B2, t)
   
@@ -457,12 +462,15 @@ function tj(ti, pii, pjj) result(t)
   real(wp), intent(in) :: pjj(:) 
   
   real(wp) :: t, dx, dy, l, xi, yi, xj, yj 
-  real(wp), parameter :: alpha = 0.5_wp 
+  real(wp), parameter :: alpha = 0.5_wp !> centripetal spline (default), 
+                                        !  0.0 for the uniform spline, 
+                                        !  1.0 for the chordal spline.
 
   xi = pii(1)
   yi = pii(2)
   xj = pjj(1)
   yj = pjj(2)
+
   dx = xj - xi
   dy = yj - yi
   l = sqrt(dx**2.0_wp + dy**2.0_wp)

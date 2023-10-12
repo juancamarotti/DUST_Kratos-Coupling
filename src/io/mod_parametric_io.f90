@@ -1282,10 +1282,11 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp) , allocatable      :: rr_unique_up(:,:), rr_unique_low(:,:), rr_mean_dat(:,:)
   real(wp) , allocatable      :: rr_up_int(:,:)
   real(wp)                    :: tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
-  real(wp)                    :: tan_le_up, tan_le_low, y_dummy_le_up, y_dummy_le_low, y_dummy_te_up, y_dummy_te_low
+  real(wp)                    :: tan_le_up, tan_le_low
+  real(wp)                    :: dummy_le_up(2), dummy_le_low(2), dummy_te_up(2), dummy_te_low(2)
   integer  , parameter        :: n_circ = 200  
   integer  , parameter        :: n_query = 20000 
-  integer  , parameter        :: maxiter = 10
+  integer  , parameter        :: maxiter = 100
   integer  , parameter        :: num_points = 1000 !> density of points for interpolation 
   integer                     :: fid, ierr
   integer                     :: i1 , idx_m, id_le, i, idx_circ_min, j, ind_x 
@@ -1361,52 +1362,64 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     rr(1,:) = rr_geo_mean(1,:)
     rr(2,:) = rr_geo_mean(2,:) 
     thickness = 0.12_wp !> dummy value (assumed a NACA0012) 
+
   else 
+    id_le = minloc(rr_dat(1,:), 1)  
+    !> some checks on the input file 
+    if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
+      allocate(rr_up(2, id_le));                    rr_up = 0.0_wp
+      allocate(rr_low(2, size(rr_dat, 2) - id_le)); rr_low = 0.0_wp
+
+      rr_up = rr_dat(:, 1:id_le) 
+      ! reverse rr_up 
+      rr_up = rr_up(:, size(rr_up, 2): 1: -1)
+      rr_low = rr_dat(:,id_le: size(rr_dat, 2))
+    else                              !> Original DUST format 
+      allocate(rr_up(2, size(rr_dat, 2) - id_le)); rr_up = 0.0_wp
+      allocate(rr_low(2, id_le));                  rr_low = 0.0_wp
+
+      rr_up = rr_dat(:, id_le : size(rr_dat, 2))
+      rr_low = rr_dat(:,1:id_le )
+      !> reverse rr_low 
+      rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
+    endif 
 
     !> x sort elements 
     allocate(rr_sort(2, size(rr_dat,2))); rr_sort = 0.0_wp 
 
     call sort_vector_real(rr_dat(1,:), size(rr_dat,2), x_sort, ind_sort) 
     !> y sort elements
-    rr_sort(1,:) = rr_dat(1,ind_sort)
+
+    rr_sort(1,:) = x_sort
     rr_sort(2,:) = rr_dat(2,ind_sort) 
     !> remouve double elements 
     call unique(rr_sort(1,:), x_unique, 1e-6_wp)
     
-    id_le = minloc(rr_dat(1,:),1)  
-    !> some checks on the input file 
-    if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
-      rr_up = rr_dat(:, 1:id_le + 1) 
-      ! reverse rr_up 
-      rr_up = rr_up(:, size(rr_up, 2): 1: -1)
-      rr_low = rr_dat(:,id_le + 1: size(rr_dat, 2))
-    else                              !> Original DUST format 
-      rr_up = rr_dat(:, id_le + 1: size(rr_dat, 2))
-      rr_low = rr_dat(:,1:id_le + 1)
-      !> reverse rr_low 
-      rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
-    endif 
-
     !> linear interpolation of the upper and lower surface with rr_unique 
     allocate(rr_unique_up(2, size(x_unique))); rr_unique_up = 0.0_wp
     allocate(rr_unique_low(2, size(x_unique))); rr_unique_low = 0.0_wp
 
-    do i = 1, size(x_unique)
-      call linear_interp(rr_up(1,:), rr_up(2,:),   rr_unique_up(1,i), rr_unique_up(2,i)) 
-      call linear_interp(rr_low(1,:), rr_low(2,:), rr_unique_low(1,i), rr_unique_low(2,i)) 
-    end do
+    rr_unique_up(1,:) = x_unique
+    rr_unique_low(1,:) = x_unique
     
+    do i = 1, size(x_unique)
+      call linear_interp(rr_up(2,:), rr_up(1,:),   rr_unique_up(1,i), rr_unique_up(2,i)) 
+      call linear_interp(rr_low(2,:), rr_low(1,:), rr_unique_low(1,i), rr_unique_low(2,i)) 
+    end do
 
+    
     !> build middle line 
+    allocate(rr_mean_dat(2, size(rr_unique_up,2))); rr_mean_dat = 0.0_wp
     rr_mean_dat(1,:) = rr_unique_low(1,:)
     rr_mean_dat(2,:) = (rr_unique_up(2,:) + rr_unique_low(2,:))/2.0_wp
+
     !>  get read of weird behaviuor 
     allocate(rr_mean(2, 10)); rr_mean = 0.0_wp 
     call linspace(0.0_wp, 1.0_wp, rr_mean(1,:)) 
     do i = 1, size(rr_mean, 2)
-      call linear_interp(rr_mean_dat(1,:), rr_mean_dat(2,:), rr_mean(1,i), rr_mean(2,i))
+      call linear_interp(rr_mean_dat(2,:), rr_mean_dat(1,:), rr_mean(1,i), rr_mean(2,i))
     enddo  
-    
+
     !> get m and p
     m = maxval(rr_mean(2,:))
     idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
@@ -1444,7 +1457,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     !> calculate thickness
     !call define_thickness(rr_dat, thickness) !> fix rr_dat 
     thickness = maxval(rr_up(2,:)) - minval(rr_low(2,:))  
-    
     ! start an iterative loop on l.e. radius to have the last point of the circle
     ! belonging to the airfoil  
     ! Initials guess: (naca profile) 
@@ -1453,10 +1465,11 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     !> get finer approximation of the upper part (maybe not strictly needed)
     allocate(rr_up_int(2, n_query)); rr_up_int = 0.0_wp 
     call linspace(0.0_wp, 1.0_wp, rr_up_int(1,:))
+
     do i = 1, size(rr_up_int, 2)
-      call linear_interp(rr_up(1,:), rr_up(2,:), rr_up_int(1,i), rr_up_int(2,i))
+      call linear_interp(rr_up(2,:), rr_up(1,:), rr_up_int(1,i), rr_up_int(2,i))
     enddo
-    
+
     do i = 1, maxiter  
       !> Get center of the circle with the following conditions:
       !  1. passing through [0 0]
@@ -1493,9 +1506,9 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       if (radius_old .ge. radius) then 
         radius = radius_old 
         exit
-      endif 
-      
+      endif       
     enddo 
+
     !> get the derivative for tangent at leading edge (to use in the
     !> splining process 
     tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
@@ -1523,56 +1536,51 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
 
     !> spline interpolation upper part
     do i = 1, size(rr_up, 2) - 1
-      if (rr_up(1,i) .ge. x_plus) then
+      if (rr_up(1,i) .gt. x_plus) then
         idx_m = i
         exit
       endif
     enddo
-    allocate(point_up(2, size(rr_up, 2) - idx_m)); point_up = 0.0_wp  
-    point_up(1,:) = rr_up(1, size(rr_up, 2) - idx_m) !  point from ,dat file 
-    point_up(2,:) = rr_up(2, size(rr_up, 2) - idx_m) !  point from ,dat file 
-    
+
+    allocate(point_up(2,  size(rr_unique_up, 2) - idx_m + 2)); point_up = 0.0_wp  
+    point_up(:, 2:size(point_up,2)) = rr_unique_up(:, idx_m:size(rr_unique_up, 2)) !  point from ,dat file 
     !> replace first point with circle point 
     point_up(:, 1) = (/x_plus, y_plus/)
-    
-    !allocate(xq_up(n_query), yq_up(n_query)); xq_up = 0.0_wp; yq_up = 0.0_wp 
-    !call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
-    !> prepare for catmull-rom interpolation 
-    y_dummy_le_up = tan_le_up*(-0.1_wp)*x_plus + y_plus 
-    y_dummy_te_up = tan_te_up*(0.1_wp)*point_up(1, size(point_up, 2)) + & 
-                    point_up(2, size(point_up, 2))
+    !> prepare for catmull-rom interpolation: get symmetric points 
+    dummy_le_up = 2.0_wp*point_up(:,1) - point_up(:,2)
+    dummy_te_up = 2.0_wp*point_up(:,size(point_up, 2)) - point_up(:,size(point_up, 2) - 1)  
     allocate(point_up_updated(2, size(point_up, 2) + 2)); point_up_updated = 0.0_wp
-    point_up_updated(:, 1) = (/x_plus, y_dummy_le_up/)
-    point_up_updated(:, size(point_up_updated, 2)) = (/point_up(1, size(point_up, 2)), y_dummy_te_up/)
-    point_up_updated(:, 2:size(point_up_updated, 2) - 1) = point_up 
+    point_up_updated(:, 1) =                               dummy_le_up
+    point_up_updated(:, 2:size(point_up_updated, 2) - 1) = point_up  
+    point_up_updated(:, size(point_up_updated, 2))       = dummy_te_up
+    !write(*,*) 'point_up_updated', point_up_updated(1,:)
+    !write(*,*) 'point_up_updated', point_up_updated(2,:)  
+
     call catmull_rom_chain(point_up_updated, num_points, chain_points_up) !> interpolation 
-    
+
     !> spline interpolation lower part
-    do i = 1, size(rr_low, 2) - 1
-      if (rr_low(1,i) .ge. x_minus) then
+    do i = 1, size(rr_unique_low, 2) - 1
+      if (rr_unique_low(1,i) .gt. x_minus) then
         idx_m = i
         exit
       endif
     enddo
 
-    allocate(point_low(2, size(rr_low, 2) - idx_m)); point_low = 0.0_wp
-    point_low(1,:) = rr_low(1, size(rr_low, 2) - idx_m) !  point from ,dat file
-    point_low(2,:) = rr_low(2, size(rr_low, 2) - idx_m) !  point from ,dat file
-
+    allocate(point_low(2, size(rr_unique_up, 2) - idx_m + 2)); point_low = 0.0_wp
+    point_low(:, 2:size(point_low,2)) = rr_unique_low(:, idx_m:size(rr_unique_low, 2)) !  point from ,dat file
+    
     !> replace first point with circle point
     point_low(:, 1) = (/x_minus, y_minus/)
 
-    !allocate(xq_low(n_query), yq_low(n_query)); xq_low = 0.0_wp; yq_low = 0.0_wp
-    !call linspace(x_minus, 1.0_wp, xq_low) ! from circle_low to TE
-
     !> prepare for catmull-rom interpolation
-    y_dummy_le_low = tan_le_low*(-0.1_wp)*x_minus + y_minus
-    y_dummy_te_low = tan_te_low*(0.1_wp)*point_low(1, size(point_low, 2)) + &
-                      point_low(2, size(point_low, 2))
+    dummy_le_low = 2.0_wp*point_low(:,1) - point_low(:,2)
+    dummy_te_low = 2.0_wp*point_low(:,size(point_low, 2)) - point_low(:,size(point_low, 2) - 1)  
+
     allocate(point_low_updated(2, size(point_low, 2) + 2)); point_low_updated = 0.0_wp
-    point_low_updated(:, 1) = (/x_minus, y_dummy_le_low/)
-    point_low_updated(:, size(point_low_updated, 2)) = (/point_low(1, size(point_low, 2)), y_dummy_te_low/)
+    point_low_updated(:, 1)                                = dummy_le_low
     point_low_updated(:, 2:size(point_low_updated, 2) - 1) = point_low
+    point_low_updated(:, size(point_low_updated, 2))       = dummy_te_low
+    
     call catmull_rom_chain(point_low_updated, num_points, chain_points_low) !> interpolation 
 
     !> reorganize vectors to prepare mesh subdivision
@@ -1587,6 +1595,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     circ_y_up = y_circ(1:idx_circ_min)
     circ_x_low = x_circ(idx_circ_min:size(x_circ))
     circ_y_low = y_circ(idx_circ_min:size(x_circ))
+
     !> reverse vectors 
     circ_x_up = circ_x_up(size(circ_x_up):1:-1) 
     circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
@@ -1598,47 +1607,47 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     !> upper part
     rr2mesh_up(1,:) = (/circ_x_up, chain_points_up(1,2:size(chain_points_up,2))/)
     rr2mesh_up(2,:) = (/circ_y_up, chain_points_up(2,2:size(chain_points_up,2))/)
-    
     !> get length and derivative (alpha) along the upper line 
     allocate(alpha_up(size(rr2mesh_up(1,:)))); alpha_up = 0.0_wp
     alpha_up(1) = atan(tan_le_up)  
     allocate(dl_up(size(rr2mesh_up(1,:)))); dl_up = 0.0_wp
-    dl_up(1) = 0.0_wp 
-    do i = 2, size(rr2mesh_up(1,:))
+
+    do i = 2, size(rr2mesh_up,2)
       dl_up(i) = dl_up(i - 1) + sqrt((rr2mesh_up(1,i) - rr2mesh_up(1,i-1))**2.0_wp + &
                                     (rr2mesh_up(2,i) - rr2mesh_up(2,i-1))**2.0_wp)
       alpha_up(i) = atan((rr2mesh_up(2,i) - rr2mesh_up(2,i-1))/ &
-                        (rr2mesh_up(1,i) - rr2mesh_up(1,i-1)))
+                    (max((rr2mesh_up(1,i) - rr2mesh_up(1,i-1)), 1e-16_wp)))  
     end do
+    
 
     !> lower part 
     rr2mesh_low(1,:) = (/circ_x_low, chain_points_low(1,2:size(chain_points_low,2))/)
-    rr2mesh_low(2,:) = (/circ_y_low, chain_points_low(1,2:size(chain_points_low,2))/) 
+    rr2mesh_low(2,:) = (/circ_y_low, chain_points_low(2,2:size(chain_points_low,2))/) 
     !> get length and derivative (alpha) along the lower line 
     allocate(alpha_low(size(rr2mesh_low(1,:)))); alpha_low = 0.0_wp
     allocate(dl_low(size(rr2mesh_low(1,:)))); dl_low = 0.0_wp
     alpha_low(1) = atan(tan_le_low)
-    dl_low(1) = 0.0_wp
-    do i = 2, size(rr2mesh_low(1,:))
+    
+    do i = 2, size(rr2mesh_low,2)
       dl_low(i) = dl_low(i - 1) + sqrt((rr2mesh_low(1,i) - rr2mesh_low(1,i-1))**2.0_wp + &
                                       (rr2mesh_low(2,i) - rr2mesh_low(2,i-1))**2.0_wp)
       alpha_low(i) = atan((rr2mesh_low(2,i) - rr2mesh_low(2,i-1))/ &
-                          (rr2mesh_low(1,i) - rr2mesh_low(1,i-1)))
+                    (max((rr2mesh_low(1,i) - rr2mesh_low(1,i-1)), 1e-16_wp)))
     end do
-
+    
     !> mean line 
     rr2mesh_mean(1,:) = xq_mean
     rr2mesh_mean(2,:) = yq_mean
     !> get length and derivative (alpha) along the mean line
     allocate(alpha_mean(size(rr2mesh_mean(1,:)))); alpha_mean = 0.0_wp
-    alpha_mean(1) = tang_mean_le
     allocate(dl_mean(size(rr2mesh_mean(1,:)))); dl_mean = 0.0_wp
-    dl_mean(1) = 0.0_wp
+    alpha_mean(1) = atan(tang_mean_le) 
+
     do i = 2, size(rr2mesh_mean(1,:))
       dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
                                         (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
       alpha_mean(i) = atan((rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))/ &
-                          (rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)))
+                      (max((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)), 1e-16_wp)))
     end do
 
     !> interpolation of the upper part 
@@ -1668,9 +1677,10 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
         endif
       enddo
     enddo
+
     !> flip lower part 
     rr_geo_low = rr_geo_low(:, size(rr_geo_low(1,:)):1:-1) 
-
+    
     !> interpolation of the mean line
     !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
     allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
@@ -1695,7 +1705,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       rr(2,:) = rr_geo_mean(2,:) 
     endif 
   end if !> old format 
-  
+
   !> cleanup
   if (allocated(rr_dat))      deallocate(rr_dat) 
   if (allocated(rr_up))       deallocate(rr_up)
