@@ -164,6 +164,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   !Check which variables to analyse
   out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
   n_var = countoption(sbprms, 'variable')
+  
   allocate(var_names(n_var))
   do i_var = 1, n_var
     var_names(i_var) = getstr(sbprms, 'variable') ; call LowCase(var_names(i_var))
@@ -177,7 +178,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_turbvisc = isInList('turbulent_viscosity',var_names)
   out_vrad     = isInList('vortex_rad',         var_names)
   out_dforce   = isInList('force',              var_names)  
-  out_dmom     = isInList('moment',            var_names)
+  out_dmom     = isInList('moment',             var_names)
 
   nprint = 0; nprint_w = 0
   if(out_vort)      nprint = nprint+1
@@ -190,10 +191,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_vrad)      nprint = nprint+1
   if(out_dforce)    nprint = nprint+1
   if(out_dmom)      nprint = nprint+1 
-
+  
   allocate(out_vars(nprint))
+  
   if(average) allocate(ave_out_vars(nprint))
-  !for the wake
+  
   if(out_wake) then
     allocate(out_vars_w(nprint))
     allocate(out_vars_vp(nprint))
@@ -267,7 +269,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                           .false.)
       i_var = i_var +1
     endif
-    if(out_vort) then
+    if(out_vort_vec) then
       call add_output_var(out_vars(i_var), vort, 'Vorticity_Vector', &
                           .false.)
       i_var = i_var +1
