@@ -195,11 +195,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -300,11 +300,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -402,11 +402,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -523,12 +523,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -640,11 +640,11 @@ name of the analysis, will be appended as a suffix to \param{basename}
 
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
@@ -735,12 +735,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -751,7 +751,7 @@ Stride to employ when loading the time series of the solver results.
 \textit{multiple:} no
 
 format of the processed results, can be \opt{dat} for formatted ascii files 
-output or \opt{tecplot} for tecplot plt files
+output or \opt{tecplot} for tecplot \texttt{.plt} files
 
 \item \param{average}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} False
@@ -761,7 +761,7 @@ average the results in the given time span.
 \item \param{component}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no.
 
-component (parametrically generated) to analyse. Only one component can be 
+component (parametrically generated) to analyze. Only one component can be 
 enabled for each analysis. 
 
 \item \param{axis_nod}: \textit{required:} one for each \param{analysis}. 
@@ -782,7 +782,7 @@ the distribution of moment along the span.
 \item \param{vortex_lattice_data}: \textit{required:} no. \textit{multiple:} no. 
 \textit{Default:} False
 
-Output additional informations regarding span distribution of several quantities 
+Output additional information regarding span distribution of several quantities 
 of interest for the lifting lines. It works only for parametric elements which 
 are lifting lines.
 
@@ -840,12 +840,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -866,7 +866,7 @@ average the results in the given time span.
 \item \param{component}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no.
 
-component to analyse. Only one component can be enabled for each analysis. 
+component to analyze. Only one component can be enabled for each analysis. 
 
 \item \param{box_sect}: \textit{required:} one for each \param{analysis} 
 if component not parametrically generated. \textit{multiple:} no.
@@ -888,7 +888,7 @@ The bounding box is extruded between the two faces.
 \item \param{face_bas}: \textit{required:} one for each \param{box_sect}. 
 \textit{multiple:} no.
 
-Lenght of the base faces in the \param{face_vec} direction. It must have 
+Length of the base faces in the \param{face_vec} direction. It must have 
 two components, one for the first beginning face, one for the last end face. 
 
 \item \param{face_hei}: \textit{required:} one for each \param{box_sect}. 
@@ -936,13 +936,13 @@ the following structure. The first line is a header specifying the
 structural component analyzed and the force/moment component collected 
 in the file. As an example,
 \begin{inputfile}[frame=single]
- 1: # Sectional load Fz of component: Wing1
+  1: # Sectional load Fz of component: Wing1
 \end{inputfile}
 The second line contains the number of sections \param{n\_sec} in which the 
 structural component is divided and the number of time steps \param{n\_time}
 of the analysis. As an example, the output file for a 10-section blade reads
 \begin{inputfile}[frame=single]
- 2: # n_sec : 10 ; n_time : 100. Next lines: y_cen , y_span, chord
+  2: # n_sec : 10 ; n_time : 100. Next lines: y_cen , y_span, chord
 \end{inputfile}
 The second line also introduce the content of lines 3, 4 and 5. Line 3 contains 
 the spanwise coordinate \param{y\_cen} of the centre of the sections, 
@@ -951,14 +951,14 @@ line 5 contains the  chord dimension \param{chord} of the section. As an
 example, if the the blade length is 0.6 and it is divided in 10 uniform sections with chord 0.05, 
 the output file reads
 \begin{inputfile}[frame=single]
- 3:  0.30000E-001  0.90000E-001  0.15000E+000  0.21000E+000 ...
- 4:  0.60000E-001  0.60000E-001  0.60000E-001  0.60000E-001 ...
- 5:  0.50000E-001  0.50000E-001  0.50000E-001  0.50000E-001 ...
+  3:  0.30000E-001  0.90000E-001  0.15000E+000  0.21000E+000 ...
+  4:  0.60000E-001  0.60000E-001  0.60000E-001  0.60000E-001 ...
+  5:  0.50000E-001  0.50000E-001  0.50000E-001  0.50000E-001 ...
 \end{inputfile}
 The sixth line is another header file containing the fields and their 
 dimension collected in the next \param{n\_time} lines.
 \begin{inputfile}[frame=single]
- 6: # t , sec(n_sec) , ref_mat(9) , ref_off(3) 
+  6: # t , sec(n_sec) , ref_mat(9) , ref_off(3) 
 \end{inputfile}
 The first field is the time. The sectional loads of the \param{n\_sec} 
 sections follow. The last 12 lines contains the (first-column) unrolled 
@@ -1111,12 +1111,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -1137,7 +1137,7 @@ average the results in the given time span.
 \item \param{component}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no.
 
-component (parametrically generated) to analyse. Only one component can be 
+component (parametrically generated) to analyze. Only one component can be 
 enabled for each analysis. 
 
 \item \param{axis_nod}: \textit{required:} one for each \param{analysis}. 
@@ -1182,7 +1182,7 @@ The third line contains the number of chordwise section \param{n\_chord} in whic
 structural component is divided and the number of time steps \param{n\_time}
 of the analysis. As an example, the output file for a 10-section blade reads
 \begin{inputfile}[frame=single]
- 3: # n_sec : 10 ; n_time : 100. Next lines: x_chord , z_chord
+  3: # n_sec : 10 ; n_time : 100. Next lines: x_chord , z_chord
 \end{inputfile}
 The third line also introduce the content of lines 4 and 5. Line 4 contains 
 the chordwise coordinate \param{x\_chord} of the centre of the panels, 
@@ -1190,8 +1190,8 @@ line 4 contains the thickness dimension \param{z\_chord} of the profile, taken a
 As an example, if the the chord length is 0.4 and it is divided in 10 uniform sections with chord 0.05, 
 the output file reads
 \begin{inputfile}[frame=single]
- 3:  0.130E+000  0.900E-001  0.500E-001 ...
- 4: -0.257E-002 -0.711E-002 -0.103E-001 ...
+  3:  0.130E+000  0.900E-001  0.500E-001 ...
+  4: -0.257E-002 -0.711E-002 -0.103E-001 ...
 \end{inputfile}
 The fifth line is another header file containing the fields and their 
 dimension collected in the next \param{n\_time} lines.
@@ -1206,7 +1206,7 @@ The files generated by sectional loads contain, as sectional quantity:
   \item \texttt{Pres}: Panel pressure for 3D panels, or delta pressure for vortex lattice or 
                       lifting  line. 
   \item \texttt{Cp}: Panel pressure coefficient for 3D panels, or delta pressure 
-                    coefficent for vortex lattice or lifting line. The implemented formulation is 
+                    coefficient for vortex lattice or lifting line. The implemented formulation is 
                     \begin{equation}
                       C_p = \dfrac{P - P_\infty}{\dfrac{1}{2} \rho_\infty U_\infty^2}
                     \end{equation}
@@ -1226,7 +1226,7 @@ The files generated by sectional loads contain, as sectional quantity:
 \section{Aeroacoustics}
 The aeroacoustics postprocessing is a specific analysis used to 
 extract from results all the various data required to perform an 
-aeroacoustics analysis (with an external software) on the analysed results. 
+aeroacoustics analysis (with an external software) on the analyzed results. 
 It is available only in .dat ascii format  and it is intended rather than 
 to be directly plotted/visualized to act as input for another software.
 
@@ -1263,12 +1263,12 @@ name of the analysis, will be appended as a suffix to \param{basename}
 \item \param{start_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-First result in the time series of the solver results to analyse.
+First result in the time series of the solver results to analyze.
 
 \item \param{end_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
 
-Last result in the time series of the solver results to analyse.
+Last result in the time series of the solver results to analyze.
 
 \item \param{step_res}: \textit{required:} one for each \param{analysis}. 
 \textit{multiple:} no
@@ -1303,7 +1303,7 @@ The second and third lines contain the current simulation time and parameters;
         dynamic viscosity, flow velocity 
   3: 10  0.000000000000000E+000   ... -0.280000000000000E+002
 \end{inputfile}
-The fourth line is a header file containing the fields collected in the nextlines.
+The fourth line is a header file containing the fields collected in the next lines.
 \begin{inputfile}[frame=single]
   4: # cx, cy, cz, nx, ny, nz, area, rho, pressure, rhoux, rhouy, rhouz, svx, svy, svz
 \end{inputfile}
