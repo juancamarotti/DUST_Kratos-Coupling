@@ -60,10 +60,10 @@ use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
 use mod_spline, only: & 
-  hermite_spline_profile 
+  hermite_spline_profile, catmull_rom_chain
 
 use mod_math, only: & 
-  linear_interp, unique, linspace
+  linear_interp, unique, unique_row, linspace, sort_vector_real
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input 
@@ -72,7 +72,7 @@ use mod_hinges, only: &
 implicit none
 
 public :: read_mesh_parametric, read_actuatordisk_parametric , &
-          define_section , define_division
+          define_section , define_division, geoseries, geoseries_both
 private
 
 character(len=*), parameter :: this_mod_name = 'mod_parametric_io'
@@ -101,7 +101,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  !real(wp), allocatable, intent(out), optional :: thickness_out(:,:)
   real(wp), allocatable , intent(out), optional                    ::  thickness(:,:)
   real(wp), allocatable                     :: thickness_section1(:), thickness_section2(:) 
   real(wp)                                  :: thickness_section
@@ -123,7 +122,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   character(len=max_char_len), allocatable , intent(out), optional :: airfoil_list_actual(:)
   integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
   real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)
-
+  !> geometric series parameters
+  real(wp)                                  :: r, r_le, r_te, r_le_fix, r_te_fix, r_le_moving, r_te_moving
+  real(wp)                                  :: x_refinement
   !> hinge mesh 
   real(wp), allocatable                     :: rrv_le(:,:), rrv_te(:,:), ac_line(:,:) 
   integer                                   :: ih, ia
@@ -139,6 +140,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp), allocatable                     :: span_list(:) 
   real(wp), allocatable                     :: sweep_list(:) 
   real(wp), allocatable                     :: dihed_list(:)
+  real(wp), allocatable                     :: division(:), divisionIB(:), divisionOB(:) 
+  !> geometric series parameters (region)
+  real(wp), allocatable                     :: r_in_list(:), r_ob_list(:), r_span_list(:)
+  real(wp), allocatable                     :: y_ref_list(:)
+
+  logical                                   :: adjust_xz = .false.
   character(len=max_char_len), allocatable  :: type_span_list(:)
   integer                                   :: n_type_span
   character                                 :: ElType
@@ -200,31 +207,53 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! - the point around which the sections are rotated to impose twist
 
 
-  ! Section parameters
-  ! already there (few lines above) as a characteristic of the whole component !!!
-  ! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section 
-  !                (as a fraction of the chord)',&
-  !               multiple=.true.);
+  !> Section parameters
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil', &
-                multiple=.true.);                
+                multiple=.true.)                
   call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
-                multiple=.true.);
+                multiple=.true.)
+  !> geoseries parameters 
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '0.125', &
+                multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
+                '0.143', multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
+                '0.066', multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
+                fixed part', '0.125', multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
+                fixed part', '0.143', multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
+                moving part', '0.143', multiple=.false.)
+  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                moving part', '0.1', multiple=.false.) 
+  call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
+                '0.5', multiple=.false.)
 
   !> Region parameters
   call pmesh_prs%CreateRealOption(    'span', 'region span',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateRealOption(   'sweep', 'region sweep angle [degrees]',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateRealOption(   'dihed', 'region dihedral angle [degrees]',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateIntOption( 'nelem_span', 'number of span-wise elements in the region',&
-                multiple=.true.);
+                multiple=.true.)
   call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
-                &uniform, cosine, cosineIB, cosineOB, equalarea', multiple=.true.);
+                &uniform, cosine, cosineIB, cosineOB, equalarea, geoseries, geoseries_ob, geoseries_ib',&
+                multiple=.true.)
+
+  !> geoseries parameters (region)
+  call pmesh_prs%CreateRealOption('r_ib', 'growth ratio of the elements inboard', &
+                multiple=.true.)
+  call pmesh_prs%CreateRealOption('r_ob', 'growth ratio of the elements at outboard', &
+                multiple=.true.)
+  call pmesh_prs%CreateRealOption('y_refinement', 'spanwise station to which the refinement start', &
+                multiple=.true.) 
   
   !> Read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
@@ -235,6 +264,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   nSections = countoption(pmesh_prs, 'chord')
   nRegions  = countoption(pmesh_prs, 'span')
   aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
+
+  !> geometric series parameters 
+  r = getreal(pmesh_prs, 'r')
+  r_le = getreal(pmesh_prs, 'r_le')
+  r_te = getreal(pmesh_prs, 'r_te')
+  r_le_fix = getreal(pmesh_prs, 'r_le_fix')
+  r_te_fix = getreal(pmesh_prs, 'r_te_fix')
+  r_le_moving = getreal(pmesh_prs, 'r_le_moving')
+  r_te_moving = getreal(pmesh_prs, 'r_te_moving')
+  x_refinement = getreal(pmesh_prs, 'x_refinement')
+
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Unconsistent input: &
@@ -256,6 +296,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
         &number of "sweep" different from number of regions.')
+
   if(countoption(pmesh_prs,'twist') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
         &number of "twist" different from number of sections.')
@@ -268,13 +309,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(      span_list(nRegions));         span_list = 0.0_wp
   allocate(     sweep_list(nRegions));        sweep_list = 0.0_wp
   allocate(     dihed_list(nRegions));        dihed_list = 0.0_wp
+  allocate(    r_span_list(nRegions));       r_span_list = 0.0_wp
+  allocate(     y_ref_list(nRegions));        y_ref_list = 0.0_wp
+  allocate(      r_in_list(nRegions));         r_in_list = 0.0_wp
+  allocate(      r_ob_list(nRegions));         r_ob_list = 0.0_wp 
 
   nelem_span_tot = 0
   do iRegion = 1,nRegions
     nelem_span_list(iRegion) = getint(pmesh_prs,'nelem_span')
-    span_list(iRegion)  = getreal(pmesh_prs,'span' )
-    sweep_list(iRegion) = getreal(pmesh_prs,'sweep')
-    dihed_list(iRegion) = getreal(pmesh_prs,'dihed')
+    span_list(iRegion)       = getreal(pmesh_prs,    'span' )
+    sweep_list(iRegion)      = getreal(pmesh_prs,    'sweep')
+    dihed_list(iRegion)      = getreal(pmesh_prs,    'dihed')
     nelem_span_tot = nelem_span_tot + nelem_span_list(iRegion)
   enddo
 
@@ -288,15 +333,25 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   else if ( n_type_span .eq. nRegions ) then
     do iRegion = 1 , nRegions
       type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
+      !> check geometry series type 
+      if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
+        y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
+        r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+        r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
+      elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ib') then 
+        r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+      elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ob') then
+        r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob')
+      endif
     end do
   else
-  write(*,*) ' Mesh file   : ' , trim(mesh_file)
-  write(*,*) ' Number of span element distribution type definitions &
-              &(type_span): ' , n_type_span
-  write(*,*) ' Number of regions : ' , nRegions
-  call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-          & the number of type of span element distribution defined is &
-          &different from the number of span regions')
+    write(*,*) ' Mesh file   : ' , trim(mesh_file)
+    write(*,*) ' Number of span element distribution type definitions &
+                &(type_span): ' , n_type_span
+    write(*,*) ' Number of regions : ' , nRegions
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+            & the number of type of span element distribution defined is &
+            &different from the number of span regions')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
@@ -442,8 +497,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
               !> hinge node adimensional location along chord
               hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
-              
-
           endif    
 
           if ((hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1)) .and. & 
@@ -529,7 +582,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         delta_x(ia) = csi_hinge(ia)
         point_region(ia) = floor(real(nelem_chord,wp)*delta_x(ia))
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
-        call define_division(type_chord, point_region(ia), csi_adim)
+        call define_division(type_chord, point_region(ia), csi_adim, & 
+                            r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
+
         chord_fraction(1:point_region(ia) + 1) = delta_x(ia)*csi_adim 
         deallocate(csi_adim)
 
@@ -540,7 +595,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         point_region(ia) = nelem_chord - sum(point_region(1:ia - 1)) 
         
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
-        call define_division(type_chord, point_region(ia), csi_adim)
+        call define_division(type_chord, point_region(ia), csi_adim , &
+                            r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
+
         chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region) + 1) ) = & 
             (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)  
         deallocate(csi_adim) 
@@ -552,7 +609,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         point_region(ia) = floor(real(nelem_chord,wp)*delta_x_no_off(ia)) 
         
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
-        call define_division(type_chord, point_region(ia), csi_adim)
+        call define_division(type_chord, point_region(ia), csi_adim, & 
+                            r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement) 
+
         chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region(1:ia)) + 1) ) = & 
             (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)   
       
@@ -561,7 +620,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     enddo 
     deallocate(point_region, ac_line, rrv_le, rrv_te)
   else
-    call define_division(type_chord, nelem_chord, chord_fraction)
+    call define_division(type_chord, nelem_chord, chord_fraction, & 
+                        r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
   endif 
   
   ! Initialize the span division to the maximum dimension
@@ -705,37 +765,72 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
                             real(nelem_span_list(iRegion),wp) * &
                             ( rrSection2 - rrSection1 )
+          adjust_xz = .false.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
           ! cosine  spacing in span
           rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
                             0.5_wp * ( rrSection2 - rrSection1 ) * &
                       cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          adjust_xz = .false.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
           ! cosine  spacing in span: outboard refinement
           rr(:,ista:iend) = rrSection1 + &
                           ( rrSection2 - rrSection1 ) * &
               sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          adjust_xz = .false. 
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           ! cosine  spacing in span: inboard refinement
           rr(:,ista:iend) = rrSection2 - &
                           ( rrSection2 - rrSection1 ) * &
               cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          adjust_xz = .false.
+
         elseif ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then 
-            !rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
-            !                      (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
-            rr(2, ista:iend) = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))* & 
-                              (rrSection2(2,:) - rrSection1(2,:)) + rrSection1(2,:) 
-            rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
-                              ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
-            rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
-                              ( rrSection2(3,:) - rrSection1(3,:) )/( rrSection2(2,:) - rrSection1(2,:) )
-        else
+          rr(2, ista:iend) = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))* & 
+                            (rrSection2(2,:) - rrSection1(2,:)) + rrSection1(2,:) 
+          adjust_xz = .true.
+
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
+          do j = 1, npoint_chord_tot
+            call geoseries_both(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), & 
+                                y_ref_list(iRegion), r_in_list(iRegion), r_ob_list(iRegion), division)  
+            rr(2, ista + j - 1) = division(i1 + 1)
+          enddo 
+          adjust_xz = .true.
+
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries_ob' ) then
+          do j = 1, npoint_chord_tot
+            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), & 
+                          r_ob_list(iRegion), divisionIB, divisionOB)  
+            rr(2, ista + j - 1) = divisionOB(i1 + 1)
+          enddo 
+          adjust_xz = .true.
+
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries_ib' ) then
+          do j = 1, npoint_chord_tot
+            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), &
+                          r_in_list(iRegion), divisionIB, divisionOB)  
+            rr(2, ista + j - 1) = divisionIB(i1 + 1)
+          enddo 
+          adjust_xz = .true.
+        
+        else 
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Incorrect input: &
-                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea.')
+                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea, &
+                & geoseries, geoseries_ib, geoseries_ob.')
         end if
-
+        !> adjust the x and z coordinate 
+        if (adjust_xz) then
+          rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+                            (rrSection2(1,:) - rrSection1(1,:))/(rrSection2(2,:) - rrSection1(2,:))
+          rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+                            (rrSection2(3,:) - rrSection1(3,:))/(rrSection2(2,:) - rrSection1(2,:))
+        endif  
       else !-> linear interpolation of the twist angle
 
         allocate(rr_tw(  2,npoint_chord_tot))
@@ -760,9 +855,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         !> rotate section back ( coord. in the local ref. frame )
         twist_rad = twist_list(iRegion+1) * pi/180.0_wp
         rr_tw_2 = matmul( &
-                  reshape( (/ cos(twist_rad), sin(twist_rad) , &
-                        -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                                rr_tw_2 )
+                  reshape( (/ cos(twist_rad), sin(twist_rad), &
+                            -sin(twist_rad), cos(twist_rad)/), (/2,2/)), rr_tw_2 )
         !> Interpolation weight 
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
@@ -774,12 +868,24 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
-          interp_weight = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp)) 
+          interp_weight = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
+          call geoseries_both(0.0_wp, 1.0_wp, nelem_span_list(iRegion), &
+                              y_ref_list(iRegion), r_in_list(iRegion), r_ob_list(iRegion), division)
+          interp_weight = division(i1 + 1) 
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries_ob' ) then
+          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), & 
+            r_ob_list(iRegion), divisionIB, divisionOB)
+          interp_weight = divisionOB(i1 + 1) 
+        elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries_ib' ) then
+          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), r_in_list(iRegion), divisionIB, divisionOB)
+          interp_weight = divisionIB(i1 + 1) 
         else
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Incorrect input: &
-                & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea, &
+                & geoseries, geoseries_ib, geoseries_ob.')
         end if
 
         ! === x,z coordinates ===
@@ -926,7 +1032,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
 
-  ! Airfoil geometry +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! Airfoil geometry 
   ! - read coordinate from file: if <airfoil> is 'xxxxxx.dat'
   ! - build as a member of a airfoil family:
   !   - NACA 4-digit: NACAmpss
@@ -1064,15 +1170,6 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   enddo
 
   thick = s
-  !xac = 0.75_wp !> control point 
-  !curv_ac = 0.0_wp
-  !if (p>0) then
-  !  if (xac <= p) then
-  !    curv_ac = m/p**2 * (2.0_wp*p*xac - xac**2)
-  !  else
-  !    curv_ac = m/(1.0_wp-p)**2 * (1.0_wp-2.0_wp*p + 2.0_wp*p*xac - xac**2)
-  !  endif
-  !endif
 
   if ( allocated(points) ) deallocate(points)
   allocate(points(2,2*nelem_chord+1))
@@ -1175,12 +1272,6 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
   enddo
 
   thick = s 
-  !xac = 0.75_wp ! control point for vl corrected
-  !if (xa <= r) then
-  !  curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
-  !else
-  !  curv_ac = mult*k1*r**3/6.0_wp*(1-xac)
-  !endif
 
   if ( allocated(points) ) deallocate(points)
   allocate(points(2,2*nelem_chord+1))
@@ -1197,283 +1288,514 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   character(len=*), intent(in)                :: filen
   character(len=*), intent(in)                :: ElType
   integer         , intent(in)                :: nelems_chord
+  real(wp)        , intent(in)                :: csi_half(:)
   real(wp)        , allocatable, intent(out)  :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
-  real(wp)                                    :: csi_ac 
-  real(wp)        , intent(in)                :: csi_half(:)
 
-  integer                :: nelems_chord_tot
-  real(wp) , allocatable :: rr_geo(:,:)
-  real(wp) , allocatable :: rr_up(:,:), rr_low(:,:), rr_pan(:,:)
-  real(wp) , allocatable :: y_mean(:,:), rr_geo_mean(:,:)
-  integer                :: np_geo
-  real(wp) , allocatable :: csi(:)
-  real(wp) , allocatable :: st_geo(:) , s_geo(:)
-  real(wp)               :: ds_geo
-  real(wp), allocatable  :: rr_tmp(:,:)
-  real(wp)               :: m, p, t, radius, x_c, y_c, alpha, beta_up, beta_low
-  real(wp)               :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
-  real(Wp)               :: m_line, min_x
-  real(wp)               :: theta_start, theta_end
-  real(wp) , allocatable :: theta(:), x(:), y(:), x_circ(:), y_circ(:)
-  real(wp) , allocatable :: point_up(:,:), point_low(:,:) 
-  real(wp) , allocatable :: xq_up(:), xq_low(:), yq_up(:), yq_low(:) 
-  real(wp) , allocatable :: circ_x_low(:), circ_y_low(:), circ_x_up(:), circ_y_up(:) 
-  real(wp) , allocatable :: rr2mesh_up(:,:), rr2mesh_low(:,:)
-  real(wp) , allocatable :: x_up(:), x_low(:), y_up(:), y_low(:)  
-  real(wp)               :: tan_le, tan_te_up, tan_te_low
-
-  integer :: fid, ierr
-  integer :: i1 , i2, idx_m, id_up, i, idx_circ_min
+  real(wp) , allocatable      :: rr_dat(:,:) 
+  real(wp) , allocatable      :: rr_up(:,:), rr_low(:,:)
+  real(wp) , allocatable      :: y_mean(:,:), rr_mean(:,:)
+  integer                     :: np_dat
+  real(wp)                    :: m, p, radius, x_c, y_c, alpha, beta_up, beta_low
+  real(wp)                    :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus
+  real(Wp)                    :: min_x
+  real(wp)                    :: theta_start, theta_end, radius_old
+  real(wp) , allocatable      :: theta(:), x_circ(:), y_circ(:), point_up_updated(:,:), point_low_updated(:,:)
+  real(wp) , allocatable      :: point_up(:,:), point_low(:,:), chain_points_up(:,:), chain_points_low(:,:)
+  real(wp) , allocatable      :: xq_mean(:), yq_mean(:) 
+  real(wp) , allocatable      :: circ_x_low(:), circ_y_low(:), circ_x_up(:), circ_y_up(:) 
+  real(wp) , allocatable      :: rr2mesh_up(:,:), rr2mesh_low(:,:), rr2mesh_mean(:,:)
+  real(wp) , allocatable      :: alpha_up(:), alpha_low(:), alpha_mean(:)
+  real(wp) , allocatable      :: dl_up(:), dl_low(:), dl_mean(:) 
+  real(wp) , allocatable      :: rr_geo_up(:,:), rr_geo_low(:,:), rr_geo_mean(:,:)
+  real(wp) , allocatable      :: rr_sort(:,:), x_sort(:), x_unique(:)
+  real(wp) , allocatable      :: csi_up(:), csi_low(:), csi_mean(:) 
+  real(wp) , allocatable      :: rr_unique_up(:,:), rr_unique_low(:,:), rr_mean_dat(:,:)
+  real(wp) , allocatable      :: rr_up_int(:,:)
+  real(wp)                    :: tan_te_up, tan_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
+  real(wp)                    :: tan_le_up, tan_le_low
+  real(wp)                    :: dummy_le_up(2), dummy_le_low(2), dummy_te_up(2), dummy_te_low(2)
+  integer  , parameter        :: n_circ = 20000  
+  integer  , parameter        :: n_query = 20000 
+  integer  , parameter        :: maxiter = 100
+  integer  , parameter        :: num_points = 1000 !> density of points for interpolation 
+  integer                     :: fid, ierr
+  integer                     :: i1 , idx_m, id_le, i, idx_circ_min, j, ind_x 
+  integer  , allocatable      :: ind_sort(:)
   character(len=*), parameter :: this_sub_name = 'read_airfoil' 
   
-  ! Read coordinates
+  !> Read coordinates from dat file 
   call new_file_unit(fid, ierr)
   open(unit=fid,file=trim(adjustl(filen)) )
-  read(fid,*) np_geo
+  read(fid,*) np_dat
 
-  allocate(rr_geo(2,np_geo)); rr_geo = 0.0_wp 
-  allocate(st_geo(np_geo), s_geo(np_geo))
-  st_geo = 0.0_wp ; s_geo = 0.0_wp
+  allocate(rr_dat(2,np_dat)); rr_dat = 0.0_wp 
 
-  do i1 = 1 , np_geo
-    read(fid,*) rr_geo(:,i1)
+  do i1 = 1 , np_dat
+    read(fid,*) rr_dat(:,i1)
   end do
   close(fid)  
-
-  id_up = floor(size(rr_geo(2,:))/2.0_wp)
-  allocate(rr_up(id_up,2));                      rr_up = 0.0_wp
-  allocate(rr_low(size(rr_geo(2,:)) - id_up,2)); rr_low = 0.0_wp 
-  allocate(rr_geo_mean(size(rr_up,2),2));            rr_geo_mean = 0.0_wp  
-  !> some checks on the input file 
-  if (rr_geo(2,2) .gt. 0.0_wp) then 
-    !>  Seilig format 
-    rr_up(:,1) = rr_geo(1:id_up + 1,1) 
-    rr_up(:,2) = rr_geo(2:id_up + 1,2)
-    ! reverse rr_up 
-    rr_up(:,1) = rr_up(size(rr_up,1): -1: 1,1)
-    rr_up(:,2) = rr_up(size(rr_up,1): -1: 1,2) 
-    rr_low = rr_geo(id_up + 1: -1,:)
-    !> build middle line 
-    rr_geo_mean(:,1) = rr_low(:,1)
-    rr_geo_mean(:,2) = (rr_up(:,1) + rr_low(:,1))/2.0_wp  
-  else
-    !> DUST format 
-    !> TODO 
-  endif  
-  ! get m and p
-  m = maxval(rr_geo_mean(:,2))
-  idx_m = maxloc(rr_geo_mean(:,2),1) ! y_mean line max thickness
-  p = rr_geo_mean(idx_m,1)         ! x_mean line max thickness 
-
-  ! The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
-  ! The expression is related NACA profile, but should be valid for all profile
-  ! close to the leading edge. 
-
-  !Get analytical derivative of the mean line in x = 0  
-  m_line = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
   
-  ! calculate thickness in a simple manner 
-  !t = max(rr_up(:,2)) + min(rr_low(:,1))  
-  call define_thickness(rr_geo, t) 
-
-  ! radius of the circle at the leading edge 
-  radius = 1.10_wp*t**2.0_wp 
-
-  ! get center of the circle with the following conditions:
-  ! 1. passing through [0 0]
-  ! 2. center lying on the linearized middle line
-  ! 3. radius given by the NACA formula
-  x_c = sqrt(radius**2.0_wp/(m_line**2.0_wp + 1.0_wp))
-  y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
-
-  ! Define the region that is approximated by a circle arc  
-  ! Get point at +/- 37.5 deg (angle that works the best) 
-  alpha = atan(y_c/x_c); ! angle of m 
-  beta_up = (180.0_wp-37.5_wp)*pi/180.0_wp
-  beta_low = (180.0_wp+37.5_wp)*pi/180.0_wp
-  x_plus = radius*cos(beta_up + alpha) + x_c
-  y_plus = radius*sin(beta_up + alpha) + y_c
-  x_minus = radius*cos(beta_low + alpha) + x_c
-  y_minus = radius*sin(beta_low + alpha) + y_c
-
-  ! get the derivative for tangent at leading edge (to use in the
-  ! splining process 
-  tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
-  tan_minus = tan(atan(-1/tan(beta_low)) + alpha)
-
-  ! leading edge circle sector
-  theta_start = beta_up + alpha
-  theta_end = beta_low + alpha
-  allocate(theta(200)); theta = 0.0_wp 
-  allocate(x_circ(200), y_circ(200)); x_circ = 0.0_wp; y_circ = 0.0_wp 
-  call linspace(theta_start, theta_end, theta)
-  do i = 1 , size(theta)
-    x_circ(i) = radius*cos(theta(i)) + x_c
-    y_circ(i) = radius*sin(theta(i)) + y_c
-  end do
-  x = radius*cos(theta) + x_c
-  y = radius*sin(theta) + y_c
-
-  ! tangent at trailing edge: backward difference
-  tan_te_up = (rr_up(1,2) - rr_up(2, 2))/(rr_up(1,1) - rr_up(2, 1))
-  tan_te_low = (rr_low(size(rr_low,1) - 1, 2) - rr_low(size(rr_low,1), 2))/&
-                (rr_low(size(rr_low,1) - 1, 1) - rr_low(size(rr_low,1), 1))
-
-  ! spline interpolation upper part
-  allocate(point_up(size(rr_up,1),2)); point_up = 0.0_wp  
-  point_up = rr_up !  point from ,dat file 
-  ! replace first point with circle point 
-  point_up(1,:) = (/x_plus, y_plus/)
-  allocate(xq_up(1000), yq_up(1000)); xq_up = 0.0_wp; yq_up = 0.0_wp 
-
-  call linspace(x_plus, 1.0_wp, xq_up) ! from circle_up to TE 
-  call hermite_spline_profile(point_up(:,1), point_up(:,2), xq_up, &
-                      tan_plus, tan_te_up, yq_up) 
+  !> retro-compatibility with old vl format 
+  if ((ElType .eq. 'v') .and. (rr_dat(1, 1) .eq. 0.0_wp) .and. (rr_dat(1, np_dat) .eq. 1.0_wp)) then 
+    allocate(rr_mean(2, np_dat));                rr_mean = 0.0_wp 
+    rr_mean(1,:) = rr_dat(1, :)
+    rr_mean(2,:) = rr_dat(2, :) 
+    m = maxval(rr_mean(2,:))
+    idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
+    p = rr_mean(1, idx_m)           ! x_mean line max thickness 
+    tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+    tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
+                (rr_mean(1, size(rr_mean,2) - 1) - rr_mean(1, size(rr_mean,2)))
   
-  !> spline interpolation lower part
-  allocate(point_low(size(rr_low,1),2)); point_low = 0.0_wp 
-  point_low = rr_low ! point from .dat file
-  point_low(1,:) = (/x_minus, y_minus/)
-  allocate(xq_low(1000), yq_low(1000)); xq_low = 0.0_wp; yq_low = 0.0_wp
-  call linspace(x_minus, 1.0_wp, xq_low) 
-  call hermite_spline_profile(point_low(:,1), point_low(:,2), xq_low, &
-                      tan_minus, tan_te_low, yq_low) 
-  
-  !> reorganize vectors to prepare mesh subdivision
-  min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
-  idx_circ_min = minloc(x_circ,1) 
-  allocate(circ_x_low(size(x_circ(1:idx_circ_min))), &
-          circ_y_low(size(y_circ(1:idx_circ_min))), &
-          circ_x_up(size(x_circ(idx_circ_min:-1))), &
-          circ_y_up(size(y_circ(idx_circ_min:-1)))) 
-  circ_x_up = x_circ(1:idx_circ_min)
-  circ_y_up = y_circ(1:idx_circ_min)
-  circ_x_low = x_circ(idx_circ_min:-1)
-  circ_y_low = y_circ(idx_circ_min:-1)
-  !> reverse vectors 
-  circ_x_up = x_up(size(x_up,1): -1: 1)
-  circ_y_up = y_up(size(y_up,1): -1: 1) 
-  
-  allocate(rr2mesh_up(2,size(circ_x_up))); rr2mesh_up = 0.0_wp
-  allocate(rr2mesh_low(2,size(circ_x_low))); rr2mesh_low = 0.0_wp 
-  ! upper
-  rr2mesh_up(1,:) = (/circ_x_up, xq_up(2:-1)/)
-  rr2mesh_up(2,:) = (/circ_y_up, yq_up(2:-1)/)
-  ! lower part 
-  rr2mesh_low(1,:) = (/circ_x_low, xq_low(2:-1)/)
-  rr2mesh_low(2,:) = (/circ_y_low, yq_low(2:-1)/) 
-
-
-
-  do i1 = 2 , np_geo
-    st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
-  end do
-  s_geo = st_geo / st_geo(np_geo)
-
-  ! condition to evaluate if the airfoil.dat input contains only the mean line 
-  ! coordinates (for VL), or all the section points. (necessary for retrocompatibility)
-  if ((rr_geo(1,size(rr_geo(1,:))) - rr_geo(1,1)) .le. 0.5_wp) then
-
-    nelems_chord_tot = 2*nelems_chord+1
-    allocate(csi(nelems_chord_tot))
-    csi(1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
-    csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
-    csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
-
-    allocate(rr_pan(2,nelems_chord_tot)); rr_pan = 0.0_wp
-    allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
-    rr_pan(:,1) = rr_geo(:,1)
-    rr_pan(:,nelems_chord_tot) = rr_geo(:,np_geo)
-    do i1 = 2 , nelems_chord_tot - 1
-      do i2 = 2 , np_geo
-        if ( csi(i1) .lt. s_geo(i2) ) then
-          ds_geo = s_geo(i2)-s_geo(i2-1)
-          rr_pan(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
-                    (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-          exit
-        end if
-      end do
+    allocate(xq_mean(n_query)); xq_mean = 0.0_wp
+    allocate(yq_mean(n_query)); yq_mean = 0.0_wp 
+    call linspace(0.0_wp, 1.0_wp, xq_mean)  
+    !> start iterative loop to get a more precise value of tang_mean_le 
+    do i = 1, maxiter
+      call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), xq_mean, &
+                                  tang_mean_le, tang_mean_te, yq_mean)
+      m = maxval(yq_mean)
+      idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
+      p = xq_mean(idx_m)           ! x_mean line max thickness
+      tang_mean_le_new = 2.0_wp*m/p
+      if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
+      tang_mean_le = tang_mean_le_new 
+    enddo 
+    !> mean line 
+    allocate(rr2mesh_mean(2,size(xq_mean))); rr2mesh_mean = 0.0_wp
+    rr2mesh_mean(1,:) = xq_mean
+    rr2mesh_mean(2,:) = yq_mean
+    !> get length and derivative (alpha) along the mean line
+    allocate(alpha_mean(size(rr2mesh_mean(1,:)))); alpha_mean = 0.0_wp
+    alpha_mean(1) = tang_mean_le
+    allocate(dl_mean(size(rr2mesh_mean(1,:))));     dl_mean = 0.0_wp
+    dl_mean(1) = 0.0_wp
+    do i = 2, size(rr2mesh_mean(1,:))
+      dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
+                                        (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
+      alpha_mean(i) = atan((rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))/ &
+                          (rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)))
     end do
-    
-    rr_tmp = rr_pan 
-    !> resort rr (first pressure side then suction side)
-    rr_pan = rr_pan(:, size(rr_pan(1,:)):1:-1)
-    !> fix trailing edge 
-    rr_pan(:,1) = rr_tmp(:,1)
-    rr_pan(:,size(rr_pan,2)) = rr_tmp(:,size(rr_pan,2))     
+    !> interpolation of the mean line
+    !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
+    allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
+    csi_mean = csi_half*dl_mean(size(dl_mean))
+    allocate(rr_geo_mean(2, size(csi_mean))); rr_geo_mean = 0.0_wp
+    do i = 1, size(csi_mean)
+      do j = 1, size(dl_mean) - 1
+        if ((csi_mean(i) .ge. dl_mean(j)) .and. (csi_mean(i) .le. dl_mean(j + 1))) then
+          rr_geo_mean(1,i) = rr2mesh_mean(1, j) + cos(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j))
+          rr_geo_mean(2,i) = rr2mesh_mean(2, j) + sin(alpha_mean(j))*(dl_mean(j + 1) - dl_mean(j))
+        endif
+      enddo
+    enddo
+    rr(1,:) = rr_geo_mean(1,:)
+    rr(2,:) = rr_geo_mean(2,:) 
+    thickness = 0.12_wp !> dummy value (assumed a NACA0012) 
+  else 
+    !> leading edge index
+    id_le = minloc(rr_dat(1,:), 1)  
+    !> some checks on the input file 
+    if (rr_dat(2,2) .gt. 0.0_wp) then !>  Seilig format 
+      allocate(rr_up(2, id_le));                    rr_up = 0.0_wp
+      allocate(rr_low(2, size(rr_dat, 2) - id_le)); rr_low = 0.0_wp
 
-    if  ( ElType .eq. 'v' ) then 
-      allocate(rr_up(2,nelems_chord+1));    rr_up = 0.0_wp
-      allocate(rr_low(2,nelems_chord+1));   rr_low = 0.0_wp
-      allocate(y_mean(1,nelems_chord+1));   y_mean = 0.0_wp
-      allocate(rr(2,nelems_chord+1));       rr = 0.0_wp
-      ! split suction and lower side
-      rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
-      rr_low = rr_pan(:,1:nelems_chord+1)
+      rr_up = rr_dat(:, 1:id_le) 
+      ! reverse rr_up 
+      rr_up = rr_up(:, size(rr_up, 2): 1: -1)
+      rr_low = rr_dat(:,id_le: size(rr_dat, 2))
+    else                              !> Original DUST format 
+      allocate(rr_up(2, size(rr_dat, 2) - id_le)); rr_up = 0.0_wp
+      allocate(rr_low(2, id_le));                  rr_low = 0.0_wp
 
-      ! y-coordinates of the mean line
-      y_mean(1,:) = (rr_up(2,:) + rr_low(2,size(rr_low(1,:)):1:-1))/2.0_wp
-      rr(1,:) = rr_up(1,:)
-      rr(2,:) = y_mean(1,:)
-      
-    elseif ( ElType .eq. 'p' ) then
-      allocate(rr(2,nelems_chord_tot));       rr = 0.0_wp 
-      rr = rr_pan
+      rr_up = rr_dat(:, id_le : size(rr_dat, 2))
+      rr_low = rr_dat(:,1:id_le )
+      !> reverse rr_low 
+      rr_low = rr_low(:, size(rr_low, 2): 1: -1) 
     endif 
 
-  else
+    !> x sort elements 
+    allocate(rr_sort(2, size(rr_dat,2))); rr_sort = 0.0_wp 
 
-    nelems_chord_tot = nelems_chord+1
-    allocate(csi(nelems_chord_tot))
-    csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
-  
-    allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
-    allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
-    rr(:,1) = rr_geo(:,1)
-    rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
-    do i1 = 2 , nelems_chord_tot - 1
-      do i2 = 2 , np_geo
-        if ( csi(i1) .lt. s_geo(i2) ) then
-          ds_geo = s_geo(i2)-s_geo(i2-1)
-          rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
-                     (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-          exit
-        end if
-      end do
+    call sort_vector_real(rr_dat(1,:), size(rr_dat,2), x_sort, ind_sort) 
+    !> y sort elements
+
+    rr_sort(1,:) = x_sort
+    rr_sort(2,:) = rr_dat(2,ind_sort) 
+
+    !> remouve double elements 
+    call unique(rr_sort(1,:), x_unique, 1e-6_wp)
+
+    !> linear interpolation of the upper and lower surface with rr_unique 
+    allocate(rr_unique_up(2, size(x_unique))); rr_unique_up = 0.0_wp
+    allocate(rr_unique_low(2, size(x_unique))); rr_unique_low = 0.0_wp
+
+    rr_unique_up(1,:) = x_unique
+    rr_unique_low(1,:) = x_unique
+    
+    do i = 1, size(x_unique)
+      call linear_interp(rr_up(2,:), rr_up(1,:),   rr_unique_up(1,i), rr_unique_up(2,i)) 
+      call linear_interp(rr_low(2,:), rr_low(1,:), rr_unique_low(1,i), rr_unique_low(2,i)) 
     end do
 
-  endif
-  !> calculate thickness for dynstall 
-  call define_thickness(rr_geo, thickness)
-  !!> get position of aerodynamic center 
-  !csi_ac = 0.75_wp ! control point for vl corrected
-  !if ( ElType .eq. 'v' ) then    
-  !  call linear_interp(rr_geo(2,:), rr_geo(1,:), csi_ac, curv_ac)
-  !else  
-  !  curv_ac = 0.0_wp
-  !endif 
-  
+    !> build middle line 
+    allocate(rr_mean_dat(2, size(rr_unique_up,2))); rr_mean_dat = 0.0_wp
+    rr_mean_dat(1,:) = rr_unique_low(1,:)
+    rr_mean_dat(2,:) = (rr_unique_up(2,:) + rr_unique_low(2,:))/2.0_wp
+
+    !>  get read of weird behaviuor 
+    allocate(rr_mean(2, 11)); rr_mean = 0.0_wp 
+    call linspace(0.0_wp, 1.0_wp, rr_mean(1,:)) 
+    do i = 1, size(rr_mean, 2)
+      call linear_interp(rr_mean_dat(2,:), rr_mean_dat(1,:), rr_mean(1,i), rr_mean(2,i))
+    enddo  
+
+
+    !> get m and p
+    m = maxval(rr_mean(2,:))
+    idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
+    p = rr_mean(1, idx_m)           ! x_mean line max thickness 
+
+    !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
+    !  The expression is related NACA profile, but should be valid for all profile
+    !  close to the leading edge. 
+    !> Get analytical derivative of the mean line in x = 0  
+    tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+    tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
+                  (rr_mean(1, size(rr_mean,2) - 1) - rr_mean(1, size(rr_mean,2)))
+    
+    allocate(xq_mean(n_query)); xq_mean = 0.0_wp
+    allocate(yq_mean(n_query)); yq_mean = 0.0_wp 
+    call linspace(0.0_wp, 1.0_wp, xq_mean)  
+    !> start iterative loop to get a more precise value of tang_mean_le 
+    do i = 1, maxiter
+      call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), xq_mean, &
+                                  tang_mean_le, tang_mean_te, yq_mean)
+      m = maxval(yq_mean)
+      idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
+      p = xq_mean(idx_m)           ! x_mean line max thickness
+      tang_mean_le_new = 2.0_wp*m/p
+      if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
+      tang_mean_le = tang_mean_le_new 
+    enddo 
+
+    !> conditions on symmetric profile 
+    if (abs(tang_mean_te) .lt. 0.03_wp) then ! tol harcoded so far 
+      tang_mean_te = 0.0_wp
+    endif 
+    if (abs(tang_mean_le) .lt. 0.03_wp) then ! tol harcoded so far 
+      tang_mean_le = 0.0_wp
+    endif 
+
+    !> calculate thickness
+    ! start an iterative loop on l.e. radius to have the last point of the circle
+    ! belonging to the airfoil  
+    ! Initials guess: (naca profile) 
+    ! radius of the circle at the leading edge 
+    thickness = 0.12  !> initial guess (NACA0012)
+    radius = 1.10_wp*thickness**2.0_wp 
+
+    !> get finer approximation of the upper part (maybe not strictly needed)
+    allocate(rr_up_int(2, n_query)); rr_up_int = 0.0_wp 
+    call linspace(0.0_wp, 1.0_wp, rr_up_int(1,:))
+
+    do i = 1, size(rr_up_int, 2)
+      call linear_interp(rr_up(2,:), rr_up(1,:), rr_up_int(1,i), rr_up_int(2,i))
+    enddo
+
+    do i = 1, maxiter  
+      !> Get center of the circle with the following conditions:
+      !  1. passing through [0 0]
+      !  2. center lying on the linearized middle line
+      !  3. radius given by the NACA formula
+      x_c = sqrt(radius**2.0_wp/(tang_mean_le**2.0_wp + 1.0_wp))
+      y_c = sqrt(radius**2.0_wp - x_c**2.0_wp)
+
+      !> Define the region that is approximated by a circle arc  
+      !  Get point at +/- 37.5 deg (angle that works the best) 
+      alpha = atan(y_c/x_c); ! angle of m 
+      beta_up =  (180.0_wp - 37.5_wp)*pi/180.0_wp
+      beta_low = (180.0_wp + 37.5_wp)*pi/180.0_wp
+      x_plus = radius*cos(beta_up + alpha) + x_c
+      y_plus = radius*sin(beta_up + alpha) + y_c
+      x_minus = radius*cos(beta_low + alpha) + x_c
+      y_minus = radius*sin(beta_low + alpha) + y_c
+
+      !> check intersection 
+      do j = 1, size(rr_up_int, 2) - 1
+        if (x_plus .ge. rr_up_int(1,j) .and. x_plus .lt. rr_up_int(1,j+1)) then
+          ind_x = j
+          exit
+        endif
+      enddo
+
+      if (y_plus .ge. rr_up_int(2, ind_x) .and. y_plus .lt. rr_up_int(2, ind_x + 1)) then
+        exit 
+      endif 
+
+      radius_old = radius 
+      radius = sqrt((rr_up_int(1,ind_x) - x_c)**2.0_wp + (rr_up_int(2,ind_x) - y_c)**2.0_wp)
+      !> if radius is decreasing, exit and return the old value
+      if (radius_old .ge. radius) then 
+        radius = radius_old 
+        exit
+      endif       
+    enddo !> radius loop 
+    !> update thickness 
+    thickness = sqrt(radius/1.10_wp)
+
+    !> get the derivative for tangent at leading edge (to use in the
+    !> splining process 
+    tan_plus = tan(atan(-1/tan(beta_up)) + alpha)
+    tan_minus = tan(atan(-1/tan(beta_low)) + alpha)
+    tan_le_up = tan(pi/2.0_wp + alpha)
+    tan_le_low = tan(-pi/2.0_wp + alpha)
+
+    !> leading edge circle sector
+    theta_start = beta_up + alpha
+    theta_end = beta_low + alpha
+    allocate(theta(n_query)); theta = 0.0_wp 
+    allocate(x_circ(n_query), y_circ(n_query)); x_circ = 0.0_wp; y_circ = 0.0_wp 
+
+    call linspace(theta_start, theta_end, theta)
+    do i = 1 , size(theta)
+      x_circ(i) = radius*cos(theta(i)) + x_c
+      y_circ(i) = radius*sin(theta(i)) + y_c
+    end do
+
+    !> tangent at trailing edge: backward difference
+    tan_te_up = (rr_unique_up(2, (size(rr_unique_up, 2) - 1)) - rr_unique_up(2, size(rr_unique_up,2))) / & 
+                (rr_unique_up(1, (size(rr_unique_up, 2) - 1)) - rr_unique_up(1, size(rr_unique_up,2)))
+    tan_te_low =  (rr_unique_low(2, (size(rr_unique_low, 2) - 1)) - rr_unique_low(2, size(rr_unique_low,2))) / & 
+                  (rr_unique_low(1, (size(rr_unique_low, 2) - 1)) - rr_unique_low(1, size(rr_unique_low,2)))
+
+    !> spline interpolation upper part
+    do i = 1, size(rr_unique_up, 2) 
+      if (rr_unique_up(1,i) .gt. x_plus) then
+        idx_m = i
+        exit
+      endif
+    enddo
+
+    allocate(point_up(2,  size(rr_unique_up, 2) - idx_m + 2)); point_up = 0.0_wp  
+    point_up(:, 2:size(point_up,2)) = rr_unique_up(:, idx_m:size(rr_unique_up, 2)) !  point from ,dat file 
+
+    !> replace first point with circle point 
+    point_up(:, 1) = (/x_plus, y_plus/)
+
+    !> prepare for catmull-rom interpolation: get symmetric points 
+    dummy_le_up = 2.0_wp*point_up(:,1) - point_up(:,2)
+    dummy_te_up = 2.0_wp*point_up(:,size(point_up, 2)) - point_up(:,size(point_up, 2) - 1)  
+    allocate(point_up_updated(2, size(point_up, 2) + 2)); point_up_updated = 0.0_wp
+    point_up_updated(:, 1) =                               dummy_le_up
+    point_up_updated(:, 2:size(point_up_updated, 2) - 1) = point_up  
+    point_up_updated(:, size(point_up_updated, 2))       = dummy_te_up
+
+    call catmull_rom_chain(point_up_updated, num_points, chain_points_up) !> interpolation 
+
+    !> spline interpolation lower part
+    do i = 1, size(rr_unique_low, 2) 
+      if (rr_unique_low(1,i) .gt. x_minus) then
+        idx_m = i
+        exit
+      endif
+    enddo
+
+    allocate(point_low(2, size(rr_unique_low, 2) - idx_m + 2)); point_low = 0.0_wp
+    point_low(:, 2:size(point_low,2)) = rr_unique_low(:, idx_m:size(rr_unique_low, 2)) !  point from ,dat file
+    
+    !> replace first point with circle point
+    point_low(:, 1) = (/x_minus, y_minus/)
+
+    !> prepare for catmull-rom interpolation
+    dummy_le_low = 2.0_wp*point_low(:,1) - point_low(:,2)
+    dummy_te_low = 2.0_wp*point_low(:,size(point_low, 2)) - point_low(:,size(point_low, 2) - 1)  
+
+    allocate(point_low_updated(2, size(point_low, 2) + 2)); point_low_updated = 0.0_wp
+    point_low_updated(:, 1)                                = dummy_le_low
+    point_low_updated(:, 2:size(point_low_updated, 2) - 1) = point_low
+    point_low_updated(:, size(point_low_updated, 2))       = dummy_te_low
+    
+    call catmull_rom_chain(point_low_updated, num_points, chain_points_low) !> interpolation 
+
+    !> reorganize vectors to prepare mesh subdivision
+    min_x = minval(x_circ,1)           ! get lowest x (in general is <= 0) 
+    idx_circ_min = minloc(x_circ,1) 
+
+    allocate(circ_x_low(idx_circ_min),              &
+            circ_y_low(idx_circ_min),               &
+            circ_x_up(size(x_circ) - idx_circ_min), &
+            circ_y_up(size(x_circ) - idx_circ_min)) 
+    circ_x_up = x_circ(1:idx_circ_min)
+    circ_y_up = y_circ(1:idx_circ_min)
+    circ_x_low = x_circ(idx_circ_min:size(x_circ))
+    circ_y_low = y_circ(idx_circ_min:size(x_circ))
+
+    !> reverse vectors 
+    circ_x_up = circ_x_up(size(circ_x_up):1:-1) 
+    circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
+
+    allocate(rr2mesh_up(2,(size(circ_x_up)   + size(chain_points_up,2) - 1))); rr2mesh_up = 0.0_wp
+    allocate(rr2mesh_low(2,(size(circ_x_low) + size(chain_points_up,2) - 1))); rr2mesh_low = 0.0_wp 
+    allocate(rr2mesh_mean(2,size(xq_mean)));                                   rr2mesh_mean = 0.0_wp
+
+    !> upper part
+    rr2mesh_up(1,:) = (/circ_x_up, chain_points_up(1,2:size(chain_points_up,2))/)
+    rr2mesh_up(2,:) = (/circ_y_up, chain_points_up(2,2:size(chain_points_up,2))/)
+    !> get length and derivative (alpha) along the upper line 
+    allocate(alpha_up(size(rr2mesh_up(1,:)))); alpha_up = 0.0_wp
+    alpha_up(1) = atan(tan_le_up)  
+    allocate(dl_up(size(rr2mesh_up(1,:)))); dl_up = 0.0_wp
+
+    do i = 2, size(rr2mesh_up,2)
+      dl_up(i) = dl_up(i - 1) + sqrt((rr2mesh_up(1,i) - rr2mesh_up(1,i-1))**2.0_wp + &
+                                    (rr2mesh_up(2,i) - rr2mesh_up(2,i-1))**2.0_wp)
+      alpha_up(i) = atan((rr2mesh_up(2,i) - rr2mesh_up(2,i-1))/ &
+                    (max((rr2mesh_up(1,i) - rr2mesh_up(1,i-1)), 1e-16_wp)))  
+    end do
+    
+
+    !> lower part 
+    rr2mesh_low(1,:) = (/circ_x_low, chain_points_low(1,2:size(chain_points_low,2))/)
+    rr2mesh_low(2,:) = (/circ_y_low, chain_points_low(2,2:size(chain_points_low,2))/) 
+    !> get length and derivative (alpha) along the lower line 
+    allocate(alpha_low(size(rr2mesh_low(1,:)))); alpha_low = 0.0_wp
+    allocate(dl_low(size(rr2mesh_low(1,:)))); dl_low = 0.0_wp
+    alpha_low(1) = atan(tan_le_low)
+    
+    do i = 2, size(rr2mesh_low,2)
+      dl_low(i) = dl_low(i - 1) + sqrt((rr2mesh_low(1,i) - rr2mesh_low(1,i-1))**2.0_wp + &
+                                      (rr2mesh_low(2,i) - rr2mesh_low(2,i-1))**2.0_wp)
+      alpha_low(i) = atan((rr2mesh_low(2,i) - rr2mesh_low(2,i-1))/ &
+                    (max((rr2mesh_low(1,i) - rr2mesh_low(1,i-1)), 1e-16_wp)))
+    end do
+    
+    !> mean line 
+    rr2mesh_mean(1,:) = xq_mean
+    rr2mesh_mean(2,:) = yq_mean
+    !> get length and derivative (alpha) along the mean line
+    allocate(alpha_mean(size(rr2mesh_mean(1,:)))); alpha_mean = 0.0_wp
+    allocate(dl_mean(size(rr2mesh_mean(1,:)))); dl_mean = 0.0_wp
+    alpha_mean(1) = atan(tang_mean_le) 
+
+    do i = 2, size(rr2mesh_mean(1,:))
+      dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
+                                        (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
+      alpha_mean(i) = atan((rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))/ &
+                      (max((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1)), 1e-16_wp)))
+    end do
+
+    !> interpolation of the upper part 
+    !> rescale csi_half in the interval [0 dl_up(size(dl_up))] 
+    allocate(csi_up(size(csi_half))); csi_up = 0.0_wp
+    csi_up = csi_half*dl_up(size(dl_up)) 
+    allocate(rr_geo_up(2, size(csi_up))); rr_up = 0.0_wp 
+    do i = 1, size(csi_up) 
+      do j = 1, size(dl_up) - 1 
+        if ((csi_up(i) .ge. dl_up(j)) .and. (csi_up(i) .le. dl_up(j + 1))) then 
+          rr_geo_up(1,i) = rr2mesh_up(1, j) + cos(alpha_up(j))*(csi_up(i) - dl_up(j)) 
+          rr_geo_up(2,i) = rr2mesh_up(2, j) + sin(alpha_up(j))*(csi_up(i) - dl_up(j)) 
+        endif   
+      enddo
+    enddo
+    
+    !> interpolation of the lower part 
+    !> rescale csi_half in the interval [0 dl_low(size(dl_low))]
+    allocate(csi_low(size(csi_half))); csi_low = 0.0_wp
+    csi_low = csi_half*dl_low(size(dl_low))
+    allocate(rr_geo_low(2, size(csi_low))); rr_geo_low = 0.0_wp
+    do i = 1, size(csi_low)
+      do j = 1, size(dl_low) - 1
+        if ((csi_low(i) .ge. dl_low(j)) .and. (csi_low(i) .le. dl_low(j + 1))) then
+          rr_geo_low(1,i) = rr2mesh_low(1, j) + cos(alpha_low(j))*(csi_low(i) - dl_low(j))
+          rr_geo_low(2,i) = rr2mesh_low(2, j) + sin(alpha_low(j))*(csi_low(i) - dl_low(j))
+        endif
+      enddo
+    enddo
+
+    !> flip lower part 
+    rr_geo_low = rr_geo_low(:, size(rr_geo_low(1,:)):1:-1) 
+    
+    !> interpolation of the mean line
+    !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
+    allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
+    csi_mean = csi_half*dl_mean(size(dl_mean))
+    allocate(rr_geo_mean(2, size(csi_mean))); rr_geo_mean = 0.0_wp
+    do i = 1, size(csi_mean)
+      do j = 1, size(dl_mean) - 1
+        if ((csi_mean(i) .ge. dl_mean(j)) .and. (csi_mean(i) .le. dl_mean(j + 1))) then
+          rr_geo_mean(1,i) = rr2mesh_mean(1, j) + cos(alpha_mean(j))*(csi_mean(i) - dl_mean(j))
+          rr_geo_mean(2,i) = rr2mesh_mean(2, j) + sin(alpha_mean(j))*(csi_mean(i) - dl_mean(j))
+        endif
+      enddo
+    enddo
+
+    if (ElType .eq. 'p') then 
+      allocate(rr(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); rr = 0.0_wp 
+      rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)), rr_geo_up(1,2:size(rr_geo_up,2))/) 
+      rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)), rr_geo_up(2,2:size(rr_geo_up,2))/)
+    elseif (ElType .eq. 'v') then 
+      allocate(rr(2,size(rr_geo_mean, 2))); rr = 0.0_wp 
+      rr(1,:) = rr_geo_mean(1,:)
+      rr(2,:) = rr_geo_mean(2,:) 
+    endif 
+  end if !> old format 
+
   !> cleanup
-  if (allocated(rr_tmp)) deallocate(rr_tmp)
-  if (allocated(rr_up)) deallocate(rr_up)
-  if (allocated(rr_low)) deallocate(rr_low)
-  if (allocated(y_mean)) deallocate(y_mean)
+  if (allocated(rr_dat))            deallocate(rr_dat) 
+  if (allocated(rr_up))             deallocate(rr_up)
+  if (allocated(rr_low))            deallocate(rr_low)
+  if (allocated(rr_mean))           deallocate(rr_mean)
+  if (allocated(theta))             deallocate(theta)
+  if (allocated(x_circ))            deallocate(x_circ)
+  if (allocated(y_circ))            deallocate(y_circ) 
+  if (allocated(point_up))          deallocate(point_up)
+  if (allocated(point_low))         deallocate(point_low)
+  if (allocated(point_up_updated))  deallocate(point_up_updated)
+  if (allocated(point_low_updated)) deallocate(point_low_updated)
+  if (allocated(chain_points_up))   deallocate(chain_points_up)
+  if (allocated(chain_points_low))  deallocate(chain_points_low)
+  if (allocated(circ_x_low))        deallocate(circ_x_low)
+  if (allocated(circ_y_low))        deallocate(circ_y_low)
+  if (allocated(circ_x_up))         deallocate(circ_x_up)
+  if (allocated(circ_y_up))         deallocate(circ_y_up)
+  if (allocated(rr2mesh_up))        deallocate(rr2mesh_up)
+  if (allocated(rr2mesh_low))       deallocate(rr2mesh_low)  
+  if (allocated(y_mean))            deallocate(y_mean)
+  if (allocated(rr_geo_low))        deallocate(rr_geo_low)
+  if (allocated(rr_geo_up))         deallocate(rr_geo_up)
+  if (allocated(rr_geo_mean))       deallocate(rr_geo_mean)
+  if (allocated(csi_up))            deallocate(csi_up)
+  if (allocated(csi_low))           deallocate(csi_low)
+  if (allocated(csi_mean))          deallocate(csi_mean)
+  if (allocated(alpha_up))          deallocate(alpha_up)
+  if (allocated(alpha_low))         deallocate(alpha_low)
+  if (allocated(alpha_mean))        deallocate(alpha_mean)
+  if (allocated(dl_up))             deallocate(dl_up)
+  if (allocated(dl_low))            deallocate(dl_low)
+  if (allocated(dl_mean))           deallocate(dl_mean)
+  if (allocated(xq_mean))           deallocate(xq_mean)
+  if (allocated(yq_mean))           deallocate(yq_mean)
 
 end subroutine read_airfoil
 
 !-------------------------------------------------------------------------------
-subroutine define_division(type_mesh, nelem, division)
+subroutine define_division(type_mesh, nelem, division, &
+                          r, r_le, r_te, r_le_aft, r_te_aft, r_le_fore, r_te_fore, xh)
 
-  real(wp), intent(out)        :: division(:)
-  integer, intent(in)          :: nelem
-  character(len=*), intent(in) :: type_mesh
+  integer, intent(in)                :: nelem
+  real(wp), intent(in)               :: r, r_le, r_te, r_le_aft
+  real(Wp), intent(in)               :: r_te_aft, r_le_fore, r_te_fore, xh
+  character(len=*), intent(in)       :: type_mesh
+  real(wp), allocatable, intent(out) :: division(:)
+
+  real(wp),        allocatable       :: division_(:)
+  real(wp)                           :: step
+  integer                            :: iPoint
+  character(len=*), parameter        :: this_sub_name = 'define_division'
   
-  real(wp)                     :: step
-  integer                      :: iPoint
-  character(len=*), parameter  :: this_sub_name = 'define_division'
-  
-  division = 0.0_wp
+  if(.not. allocated(division)) allocate(division(nelem+1));  division = 0.0_wp
   step = 1.0_wp/(real(nelem,wp) + 1e-12_wp)
 
   select case (trim(type_mesh))
@@ -1493,12 +1815,127 @@ subroutine define_division(type_mesh, nelem, division)
     do iPoint = 1,nelem+1
       division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
+  case ("geoseriesLE", "geoseries_ib")
+    call geoseries(0.0_wp, 1.0_wp, nelem, r, division, division_) 
+  case ("geoseriesTE", "geoseries_ob")
+    call geoseries(0.0_wp, 1.0_wp, nelem, r, division_, division) 
+  case ("geoseries")
+    call geoseries_both(0.0_wp, 1.0_wp, nelem, xh, r_le, r_te, division)
+  case ("geoseries_hi", "geoseriesAS")
+    call geoseries_hinge(0.0_wp, 1.0_wp, nelem, xh, r_le_aft, r_te_aft, r_le_fore, r_te_fore, division)
   case default
     call error(this_sub_name, this_mod_name, 'Incorrect input: &
         & type_chord must be equal to uniform, cosine, cosineLE, cosineTE')
   end select
 
 end subroutine define_division
+
+subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te) 
+  real(wp), intent(in)               :: start_x, end_x
+  integer, intent(in)                :: n_elem
+  real(wp), intent(in)               :: r
+  real(wp), allocatable, intent(out) :: dcsi_le(:), dcsi_te(:) 
+
+  real(wp), allocatable              :: dl(:)
+  real(wp)                           :: r_d
+  integer :: i
+  character(len=*), parameter :: this_sub_name = 'geoseries' 
+
+  allocate(dl(n_elem)); dl = 0.0_wp
+  if (.not. allocated(dcsi_te)) allocate(dcsi_te(n_elem + 1)); dcsi_te = 0.0_wp 
+  if (.not. allocated(dcsi_le)) allocate(dcsi_le(n_elem + 1)); dcsi_le = 0.0_wp
+  !> check series convergence 
+  if ((r .ge. 1.0_wp) .or. (r .le. 0.0_wp)) then 
+    call error(this_mod_name, this_sub_name, 'insert a growth value between 0 and 1') 
+  end if
+  
+  r_d = 1-r; ! growth ratio (intended as decreasing ratio) 
+  ! get size of the first element knowing the sum of the geometric series
+  dl(1) = (1-r_d)/(1-r_d**real(n_elem,wp));
+  do i = 2, n_elem
+      dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
+  end do 
+  do i = 1, n_elem
+      dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
+  end do
+
+  dcsi_le = (1-dcsi_te)
+  !> flip dcsi_le
+  dcsi_le = dcsi_le(size(dcsi_le):1:-1)  
+  !> rescale in the interval 
+  dcsi_te = dcsi_te*(end_x - start_x) + start_x 
+  dcsi_le = dcsi_le*(end_x - start_x) + start_x
+
+  !> cleanup
+  if (allocated(dl)) deallocate(dl)
+
+
+end subroutine geoseries 
+
+subroutine geoseries_both(start_x, end_x, n_elem, xh, r_le, r_te, dcsi)
+  real(wp),               intent(in)    :: start_x, end_x
+  integer,                intent(in)    :: n_elem
+  real(wp),               intent(in)    :: xh
+  real(wp),               intent(in)    :: r_le, r_te
+  real(wp), allocatable,  intent(out)   :: dcsi(:) 
+
+  real(wp), allocatable                 :: dcsi_le(:), dcsi_te(:) 
+  real(wp), allocatable                 :: dcsi_le_(:), dcsi_te_(:) !> dummy
+  real(wp)                              :: mid_point, start_x_le, end_x_le, start_x_te, end_x_te 
+  integer                               :: n_elem_le, n_elem_te
+  character(len=*), parameter           :: this_sub_name = 'geoseries_both' 
+  
+  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
+
+  n_elem_le = ceiling(real(n_elem,wp)*xh) 
+  n_elem_te = n_elem - n_elem_le
+  mid_point = (start_x + end_x)*xh
+  start_x_le = start_x
+  end_x_le = mid_point
+  start_x_te = mid_point
+  end_x_te = end_x
+  call geoseries(start_x_le, end_x_le, n_elem_le, r_le, dcsi_le, dcsi_te_)
+  call geoseries(start_x_te, end_x_te, n_elem_te, r_te, dcsi_le_, dcsi_te)
+  dcsi = (/dcsi_le(1:(size(dcsi_le)-1)), dcsi_te/) 
+  !> cleanup
+  if (allocated(dcsi_le))  deallocate(dcsi_le)
+  if (allocated(dcsi_te))  deallocate(dcsi_te)
+  if (allocated(dcsi_le_)) deallocate(dcsi_le_)
+  if (allocated(dcsi_te_)) deallocate(dcsi_te_)
+
+end subroutine geoseries_both
+
+subroutine geoseries_hinge(start_x, end_x, n_elem, xh, &
+                          r_le_aft, r_te_aft, r_le_fore, r_te_fore, dcsi)
+  real(wp),               intent(in)     :: start_x, end_x
+  integer,                intent(in)     :: n_elem
+  real(wp),               intent(in)     :: xh
+  real(wp),               intent(in)     :: r_le_aft, r_te_aft, r_le_fore, r_te_fore
+  real(wp), allocatable,  intent(out)    :: dcsi(:)
+
+  real(wp), parameter                 :: x_mid = 0.5_wp !> put as input? 
+  real(wp)                            :: start_x_aft, end_x_aft, start_x_fore, end_x_fore
+  real(wp), allocatable               :: dcsi_aft(:), dcsi_fore(:) 
+  integer                             :: n_elem_aft, n_elem_fore 
+  character(len=*), parameter         :: this_sub_name = 'geoseries_hinge' 
+  
+  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
+  n_elem_aft = ceiling(real(n_elem,wp)*xh) 
+  n_elem_fore = n_elem - n_elem_aft
+  start_x_aft = start_x
+  end_x_aft = xh
+  start_x_fore = xh
+  end_x_fore = end_x
+  call geoseries_both(start_x_aft, end_x_aft, n_elem_aft, x_mid, r_le_aft, r_te_aft, dcsi_aft);
+  call geoseries_both(start_x_fore, end_x_fore, n_elem_fore, x_mid, r_le_fore, r_te_fore, dcsi_fore);
+
+  dcsi = (/dcsi_aft(1:(size(dcsi_aft)-1)), dcsi_fore/)
+
+  !> cleanup
+  if (allocated(dcsi_aft))  deallocate(dcsi_aft)
+  if (allocated(dcsi_fore)) deallocate(dcsi_fore)  
+
+end subroutine geoseries_hinge
 
 !-------------------------------------------------------------------------------
 subroutine define_thickness(rr_geo, thickness)

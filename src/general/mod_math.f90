@@ -58,7 +58,7 @@ implicit none
 
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
-          unique, infinite_plate_spline, tessellate, & 
+          unique, unique_row, infinite_plate_spline, tessellate, & 
           vec2mat, mat2vec, invmat, invmat_banded, linspace
 
 private
@@ -109,13 +109,14 @@ subroutine linear_interp_vector(val_vec , t_vec , t , val)
     call error(this_sub_name, this_mod_name, 'Different sizes for x and y &
                                   &data vector provided for interpolation')
   end if
-
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
-  if ( t .lt. minval(t_vec) ) then
+  if ( t .le. minval(t_vec)-eps ) then
+    write(*,*) t, minval(t_vec)
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
-  if ( t .gt. maxval(t_vec) ) then
+  if ( t .ge. maxval(t_vec)+eps ) then
+    write(*,*) t, maxval(t_vec)
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
@@ -154,11 +155,11 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
   end if
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
-  if ( t .lt. minval(t_vec) ) then
+  if ( t .le. minval(t_vec)-eps ) then
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
-  if ( t .gt. maxval(t_vec) ) then
+  if ( t .ge. maxval(t_vec)+eps ) then
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
@@ -221,10 +222,10 @@ subroutine invmat_banded(A, n)
   i2 = 0
   j2 = 0
 
-do i1=1,n
-write(*,*) A(i1,:)
-enddo
-write(*,*) "++++"
+!do i1=1,n
+!write(*,*) A(i1,:)
+!enddo
+!write(*,*) "++++"
   do i1 = 1,n
       do j1 = 1,n
         ! check if we are still inside a previous block
@@ -249,7 +250,7 @@ write(*,*) "++++"
             ! extract the block
             Anz = A(i1:i2,j1:j2)
             allocate(ipiv(nb)); ipiv = 0
- write(*,*) Anz
+! write(*,*) Anz
             !> Factorize the block
 #if (DUST_PRECISION==1)
             call sgetrf(nb, nb, Anz, nb, ipiv, info)
@@ -556,6 +557,48 @@ subroutine unique(vec, vec_unique, tol)
 
 end subroutine unique  
 
+subroutine unique_row(vec, vec_unique, tol)  
+  real(wp), intent(inout)                  :: vec(:,:) 
+  real(wp), intent(in)                  :: tol
+  real(wp), allocatable, intent(out)    :: vec_unique(:,:)
+  
+  real(wp), allocatable                 :: vec_sort(:) 
+  real(wp), allocatable                 :: vec_tmp(:,:)
+  real(wp), allocatable                 :: vec_sort_row(:,:)
+  integer,  allocatable                 :: ind(:)
+  integer                               :: nel, i, j, u 
+  !> column vector 
+  nel = size(vec, 1) 
+  allocate(vec_sort_row(nel, size(vec,2))); vec_sort_row = 0.0_wp
+
+  call sort_vector_real(vec(:,1), nel, vec_sort, ind)
+
+  vec_sort_row = vec(ind, :) 
+
+  i = 1;   j = 2;   u = 1
+
+  allocate(vec_tmp(nel, size(vec,2))); vec_tmp = 0.0_wp 
+
+  vec_tmp(1, :) = vec_sort_row(1,:) 
+  do while (j .le. nel)
+    if (abs(vec_sort(j) - vec_sort(i)) .le. tol) then  
+      j = j + 1
+    else
+      u = u + 1
+      vec_tmp(u,:) = vec_sort_row(j, :) 
+      i = j 
+      j = j + 1   
+    endif 
+  enddo
+  
+  deallocate(vec_sort, vec_sort_row)
+
+  allocate(vec_unique(u, size(vec,2))); vec_unique = 0.0_wp 
+  vec_unique = vec_tmp(1:u, :)  
+
+end subroutine unique_row 
+
+
 ! ----------------------------------------------------------------------
 ! RBF interpolation weight matrix for 2D structures (plates)
 subroutine infinite_plate_spline(pos_interp, pos_ref, W)
@@ -856,12 +899,12 @@ subroutine linspace(from, to, array)
   if (n .eq. 0) return
 
   if (n .eq. 1) then
-      array(1) = from
-      return
+    array(1) = from
+    return
   end if
 
   do i=1, n
-      array(i) = from + range * (i - 1) / (n - 1)
+    array(i) = from + range * real(i - 1, wp)/real(n - 1,wp)
   end do
 
 end subroutine

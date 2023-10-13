@@ -2,12 +2,12 @@
 \label{ch:Pre}
 
 The DUST preprocessor is used to generate the geometrical components required to model 
-the surfaces of the analysed body. It gathers the meshes of all the components required 
+the surfaces of the analyzed body. It gathers the meshes of all the components required 
 for the complete model, process them when necessary and generates all the parametrically 
 specified components. 
 
 The preprocessor is executed simply invoking the executable \texttt{dust\_pre} in the desired folder. 
-The input file containing all the required informations for the execution of the preprocessor must be 
+The input file containing all the required information for the execution of the preprocessor must be 
 passed as argument to the command call. If not provided explicitly the preprocessor automatically 
 tries to read the default input file \texttt{dust\_pre.in}.
 \begin{command}[caption={Preprocessor command looking for input file \texttt{input\_file\_name.in}}]
@@ -125,17 +125,17 @@ scaling_factor = 1.0
 
 The detailed parameters of the geometry file are:
 \begin{itemize}
-\item \param{mesh_file}: \textit{required:} yes (if not parametric). \textit{multiple:} no. \textit{type:} string. 
+\item \param{mesh\_file}: \textit{required:} yes (if not parametric). \textit{multiple:} no. \textit{type:} string. 
 
 name of the file containing the mesh.
 
-\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
+\item \param{mesh\_file\_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
 
 type of the mesh. Valid options at the moment are \opt{cgns} for cgns, \opt{parametric} 
 for parametrically generated meshes and \opt{basic} for ascii input meshes. 
 The last is only for development purposes. 
 
-\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+\item \param{el\_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
 type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, 
 \opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} stands for 
@@ -172,34 +172,34 @@ point around which to mirror the mesh.
 
 Direction in which to mirror the mesh.
 
-\item \param{tol_se_wing}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001 \textit{type:} real.
+\item \param{tol\_se\_wing}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001 \textit{type:} real.
 
 Tolerance in trailing edge merging of nodes. Override for the single component the value 
 defined (or the default value) in the main input file to the preprocessor. 
 Warning: the default value is not employed if the same parameter is defined (and not left default) in file \ref{file:dust_pre.in}. 
 
-\item \param{inner_product_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} -0.5 \textit{type:} real
+\item \param{inner\_product\_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} -0.5 \textit{type:} real
 Tolerance for the identification of trailing edges using the inner product of the normals.
 Override for the single component the value defined (or the default value) 
 in the main input file to the preprocessor. Warning: the default value is not 
 employed if the same parameter is defined (and not left default) in file \ref{file:dust_pre.in}. 
 
-\item \param{proj_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
+\item \param{proj\_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
 
 Force the projection of the trailing edge in a specific direction
 
-\item \param{proj_te_dir}: \textit{required:} if \param{proj_te} is true. \textit{multiple:} no. \textit{type:} string.
+\item \param{proj\_te\_dir}: \textit{required:} if \param{proj\_te} is true. \textit{multiple:} no. \textit{type:} string.
 
 Choose in which way to project the trailing edge. If it is \opt{parallel} the 
-trailing edge direction will be forced in the direction given in \param{proj_te_vector}, 
-while if it is \opt{normal} the trailing edge will be projected in a plane normal to \param{proj_te_vector}.
+trailing edge direction will be forced in the direction given in \param{proj\_te\_vector}, 
+while if it is \opt{normal} the trailing edge will be projected in a plane normal to \param{proj\_te\_vector}.
 
-\item \param{proj_te_vector}: \textit{required:} if \param{proj_te} is true. 
+\item \param{proj\_te\_vector}: \textit{required:} if \param{proj\_te} is true. 
 \textit{multiple:} no. \textit{type:} real array, length 3.
 
 vector to specify the direction declared in \param{proj_te_dir}
 
-\item \param{suppress_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
+\item \param{suppress\_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
 
 Suppress the trailing edge from the component: even if a trailing edge is found, 
 it is suppressed and the component will not release a wake from a trailing edge during the simulation.
@@ -207,25 +207,25 @@ it is suppressed and the component will not release a wake from a trailing edge 
 \item \param{scale\_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real. 
 Scaling factor for the first implicit wake panel. 
 
-\item \param{section_name} \textit{required:} no. \textit{multiple:} yes. \textit{type:} string 
+\item \param{section\_name} \textit{required:} no. \textit{multiple:} yes. \textit{type:} string 
 
 To be used only with cgns meshes: specify only a subset of all the sections (geometrical components) 
 available in the cgns file to be loaded and employed as geometry. 
-If no \param{section_name} is specified, all the sections of the cgns file will be employed.
+If no \param{section\_name} is specified, all the sections of the cgns file will be employed.
 
 \item \param{offset} \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
 
 offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
 
-\item \param{scaling_factor} \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
+\item \param{scaling\_factor} \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
 
 Scaling factor to apply to the loaded points. Allows to scale the coordinates of 
 the loaded points of the specified factor.
 
 offset and scaling are applied in the following order:
 \begin{equation*}
-\mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
+  \mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
 \end{equation*}
 \end{itemize}
 
@@ -469,7 +469,7 @@ r_sec = b * ( 1.0 - y_sec.^2 / a^2 ).^0.5 ;
 
 %> extreme points y coord
 y01 = - a ; y02 = a ;
- 
+
 % === rr array ===
 rr = zeros(n_points,3) ; ir = 0 ;
 
@@ -591,7 +591,7 @@ files of the ellipsoidal tank, generated by the \opt{tank.m} script \ref{file:ta
  \end{inputfile}
 \end{minipage} \hspace{10pt}
 \begin{minipage}[t]{0.48\textwidth}
- \begin{inputfile}[frame=single, caption={\opt{ee.dat} file created by \opt{tank.m}}, label={file:tank_ee}]
+  \begin{inputfile}[frame=single, caption={\opt{ee.dat} file created by \opt{tank.m}}, label={file:tank_ee}]
      1     2     3     0
      1     3     4     0
      1     4     5     0
@@ -640,7 +640,7 @@ files of the ellipsoidal tank, generated by the \opt{tank.m} script \ref{file:ta
     39    42    40     0
     40    42    41     0
     41    42    34     0
- \end{inputfile}
+  \end{inputfile}
 \end{minipage} \hspace{10pt}
 
 
@@ -726,164 +726,188 @@ A representation of sections and regions employed for the generation of a wing i
 The body is generated from the first section, starting from the specified starting point, and it is extruded along the y axis, 
 with the x axis pointing from the leading edge towards the trailing edge and the z axis normal to the x-y plane. 
 The type of geometry generated depends on the type of elements required. If surface panels are required the full 
-three dimensional geometry will be generated, if vortex lattice elements are required only the flat, mean line 
-surface will be generated and finally if lifting line elements are required only a one dimensional line will be generated. 
+three dimensional geometry will be generated, if vortex lattice elements are required only the mean line 
+surface will be generated, and finally if lifting line elements are required, only a one dimensional line will be generated. 
 Finally the mirroring of the geometry introduced for user generated meshes is available also for parametric geometries.
 
 All the detailed parameters of the geometry input file for parametric geometry are:
 \begin{itemize}
-\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
+  \item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
 
-Use \param{parametric} for parametric geometry.
+  Use \param{parametric} for parametric geometry.
 
-\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+  \item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
-type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, 
-\opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} 
-stands for lifting lines used to produce a 1D model of a lifting surface. 
+  type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, 
+  \opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} 
+  stands for lifting lines used to produce a 1D model of a lifting surface. 
 
-\item \param{offset} \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
+  \item \param{offset} \textit{required:} no. \textit{multiple:} no. 
+  \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
 
-offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
+  offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
 
-\item \param{scaling_factor} \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} 1.0 \textit{type:} real.
+  \item \param{scaling_factor} \textit{required:} no. \textit{multiple:} no. 
+  \textit{default:} 1.0 \textit{type:} real.
 
-Scaling factor to apply to the loaded points. Allows to scale the coordinates of the loaded points of the specified factor.
+  Scaling factor to apply to the loaded points. Allows to scale the coordinates of the loaded points of the specified factor.
 
-offset and scaling are applied in the following order:
-\begin{equation*}
-\mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
-\end{equation*}
-
-
-\item \param{airfoil_table_correction}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} logical.
-
-Require the viscous correction for \opt{v} elements by introducing the c81 aerodynamic tables. (Still experimental) 
+  offset and scaling are applied in the following order:
+  \begin{equation*}
+    \mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
+  \end{equation*}
 
 
-\item \param{mesh\_symmetry} \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} false. \textit{type:} logical.
+  \item \param{airfoil_table_correction}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} logical.
 
-Choose to reflect the mesh around a point and a direction. Useful to produce full meshes out of symmetrical half models. 
-Keeps both the original and the symmetrical part. 
+  Require the viscous correction for \opt{v} elements by introducing the c81 aerodynamic tables. 
 
-\item \param{symmetry\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
-\textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
+  \item \param{mesh\_symmetry} \textit{required:} no. \textit{multiple:} no. 
+  \textit{default:} false. \textit{type:} logical.
 
-point around which to reflect the mesh.
+  Choose to reflect the mesh around a point and a direction. Useful to produce full meshes out of symmetrical half models. 
+  Keeps both the original and the symmetrical part. 
 
-\item \param{symmetry\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
-\textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
+  \item \param{symmetry\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
+  \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Direction in which to reflect the mesh.
+  point around which to reflect the mesh.
 
-\item \param{mesh\_mirror} \textit{required:} no. \textit{multiple:} no. \textit{default:} false. \textit{type:} logical.
+  \item \param{symmetry\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
+  \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
-Choose to mirror the mesh around a point and a direction. Same as \param{mesh\_symmetry},
-but does not keep both the original, i.e. the mesh is not doubled.
+  Direction in which to reflect the mesh.
 
-\item \param{mirror\_point}:  \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
-\textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
+  \item \param{mesh\_mirror} \textit{required:} no. \textit{multiple:} no. \textit{default:} false. \textit{type:} logical.
 
-point around which to mirror the mesh.
+  Choose to mirror the mesh around a point and a direction. Same as \param{mesh\_symmetry},
+  but does not keep both the original, i.e. the mesh is not doubled.
 
-\item \param{mirror\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
-\textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
+  \item \param{mirror\_point}:  \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
+  \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Direction in which to mirror the mesh.
+  point around which to mirror the mesh.
 
-\item \param{twist\_linear\_interpolation} \textit{required:} no. 
-\textit{multiple:} no. \textit{default:} false. \textit{type:} logical.
+  \item \param{mirror\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. 
+  \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
-Choose to apply linear interpolation to the twist angle, instead of interpolating the point coordinates between two neighboring sections defined in the input file.
+  Direction in which to mirror the mesh.
 
-\item \param{starting\_point} \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} (/ 0.0, 0.0, 0.0 /) \textit{type:} real array, length 3.
+  \item \param{twist\_linear\_interpolation} \textit{required:} no. 
+  \textit{multiple:} no. \textit{default:} false. \textit{type:} logical.
 
-point in the local reference frame in which to start extruding the parametric geometry.
+  Choose to apply linear interpolation to the twist angle, instead of interpolating the point coordinates between two neighboring   sections defined in the input file.
 
-\item \param{reference\_chod\_fraction} \textit{required:} no. 
-\textit{multiple:} no. \textit{default:} 0.0 \textit{type:} real
+  \item \param{starting\_point} \textit{required:} no. \textit{multiple:} no. 
+  \textit{default:} (/ 0.0, 0.0, 0.0 /) \textit{type:} real array, length 3.
 
-Fraction of the chord at which to place the axis which will be rotated of the sweep and dihedral angles, and 
-around which airfoils are twisted. 
+  point in the local reference frame in which to start extruding the parametric geometry.
 
-\item \param{mesh\_flat} \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} true \textit{type:} logical
+  \item \param{reference\_chod\_fraction} \textit{required:} no. 
+  \textit{multiple:} no. \textit{default:} 0.0 \textit{type:} real
 
-Used only in case of lifting lines (\opt{l}) elements. If enabled instead of generating lifting lies 
-actually twisted according to the input twist, but rather a flat surface with only the normal vectors twisted 
-according to the input twist. 
+  Fraction of the chord at which to place the axis which will be rotated of the sweep and dihedral angles, and 
+  around which airfoils are twisted. 
 
-\item \param{nelem\_chord} \textit{required:} yes, if parametric. \textit{multiple:} no. \textit{type:} integer.
+  \item \param{mesh\_flat} \textit{required:} no. \textit{multiple:} no. 
+  \textit{default:} true \textit{type:} logical
 
-Number of elements in chord direction. Note: if the elements are vortex lattice $nelem\_chord$ 
-elements will be generated, while in case of surface panels $2nelem\_chord$ elements will be produced, 
-$nelem\_chord$ on the lower and $nelem\_chord$ on the upper side. In case of lifting lines this parameter is ignored.
+  Used only in case of lifting lines (\opt{l}) elements. If enabled instead of generating lifting lies 
+  actually twisted according to the input twist, but rather a flat surface with only the normal vectors twisted 
+  according to the input twist. 
 
-\item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} uniform \textit{type:} string.
+  \item \param{nelem\_chord} \textit{required:} yes, if parametric. \textit{multiple:} no. \textit{type:} integer.
 
-Type of subdivision in the chord-wise direction. Can be \opt{uniform} for a uniform distribution (suggested for vortex lattices), 
-\opt{cosine} for a cosine distribution, refined both on the leading and trailing edge, 
-\opt{cosineLE} for a half cosine refined only on leading edge (suggested for surface panels) or \opt{cosineTE} for a +
-half cosine refined only on the trailing edge. 
+  Number of elements in chord direction. Note: if the elements are vortex lattice \texttt{nelem\_chord} 
+  elements will be generated, while in case of surface panels $2\cdot$\texttt{nelem\_chord} elements will be produced, 
+  \texttt{nelem\_chord} on the lower and \texttt{nelem\_chord} on the upper side. In case of lifting lines this parameter is ignored.
 
-\item \param{chord} \textit{required:} at least 2. \textit{multiple:} yes. \textit{type:} real.
+  \item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. 
+  \textit{default:} uniform \textit{type:} string.
 
-Defines a section, by its chord length
+  Type of subdivision in the chord-wise direction: 
+  \begin{itemize}
+    \item \opt{uniform} for a uniform distribution (suggested for vortex lattices). 
+    \item \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge.  
+    \item \opt{cosine\_le} for a half cosine refined only on leading edge (suggested for surface panels). 
+    \item \opt{cosine\_te} for a half cosine refined only on the trailing edge (not recommended). 
+    \item \opt{geoseries} for a geometric series distribution, refined both on the leading and trailing edge.
+    In this case, the parameters \param{r\_le} and \param{r\_te} represent the growth ratio at leading edge and 
+    trailing edge respectively. Furthermore \param{x\_refinement} represents the position of the point at which
+    the growth ratio is defined.
+    \item \opt{geoseries\_le} for a half geometric series refined only on leading edge. 
+    In this case the parameter \param{r} represents the growth ratio.
+    \item \opt{geoseries\_te} for a half geometric series refined only on the trailing edge (not recommended).
+    In this case the parameter \param{r} represents the growth ratio.
+    \item \opt{geoseries\_hi} for a geometric series distribution, refined both on the leading and trailing edge, 
+    and where an hinge axis is present (although can work also for components without hinge). 
+    In this case, the parameters \param{r\_le\_fix} and \param{r\_te\_fix} represent the growth ratio at leading edge and
+    trailing edge respectively of the fixed part of the profile, while \param{r\_le\_moving} and \param{r\_te\_moving} 
+    represent the growth ratio at leading edge and trailing edge respectively of the moving part. 
+    Furthermore \param{x\_refinement} represents the position the hinge axis. 
+  \end{itemize}
 
-\item \param{twist} \textit{required} in same number as \param{chord}. \textit{multiple} yes. \textit{type:} real.
+  \item \param{chord} \textit{required:} at least 2. \textit{multiple:} yes. \textit{type:} real.
 
-Angle of twist, in degrees, of the airfoil section.
+  Defines a section, by its chord length
 
-\item \param{airfoil}/\param{airfoil\_table} \textit{required:} in same number as 
-\param{chord}. \textit{multiple:} yes. \textit{type:} string.
+  \item \param{twist} \textit{required} in same number as \param{chord}. \textit{multiple} yes. \textit{type:} real.
 
-Airfoil of the section. There are different ways to define an airfoil. It can be defined by the user as a 
-series of points, and so \param{airfoil} must be the path to a .dat file (the extension is mandatory) 
-containing the two dimensional coordinates of an airfoil; the file must have in the first line an integer 
-representing the number of points provided, followed by the coordinates of each point on separate lines. 
-It can also be an analytical NACA profile, and so must be provided as a 
-NACAXXXX string (at the moment only 4 digits and some 5 digits are implemented). 
+  Angle of twist, in degrees, of the airfoil section.
 
-In case of lifting lines or when \param{airfoil\_table\_correction} is true on the vortex lattice, to mark 
-the difference the \param{airfoil\_table} must be employed, and it refers to the path to the corresponding c81 lookup table. 
+  \item \param{airfoil}/\param{airfoil\_table} \textit{required:} in same number as 
+  \param{chord}. \textit{multiple:} yes. \textit{type:} string.
 
-Optionally in the \param{airfoil} or \param{airfoil\_table} parameter it is possible to specify the option 
-\opt{interp}. In this case the airfoil (airfoil section, mean line, section defined from file or c81 lookup 
-table according to the type of elements) in the section will be linearly interpolated among the pair of 
-explicitly specified airfoils in which the section is contained. 
+  Airfoil of the section. There are different ways to define an airfoil. It can be defined by the user as a 
+  series of points, and so \param{airfoil} must be the path to a .dat file (the extension is mandatory) 
+  containing the two dimensional coordinates of an airfoil; the file must have in the first line an integer 
+  representing the number of points provided, followed by the coordinates of each point on separate lines. 
+  It can also be an analytical NACA profile, and so must be provided as a 
+  NACAXXXX string (at the moment only 4 digits and some 5 digits are implemented). 
 
-\item \param{span} \textit{required:} at least one, in same number as \param{chord}-1 \textit{multiple:} yes. \textit{type:} real.
+  In case of lifting lines or when \param{airfoil\_table\_correction} is true on the vortex lattice, to mark 
+  the difference the \param{airfoil\_table} must be employed, and it refers to the path to the corresponding c81 lookup table. 
 
-Define the span length of the region between two sections.  
+  Optionally in the \param{airfoil} or \param{airfoil\_table} parameter it is possible to specify the option 
+  \opt{interp}. In this case the airfoil (airfoil section, mean line, section defined from file or c81 lookup 
+  table according to the type of elements) in the section will be linearly interpolated among the pair of 
+  explicitly specified airfoils in which the section is contained. 
 
-\item \param{sweep} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} real.
+  \item \param{span} \textit{required:} at least one, in same number as \param{chord}-1 \textit{multiple:} yes. \textit{type:} real.
 
-Angle of sweep of the region, positive if swept backwards (towards positive x).
+  Define the span length of the region between two sections.  
 
-\item \param{dihed} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} real.
+  \item \param{sweep} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} real.
 
-Angle of dihedral of the region, positive if rotated upwards (towards positive z).
+  Angle of sweep of the region, positive if swept backwards (towards positive x).
 
-\item \param{nelem\_span} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} integer.
+  \item \param{dihed} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} real.
 
-Number of elements in the spanwise direction, in the single region.
+  Angle of dihedral of the region, positive if rotated upwards (towards positive z).
 
-\item \param{type\_span} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} string.
+  \item \param{nelem\_span} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} integer.
 
-type of refinement of the elements in the spanwise direction. As for the chordwise direction, 
-the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both 
-inboard and outboard, and \opt{cosine_ib} and \opt{cosine_ob} for half cosine refinement only inboard or outboard. 
-\opt{equalarea} employed a equal-annuli mesh subdivision: this is useful for rotating blades since it guarantees the constant 
-area for each trailed-wake panel. 
-  
+  Number of elements in the spanwise direction, in the single region.
+
+  \item \param{type\_span} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} string.
+
+  type of refinement of the elements in the spanwise direction. As for the chordwise direction, 
+  the options are:
+  \begin{itemize}
+    \item \opt{uniform} for a uniform distribution, 
+    \item \opt{cosine} for a cosine refinement both inboard and outboard
+    \item \opt{cosine\_ib} for half cosine refinement only inboard
+    \item \opt{cosine\_ob} for half cosine refinement only outboard. 
+    \item \opt{equalarea} employed a equal-annuli mesh subdivision: this is useful for rotating blades since it guarantees the constant 
+    area for each trailed-wake panel.
+    \item \opt{geoseries} for a geometric series distribution, refined both inboard and outboard.
+    In this case, the parameters \param{r\_ib} and \param{r\_ob} represent the growth ratio inboard and outboard respectively. 
+    \item \opt{geoseries\_ib} for a half geometric series refined only inboard.
+    In this case the parameter \param{r} represents the growth ratio.
+    \item \opt{geoseries\_ob} for a half geometric series refined only outboard.
+    In this case the parameter \param{r} represents the growth ratio.  
+  \end{itemize} 
 \end{itemize}
-
-%TODO: actuator disk?
 
 The concept of sections and regions is illustrated in figure \ref{fig:parametric_wing}. 
 Furthermore an example to understand the geometrical role of the parameters in the input file is presented 
@@ -976,8 +1000,30 @@ twist = -5
 airfoil = NACA0012
 \end{inputfile}
 
-
 \subsection{Airfoils sections geometry}
+\label{sec:Airfoils_sections_geometry}
+\begin{figure}[htbp]
+  \centering
+  \makebox[\textwidth][c]{
+  \subfigure[\label{fig:uniform}\param{uniform}]{\includegraphics[width=.45\textwidth]{airfoil_fig/uniform.eps}}
+  \subfigure[\label{fig:cosine} \param{cosine}]{\includegraphics[width=.45\textwidth]{airfoil_fig/cosine.eps}}
+  }
+  %\vspace{1.0cm}
+  \makebox[\textwidth][c]{
+  \subfigure[\label{fig:cosinele}\param{cosine_le}]{\includegraphics[width=.45\textwidth]{airfoil_fig/cosineLE.eps}}
+  \subfigure[\label{fig:cosinete}\param{cosine_te}]{\includegraphics[width=.45\textwidth]{airfoil_fig/cosineTE.eps}}
+  }
+  \makebox[\textwidth][c]{
+  \subfigure[\label{fig:geoseriesle}\param{geoseries_le}: \param{r} = 1/7]{\includegraphics[width=.45\textwidth]{airfoil_fig/geoseriesLE.eps}}
+  \subfigure[\label{fig:geoserieste}\param{geoseries_te}: \param{r} = 1/7]{\includegraphics[width=.45\textwidth]{airfoil_fig/geoseriesTE.eps}}
+  }
+  \makebox[\textwidth][c]{
+  \subfigure[\label{fig:geoseries}\param{geoseries}: \param{r\_le} = 1/7,  \param{r\_te} = 1/10, \param{x\_refinement} = 0.5]{\includegraphics[width=.45\textwidth]{airfoil_fig/geoseries.eps}}
+  \subfigure[\label{fig:geoserieshi}\param{geoseries_hi}: \param{r\_le_fix} = 1/5,  \param{r\_te_fix} = 1/3, \param{r\_le_moving} = 1/3,  \param{r\_te_moving} = 1/8, \param{x\_refinement} = 0.75]{\includegraphics[width=.45\textwidth]{airfoil_fig/geoseriesHI.eps}}
+  }
+  \caption{Chordwise distributions for a NACA4412 profile with 20 elements.}
+  \label{fig:chordwisedistributions}
+\end{figure}
 The airfoils sections, introduced with the keyword \param{airfoil}, as previously discussed, 
 can be introduced either by specifying a NACA airfoil shape, or by providing a two dimensional 
 geometry using an ascii file. In both cases the resulting number of points in the section is the 
@@ -1001,7 +1047,10 @@ defines the shape of the airfoil. The curve must start at the trailing edge,
 pass from the lower side of the airfoil, the leading edge, the upper side and end 
 again at the trailing edge. The first and last point can be not coinciding, 
 to generate an open trailing edge. In case of vortex lattices, the mean line is 
-automatically computed. 
+automatically computed.  \textbf{Update}: from release \texttt{0.8.3-b}, the \textit{Seilig} format is supported. 
+In this format, the curve start at the trailing edge, pass from the side of the airfoil, the leading edge and end again at the trailing edge. 
+
+From release \texttt{0.8.3-b}, before meshing the airfoil, the original point will be preprocessed with a Catmull-Rom spline to smooth the curve. 
 
 The input is assumed to be normalized to have an unit chord, the final chord of 
 the geometry will be generated by multiplying by the \param{chord} parameter the coordinates 
@@ -1125,7 +1174,7 @@ Following lines contain the tables of the aerodynamic coefficients for each Reyn
   \item $2^{nd}$ Reynolds number (here 5000000), DUMMY
   \item Follows the same structure as the first Reynolds number   
 \end{enumerate}
-\textit{\textcolor{red}{Remark}}: each element of the aerodynamic table is separated by a white space in free format in a single. 
+\textbf{Remark}: each element of the aerodynamic table is separated by a white space in free format in a single. 
 In MBDyn, the format of each following line is up to 10 fields of 7 chars each;
 records longer than 10 fields are broken on multiple lines, with the first field filled with blanks. 
 
@@ -1259,19 +1308,19 @@ All the detailed parameters of the Hinged surfaces input file are:
     
     Number of hinges and rotating parts (e. g. aileron) of the component.
     
-    \item \param{hinge\_Tag}: \textit{required:} no. \textit{multiple:} same number as \param{n\_hinge} \textit{type:} string 
+    \item \param{hinge\_tag}: \textit{required:} no. \textit{multiple:} same number as \param{n\_hinge} \textit{type:} string 
     
     name of the control surface.
     
-    \item \param{hinge\_Nodes\_Input}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
+    \item \param{hinge\_nodes\_input}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
     
     type of hinge nodes input: \opt{parametric} or \opt{from\_file}. (TODO add details)
     
-    \item \param{node_1} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
+    \item \param{node\_1} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
     
     First node of the hinge. Components in the local reference frame of the component.
     
-    \item \param{node_2} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
+    \item \param{node\_2} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
     
     Second node of the hinge. Components in the local reference frame of the component.
     
@@ -1562,11 +1611,28 @@ this parameter is ignored.
 \item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} \param{uniform} \textit{type:} string.
 
-type of subdivision in the chord-wise direction. Can be \opt{uniform} 
-for a uniform distribution, \opt{cosine} for a cosine distribution, 
-refined both on the leading and trailing edge, \opt{cosineLE} for a 
-half cosine refined only on leading edge or \opt{cosineTE} for a half 
-cosine refined only on the trailing edge. 
+Type of subdivision in the chord-wise direction can be:   
+\begin{itemize}
+  \item \opt{uniform} for a uniform distribution (suggested for vortex lattices). 
+  \item \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge.  
+  \item \opt{cosine\_le} for a half cosine refined only on leading edge (suggested for surface panels). 
+  \item \opt{cosine\_te} for a half cosine refined only on the trailing edge (not recommended). 
+  \item \opt{geoseries} for a geometric series distribution, refined both on the leading and trailing edge.
+  In this case, the parameters \param{r\_le} and \param{r\_te} represent the growth ratio at leading edge and 
+  trailing edge respectively. Furthermore \param{x\_refinement} represents the position of the point at which
+  the growth ratio is defined.
+  \item \opt{geoseries\_le} for a half geometric series refined only on leading edge. 
+  In this case the parameter \param{r} represents the growth ratio.
+  \item \opt{geoseries\_te} for a half geometric series refined only on the trailing edge (not recommended).
+  In this case the parameter \param{r} represents the growth ratio.
+  \item \opt{geoseries\_hi} for a geometric series distribution, refined both on the leading and trailing edge, 
+  and where an hinge axis is present (although can work also for components without hinge). 
+  In this case, the parameters \param{r\_le\_fix} and \param{r\_te\_fix} represent the growth ratio at leading edge and
+  trailing edge respectively of the fixed part of the profile, while \param{r\_le\_moving} and \param{r\_te\_moving} 
+  represent the growth ratio at leading edge and trailing edge respectively of the moving part. 
+  Furthermore \param{x\_refinement} represents the position the hinge axis. 
+\end{itemize}
+
 
 \end{itemize}
 %
@@ -1638,7 +1704,7 @@ The parameters of a \param{line} element are:
     \param{spline} for Hermitian splines.
 
 \item \param{end_points}  \textit{required}: yes, \textit{multiple}: no, 
-\textit{type}: integer array, lenght 2.
+\textit{type}: integer array, length 2.
 
     \param{id} numbers of the beginning and ending \param{point}s of the line. 
     For \param{straight} lines, this two numbers must be consecutive. 
@@ -1654,11 +1720,21 @@ The parameters of a \param{line} element are:
 \item \param{type\_span} \textit{required}: no, \textit{multiple}: no, 
 \textit{default}: \param{uniform}, \textit{type}: string.
 
-    type of refinement of the elements in the spanwise direction. 
-    As for the chordwise direction, the options are \opt{uniform} 
-    for a uniform distribution, \opt{cosine} for a cosine refinement 
-    both inboard and outboard, and \opt{cosineIB} and \opt{cosineOB} 
-    for half cosine refinement only inboard or outboard. 
+    Type of refinement of the elements in the spanwise direction can be: 
+    \begin{itemize}
+      \item \opt{uniform} for a uniform distribution, 
+      \item \opt{cosine} for a cosine refinement both inboard and outboard
+      \item \opt{cosine_ib} for half cosine refinement only inboard
+      \item \opt{cosine_ob} for half cosine refinement only outboard. 
+      \item \opt{equalarea} employed a equal-annuli mesh subdivision: this is useful for rotating 
+      blades since it guarantees the constant area for each trailed-wake panel.
+      \item \opt{geoseries} for a geometric series distribution, refined both inboard and outboard.
+      In this case, the parameters \param{r\_ib} and \param{r\_ob} represent the growth ratio inboard and outboard respectively. 
+      \item \opt{geoseries_ib} for a half geometric series refined only inboard.
+      In this case the parameter \param{r} represents the growth ratio.
+      \item \opt{geoseries_ob} for a half geometric series refined only outboard.
+      In this case the parameter \param{r} represents the growth ratio.  
+    \end{itemize} 
   
 \item \param{tangent\_vec1} \textit{required}: if \param{Line\%type = spline} 
 and \param{Line\%end\_points(1) = 1}, \textit{multiple}: no, 
@@ -1702,10 +1778,10 @@ $\mathbf{d}_i$ the approximation of the derivatives at the interpolation
 points. For the interior points of a spline,
 \begin{equation}
 \begin{aligned}
-\mathbf{d}_i & = 0.5 ( \mathbf{r}_{i+1} - \mathbf{r}_{i  } ) \ 
+\mathbf{d}_i & = 0.5  ( \mathbf{r}_{i+1} - \mathbf{r}_{i}) \ 
                       (1-\param{bias}) (1-\param{tension}) \\
-             & + 0.5 ( \mathbf{r}_{i  } - \mathbf{r}_{i-1} ) \ 
-                    (1+\param{bias}) (1-\param{tension}) \ .
+              & + 0.5 ( \mathbf{r}_{i  } - \mathbf{r}_{i-1}) \ 
+                      (1+\param{bias}) (1-\param{tension}) \ .
 \end{aligned}
 \end{equation}
 The \param{bias} parameter is a weight on the finite difference 
@@ -1873,7 +1949,7 @@ It is meant to represent the location where the thin vortical layer leaves a lif
 body when the boundary layer is still attached. In the \DUST \ preprocessor the 
 trailing edge is identified geometrically, possibly according to a set of parameters. 
 
-In case of paranetrically generated elements, which represent extruded airfoils, 
+In case of parametrically generated elements, which represent extruded airfoils, 
 the trailing edge is simply generated connecting all the trailing edge of the two 
 (or mono) dimensional sections that compose the parametric geometry.
 
@@ -1905,13 +1981,13 @@ is decided. During the simulation the whole wake is advected according to the
 velocity generated by the singularities of the bodies and the wake, however the 
 first wake panel is geometrically pre-determined and its intensity is implicitly 
 solved alongside the rest of the singularities of the body surfaces. The first panel 
-starts from the trailing adge and its nodes, and its length is decided during the 
+starts from the trailing edge and its nodes, and its length is decided during the 
 simulation, however the direction alongside it is stretched from the trailing edge 
 is determined in the preprocessor. 
 
 If no specific indication is given, the direction of the first implicit wake 
 panel is the average of the two edges directions from the upper and lower elements 
-connected at the trailing edge node. It is however possible to alter this behaviour 
+connected at the trailing edge node. It is however possible to alter this behavior 
 by setting \param{proj_te} to true. Then the user must provide a direction 
 vector with \param{proj_te_vector}, which identifies the direction in which 
 to project the first panel direction if \param{proj_te_dir} is \opt{parallel}, 

@@ -416,7 +416,7 @@ subroutine save_status(geo, wake,  it, time, run_id)
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen
     vel_w(:,ip,1) = wake%part_p(ip)%p%vel
-    vort_v(:,ip) = wake%part_p(ip)%p%dir * wake%part_p(ip)%p%mag
+    vort_v(:,ip) = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag
     turbvisc(ip) = wake%part_p(ip)%p%turbvisc
     v_rad(ip) = wake%part_p(ip)%p%r_Vortex
   enddo

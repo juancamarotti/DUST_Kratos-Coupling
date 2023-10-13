@@ -104,7 +104,6 @@ viscosity_effects = F
 particles_redistribution = F
 particles_redistribution_ratio = 3.0
 octree_level_solid = 4
-turbulent_viscosity = F
 HCAS = F
 HCAS_time = 4.0
 HCAS_velocity = (/2.0, 0.0, 0.0/)
@@ -174,11 +173,11 @@ The amount of (if any) debug output is controlled by \param{debug\_level}.
 A parameter controlling the verbosity (both in terms of standard output and files output) 
 of the simulation. A smaller value leads to fewer output, with 0 being a silent simulation, 
 while values higher of 10 lead to debug files to be produced. 
-A value of 3 is a balanced value to obtain a reasonable amount of informations 
+A value of 3 is a balanced value to obtain a reasonable amount of information 
 on the simulation. 
 
 WARNING: the present feature tends to evolve rapidly during the development. 
-Values higher than 10 may lead to unexpected behaviours. 
+Values higher than 10 may lead to unexpected behaviors. 
 
 
 \item \param{tstart}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} real.
@@ -241,7 +240,7 @@ relative geometry file in the same location, as discussed in \ref{sec:Solver_Out
 If such geometry file is not provided the solver, as in the case of standard starting, 
 will attempt to generate such file with the default preprocessor input. Beware that in 
 this case, if the geometry of the results from which the solver is starting was generated 
-from another geometry input this could lead to unexpected behaviour.
+from another geometry input this could lead to unexpected behavior.
 
 
 \item \param{reset\_time}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 
@@ -527,10 +526,10 @@ Surface correction element radius multiplication factor.
 The velocity of the particles is corrected to avoid penetration through a 
 particular element if the particle hits the surface within a distance 
 (tangent to the surface) $d_t \leq P_e \max{l_i} \frac{\sqrt{2}}{2}$ 
-from the element centre, where $l_i$ are the lenght of the element sides 
+from the element centre, where $l_i$ are the length of the element sides 
 and $P_e$ is the factor. 
 A bigger factor leads to a potentially higher level of correction 
-(concurrent correction from different neighbouring elements) 
+(concurrent correction from different neighboring elements) 
 while a smaller factor may let some particles slip through the surface. 
 
 \item \param{divergence_filtering}: \textit{required:} no. \textit{multiple:} no. 
@@ -566,9 +565,9 @@ on the geometry surface. Experimental feature, still in development.
 \item \param{particles_redistribution}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} F \textit{type:} logical.
 
-Redistribute the particles having a small intensity to the neighbouring ones. 
+Redistribute the particles having a small intensity to the neighboring ones. 
 Active only if \param{fmm} is active, otherwise ignored. Redistributed particles 
-are then ereased to reduce the total number of particles.
+are then erased to reduce the total number of particles.
 
 \item \param{particles_redistribution_ratio}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 3.0 \textit{type:} real.
@@ -587,7 +586,7 @@ When employing \param{particles_redistribution}, the particles too near
 to a solid boundary are not redistributed to reduce the error induced by 
 the redistribution on the solution on solid surfaces. The octree cells at 
 level \param{octree_level_solid} containing a panel (SP, VL or LL) are marked 
-as containing a solid boudary, as well as all their neighbour at that level. 
+as containing a solid boundary, as well as all their neighbor at that level. 
 All the children of cells containing a solid boundary are marked as containing 
 a solid boundary. In the cells containing a solid boundary the redistribution 
 is not performed.
@@ -694,7 +693,7 @@ that triggers the increase of the octree levels.
 \item \param{refine_wake}: \textit{required:} no. 
 \textit{multiple:} no. \textit{type:} logical. \textit{default:} T. 
 
-Allow splitting the wake panel into subparticles with a division that is sub-multiple of the shortest panel edge.   
+Allow splitting the wake panel into sub-particles with a division that is sub-multiple of the shortest panel edge.   
 
 \item \param{k_refine}: \textit{required:} no. \textit{multiple:} no. \textit{type:} integer. \textit{default:} 1. 
 
@@ -751,9 +750,9 @@ usually in challenging configurations such as hovering rotors,
 it is possible that a non perfect convergence of the non-linear 
 solver leads to some few elements of the lifting line (typically one) 
 to converge on a stalled configuration among a series of completely 
-non stalled elements. This is unphysical, and usually it is solved 
+non stalled elements. This is un-physical, and usually it is solved 
 during the evolution of the simulation. It is however possible to 
-identify this behaviour and use the previous solution for these 
+identify this behavior and use the previous solution for these 
 sections to improve convergence. 
 
 \item \param{ll_stall_regularisation_nelems}: \textit{required:} no. 
@@ -765,12 +764,12 @@ stall among non stalled elements. At the moment cannot be higher than 1.
 \item \param{ll_stall_regularisation_niters}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 1. \textit{type:} integer.
 
-Number of LL iterations between two regularisation processes.
+Number of LL iterations between two regularization processes.
 
 \item \param{ll_stall_regularisation_alpha_stall} \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 15.0. \textit{type:} real.
 
-Stall angle [deg] used as a threshold for regularisation process. 
+Stall angle [deg] used as a threshold for regularization process. 
 
 \item \param{ll_loads_avl}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} F. \textit{type:} logical.
@@ -1583,7 +1582,7 @@ in \DUST{} will be discussed.
 All the equations, models, inputs, outputs etc. in the code are \textbf{dimensional}. 
 This does not mean that they are required to be in a specific dimensional unit, 
 but only that \textbf{no sort of non-dimensionalization is performed in the code}. 
-The user is fully resposible for the scaling (or not) of his inputs, and as a 
+The user is fully responsible for the scaling (or not) of his inputs, and as a 
 consequence of the outputs. 
 
 More in detail the core of \DUST{} solves the potential equations, which are a 
@@ -1619,7 +1618,7 @@ built parametrically already scaled. The velocity might be scaled on the free
 stream one, specifying directly $U'=U/U=1$, as well as the density $\rho' = \rho/\rho = 1$. 
 
 With these parameters as input, the output would be scaled accordingly, 
-leding for example to the scaled loads $L'$. These outputs, being scaled, 
+leading for example to the scaled loads $L'$. These outputs, being scaled, 
 are not numerically equal to the ones obtained in example \ref{ex:pot-dim}, 
 however they can be on the one hand scaled back to the real ones employing 
 the inverse scaling used for the inputs, or on the other hand if only the 

@@ -575,9 +575,13 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call read_hdf5_al(v_rad,'VortexRad',gloc)
     if(present(vpturbvisc)) call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
+    allocate(vpvort_v(3,size(wvort_read,2))) !vorticity vector 
     do ip = 1,size(vpvort)
       vpvort(ip) = norm2(wvort_read(:,ip))
+      vpvort_v(:,ip) = wvort_read(:,ip)/vpvort(ip)
+      !write(*,*) 'vorticity vector', vpvort_v(:,ip) !, vpvort(ip)
     enddo
+    
     !deallocate(wvort_read)
     call move_alloc(wvort_read, vpvort_v)
     call close_hdf5_group(gloc)
