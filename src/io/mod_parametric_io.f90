@@ -1489,8 +1489,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     endif 
 
     !> calculate thickness
-    !call define_thickness(rr_dat, thickness) !> fix rr_dat 
-    !thickness = maxval(rr_up(2,:)) - minval(rr_low(2,:))  
     ! start an iterative loop on l.e. radius to have the last point of the circle
     ! belonging to the airfoil  
     ! Initials guess: (naca profile) 
@@ -1544,6 +1542,8 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
         exit
       endif       
     enddo !> radius loop 
+    !> update thickness 
+    thickness = sqrt(radius/1.10_wp)
 
     !> get the derivative for tangent at leading edge (to use in the
     !> splining process 
@@ -1743,36 +1743,40 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   end if !> old format 
 
   !> cleanup
-  if (allocated(rr_dat))      deallocate(rr_dat) 
-  if (allocated(rr_up))       deallocate(rr_up)
-  if (allocated(rr_low))      deallocate(rr_low)
-  if (allocated(rr_mean))     deallocate(rr_mean)
-  if (allocated(theta))       deallocate(theta)
-  if (allocated(x_circ))      deallocate(x_circ)
-  if (allocated(y_circ))      deallocate(y_circ) 
-  if (allocated(point_up))    deallocate(point_up)
-  if (allocated(point_low))   deallocate(point_low)
-  if (allocated(circ_x_low))  deallocate(circ_x_low)
-  if (allocated(circ_y_low))  deallocate(circ_y_low)
-  if (allocated(circ_x_up))   deallocate(circ_x_up)
-  if (allocated(circ_y_up))   deallocate(circ_y_up)
-  if (allocated(rr2mesh_up))  deallocate(rr2mesh_up)
-  if (allocated(rr2mesh_low)) deallocate(rr2mesh_low)  
-  if (allocated(y_mean))      deallocate(y_mean)
-  if (allocated(rr_geo_low))  deallocate(rr_geo_low)
-  if (allocated(rr_geo_up))   deallocate(rr_geo_up)
-  if (allocated(rr_geo_mean)) deallocate(rr_geo_mean)
-  if (allocated(csi_up))      deallocate(csi_up)
-  if (allocated(csi_low))     deallocate(csi_low)
-  if (allocated(csi_mean))    deallocate(csi_mean)
-  if (allocated(alpha_up))    deallocate(alpha_up)
-  if (allocated(alpha_low))   deallocate(alpha_low)
-  if (allocated(alpha_mean))  deallocate(alpha_mean)
-  if (allocated(dl_up))       deallocate(dl_up)
-  if (allocated(dl_low))      deallocate(dl_low)
-  if (allocated(dl_mean))     deallocate(dl_mean)
-  if (allocated(xq_mean))     deallocate(xq_mean)
-  if (allocated(yq_mean))     deallocate(yq_mean)
+  if (allocated(rr_dat))            deallocate(rr_dat) 
+  if (allocated(rr_up))             deallocate(rr_up)
+  if (allocated(rr_low))            deallocate(rr_low)
+  if (allocated(rr_mean))           deallocate(rr_mean)
+  if (allocated(theta))             deallocate(theta)
+  if (allocated(x_circ))            deallocate(x_circ)
+  if (allocated(y_circ))            deallocate(y_circ) 
+  if (allocated(point_up))          deallocate(point_up)
+  if (allocated(point_low))         deallocate(point_low)
+  if (allocated(point_up_updated))  deallocate(point_up_updated)
+  if (allocated(point_low_updated)) deallocate(point_low_updated)
+  if (allocated(chain_points_up))   deallocate(chain_points_up)
+  if (allocated(chain_points_low))  deallocate(chain_points_low)
+  if (allocated(circ_x_low))        deallocate(circ_x_low)
+  if (allocated(circ_y_low))        deallocate(circ_y_low)
+  if (allocated(circ_x_up))         deallocate(circ_x_up)
+  if (allocated(circ_y_up))         deallocate(circ_y_up)
+  if (allocated(rr2mesh_up))        deallocate(rr2mesh_up)
+  if (allocated(rr2mesh_low))       deallocate(rr2mesh_low)  
+  if (allocated(y_mean))            deallocate(y_mean)
+  if (allocated(rr_geo_low))        deallocate(rr_geo_low)
+  if (allocated(rr_geo_up))         deallocate(rr_geo_up)
+  if (allocated(rr_geo_mean))       deallocate(rr_geo_mean)
+  if (allocated(csi_up))            deallocate(csi_up)
+  if (allocated(csi_low))           deallocate(csi_low)
+  if (allocated(csi_mean))          deallocate(csi_mean)
+  if (allocated(alpha_up))          deallocate(alpha_up)
+  if (allocated(alpha_low))         deallocate(alpha_low)
+  if (allocated(alpha_mean))        deallocate(alpha_mean)
+  if (allocated(dl_up))             deallocate(dl_up)
+  if (allocated(dl_low))            deallocate(dl_low)
+  if (allocated(dl_mean))           deallocate(dl_mean)
+  if (allocated(xq_mean))           deallocate(xq_mean)
+  if (allocated(yq_mean))           deallocate(yq_mean)
 
 end subroutine read_airfoil
 

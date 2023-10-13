@@ -109,13 +109,14 @@ subroutine linear_interp_vector(val_vec , t_vec , t , val)
     call error(this_sub_name, this_mod_name, 'Different sizes for x and y &
                                   &data vector provided for interpolation')
   end if
-
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
-  if ( t .le. minval(t_vec) ) then
+  if ( t .le. minval(t_vec)-eps ) then
+    write(*,*) t, minval(t_vec)
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
-  if ( t .ge. maxval(t_vec) ) then
+  if ( t .ge. maxval(t_vec)+eps ) then
+    write(*,*) t, maxval(t_vec)
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
@@ -154,11 +155,11 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
   end if
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
-  if ( t .le. minval(t_vec) ) then
+  if ( t .le. minval(t_vec)-eps ) then
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
-  if ( t .ge. maxval(t_vec) ) then
+  if ( t .ge. maxval(t_vec)+eps ) then
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
