@@ -367,10 +367,10 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     else if ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
       ispace = 5 
 
-    else if ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseries_ob' ) then
       ispace = 6 
 
-    else if ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseries_ib' ) then
       ispace = 7
 
     else
@@ -379,7 +379,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                     trim(type_span_list(iRegion))
       call error(this_sub_name, this_mod_name, 'Inconsistent input: &
             & type_span must be equal to uniform, cosine, cosineIB,&
-            & cosineOB, equalarea, geoseries, geoseriesOB, geoseriesIB.')
+            & cosineOB, equalarea, geoseries, geoseries_ob, geoseries_ib.')
     end if
 
     !> save before update
@@ -549,8 +549,8 @@ end subroutine read_mesh_ll
 !!   ISPACE = 3    right cosine spacing
 !!   ISPACE = 4    equalarea spacing
 !!   ISPACE = 5    geoseries 
-!!   ISPACE = 6    geoseriesOB
-!!   ISPACE = 7    geoseriesIB
+!!   ISPACE = 6    geoseries_ob
+!!   ISPACE = 7    geoseries_ib
 
 function spacing_weights ( itype, i, n ) result(w)
 

@@ -1016,12 +1016,12 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
       rr(i,2) = division(i-1) 
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
       rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
-    elseif ( trim(type_span) .eq. 'geoseriesOB') then
+    elseif ( trim(type_span) .eq. 'geoseries_ob') then
       call geoseries(r1(2), r2(2), nelems, 1/10.0_wp, divisionIB, divisionOB) 
       rr(i,2) = divisionIB(i-1) 
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
       rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))  
-    elseif ( trim(type_span) .eq. 'geoseriesIB') then
+    elseif ( trim(type_span) .eq. 'geoseries_ib') then
       call geoseries(r1(2), r2(2), nelems, 1/10.0_wp, divisionIB, divisionOB)  
       rr(i,2) = divisionOB(i-1) 
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
@@ -1528,7 +1528,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
     call pmesh_prs%CreateStringOption('type_chord', &
                   'type of chord-wise division: uniform, cosine, &
                   &cosineLE, cosineTE, geoseries, geoseriesLE, &
-                  &geoseriesTE, geoseriesHI', 'uniform', & 
+                  &geoseriesTE, geoseries_hi', 'uniform', & 
                   multiple=.false.)
     
     !> geometric series parameters 
