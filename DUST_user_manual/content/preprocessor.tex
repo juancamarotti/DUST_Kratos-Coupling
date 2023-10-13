@@ -726,8 +726,8 @@ A representation of sections and regions employed for the generation of a wing i
 The body is generated from the first section, starting from the specified starting point, and it is extruded along the y axis, 
 with the x axis pointing from the leading edge towards the trailing edge and the z axis normal to the x-y plane. 
 The type of geometry generated depends on the type of elements required. If surface panels are required the full 
-three dimensional geometry will be generated, if vortex lattice elements are required only the flat, mean line 
-surface will be generated and finally if lifting line elements are required only a one dimensional line will be generated. 
+three dimensional geometry will be generated, if vortex lattice elements are required only the mean line 
+surface will be generated, and finally if lifting line elements are required, only a one dimensional line will be generated. 
 Finally the mirroring of the geometry introduced for user generated meshes is available also for parametric geometries.
 
 All the detailed parameters of the geometry input file for parametric geometry are:
@@ -754,7 +754,7 @@ Scaling factor to apply to the loaded points. Allows to scale the coordinates of
 
 offset and scaling are applied in the following order:
 \begin{equation*}
-\mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
+  \mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
 \end{equation*}
 
 
@@ -820,16 +820,33 @@ according to the input twist.
 \item \param{nelem\_chord} \textit{required:} yes, if parametric. \textit{multiple:} no. \textit{type:} integer.
 
 Number of elements in chord direction. Note: if the elements are vortex lattice $nelem\_chord$ 
-elements will be generated, while in case of surface panels $2nelem\_chord$ elements will be produced, 
+elements will be generated, while in case of surface panels $2\cdot nelem\_chord$ elements will be produced, 
 $nelem\_chord$ on the lower and $nelem\_chord$ on the upper side. In case of lifting lines this parameter is ignored.
 
 \item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} uniform \textit{type:} string.
 
-Type of subdivision in the chord-wise direction. Can be \opt{uniform} for a uniform distribution (suggested for vortex lattices), 
-\opt{cosine} for a cosine distribution, refined both on the leading and trailing edge, 
-\opt{cosineLE} for a half cosine refined only on leading edge (suggested for surface panels) or \opt{cosineTE} for a +
-half cosine refined only on the trailing edge. 
+Type of subdivision in the chord-wise direction: 
+\begin{itemize}
+  \item \opt{uniform} for a uniform distribution (suggested for vortex lattices). 
+  \item \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge.  
+  \item \opt{cosineLE} for a half cosine refined only on leading edge (suggested for surface panels). 
+  \item \opt{cosineTE} for a half cosine refined only on the trailing edge (not recommended). 
+  \item \opt{geoseries} for a geometric series distribution, refined both on the leading and trailing edge.
+  In this case, the parameters \param{r\_le} and \param{r\_te} represent the growth ratio at leading edge and 
+  trailing edge respectively. Furthermore \param{x\_refinement} represents the position of the point at which
+  the growth ratio is defined.
+  \item \opt{geoseriesLE} for a half geometric series refined only on leading edge. 
+  In this case the parameter \param{r} represents the growth ratio.
+  \item \opt{geoseriesTE} for a half geometric series refined only on the trailing edge (not recommended).
+  In this case the parameter \param{r} represents the growth ratio.
+  \item \opt{geoseriesHI} for a geometric series distribution, refined both on the leading and trailing edge, 
+  and where an hinge axis is present (although can work also for components without hinge). 
+  In this case, the parameters \param{r\_le\_fix} and \param{r\_te\_fix} represent the growth ratio at leading edge and
+  trailing edge respectively of the fixed part of the profile, while \param{r\_le\_moving} and \param{r\_te\_moving} 
+  represent the growth ratio at leading edge and trailing edge respectively of the moving part. 
+  Furthermore \param{x\_refinement} represents the position the hinge axis. 
+\end{itemize}
 
 \item \param{chord} \textit{required:} at least 2. \textit{multiple:} yes. \textit{type:} real.
 
@@ -876,11 +893,20 @@ Number of elements in the spanwise direction, in the single region.
 \item \param{type\_span} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} string.
 
 type of refinement of the elements in the spanwise direction. As for the chordwise direction, 
-the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both 
-inboard and outboard, and \opt{cosine_ib} and \opt{cosine_ob} for half cosine refinement only inboard or outboard. 
-\opt{equalarea} employed a equal-annuli mesh subdivision: this is useful for rotating blades since it guarantees the constant 
-area for each trailed-wake panel. 
-  
+the options are:
+\begin{itemize}
+  \item \opt{uniform} for a uniform distribution, 
+  \item \opt{cosine} for a cosine refinement both inboard and outboard
+  \item \opt{cosine_ib} for half cosine refinement only inboard
+  \item \opt{cosine_ob} for half cosine refinement only outboard. 
+  \item \opt{equalarea} employed a equal-annuli mesh subdivision: this is useful for rotating blades since it guarantees the constant 
+  area for each trailed-wake panel.
+  \item \opt{geoseries} for a geometric series distribution, refined both inboard and outboard.
+  In this case, the parameters \param{r\_ib} and \param{r\_ob} represent the growth ratio inboard and outboard respectively. 
+  \item \opt{geoseriesIB} for a half geometric series refined only inboard.
+  In this case the parameter \param{r} represents the growth ratio.
+  \item \opt{geoseriesOB} for a half geometric series refined only outboard.
+  In this case the parameter \param{r} represents the growth ratio.  
 \end{itemize}
 
 %TODO: actuator disk?

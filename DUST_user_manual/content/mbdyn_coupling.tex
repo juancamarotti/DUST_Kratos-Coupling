@@ -1,5 +1,7 @@
 \chapter{Coupling with a structural software through preCICE}
+\label{chap:preCICE}
 \section{Introduction}
+\label{sec:preCICEintro} 
 The communication between DUST and MBDyn is managed by preCICE 
 (Precise Code Interaction Coupling Environment), a coupling library for partitioned 
 multi-physics simulations, originally developed for fluid-structure interaction 
@@ -53,6 +55,7 @@ In the DUST solver input file, a new keyword is added:
     Path of the preCICE XML configuration file.
 \end{itemize}
 \subsection{preCICE XML}
+\label{subsec:preCICEXML}
 preCICE needs to be configured at runtime via an \texttt{xml} file, 
 typically named \texttt{precice-config.xml}. Here, you specify which 
 solvers participate in the coupled simulation, which coupling data 
@@ -211,8 +214,9 @@ Anderson acceleration, \texttt{IQN-IMVJ} aka. generalized Broyden).
 For more details, see \url{https://precice.org}.
 
 \section{Coupling example}
-
+\label{sec:couplingexample}
 \subsection{MBDyn external force}
+\label{subsec:MBDynexternalforce}
 The aerodynamic loads computed by DUST are introduced in the MBDyn model as an external structural force acting on some nodes\footnote[1]{All the examples are taken form the \texttt{coupled\_wing} example}.
 \begin{inputfile}[frame=single, caption={}, label={}]
   force: 9, external structural,

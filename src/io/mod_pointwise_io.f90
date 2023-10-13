@@ -163,7 +163,10 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   !> Point and line structures
   type(t_point) , allocatable                                       :: points(:)
   type(t_line ) , allocatable                                       :: lines(:)
-
+  !> geo series mesh
+  real(wp)                                                          :: r , r_le , r_te , r_le_fix 
+  real(wp)                                                          :: r_le_moving , r_te_fix , r_te_moving 
+  real(wp)                                                          :: x_refinement
   !> ee, rr size
   integer                                                           :: nelem_chord_tot, npoint_chord_tot, npoint_span_tot
   integer                                                           :: ee_size , rr_size
@@ -201,9 +204,19 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   type_chord  = getstr(pmesh_prs,'type_chord')
+  !> geo series mesh 
+  r = getreal(pmesh_prs,'r')
+  r_le = getreal(pmesh_prs,'r_le')
+  r_te = getreal(pmesh_prs,'r_te')
+  r_le_fix = getreal(pmesh_prs,'r_le_fix')
+  r_le_moving = getreal(pmesh_prs,'r_le_moving')
+  r_te_fix = getreal(pmesh_prs,'r_te_fix')
+  r_te_moving = getreal(pmesh_prs,'r_te_moving')
+  x_refinement = getreal(pmesh_prs,'x_refinement')
+  !> end geo series mesh
   ElType = trim(getstr(pmesh_prs,'ElType'))
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
-  aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
+  aero_table = getlogical(pmesh_prs,     'airfoil_table_correction')
   
   !> Read points and lines
   call read_points ( ElType, pmesh_prs , point_prs , points , aero_table)
@@ -274,7 +287,8 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   end if 
 
   allocate(chord_fraction(nelem_chord+1))
-  call define_division(type_chord, nelem_chord, chord_fraction)
+  call define_division(type_chord, nelem_chord, chord_fraction, &
+                      r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
 
   if (present(thickness)) then 
     allocate(thickness(2,size(points)))

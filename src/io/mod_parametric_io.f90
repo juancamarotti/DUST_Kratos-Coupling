@@ -122,7 +122,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   character(len=max_char_len), allocatable , intent(out), optional :: airfoil_list_actual(:)
   integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
   real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)
-
+  !> geometric series parameters
+  real(wp)                                  :: r, r_le, r_te, r_le_fix, r_te_fix, r_le_moving, r_te_moving
+  real(wp)                                  :: x_refinement
   !> hinge mesh 
   real(wp), allocatable                     :: rrv_le(:,:), rrv_te(:,:), ac_line(:,:) 
   integer                                   :: ih, ia
@@ -139,6 +141,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp), allocatable                     :: sweep_list(:) 
   real(wp), allocatable                     :: dihed_list(:)
   real(wp), allocatable                     :: division(:), divisionIB(:), divisionOB(:) 
+  !> geometric series parameters (region)
+  real(wp), allocatable                     :: r_in_list(:), r_ob_list(:), r_span_list(:)
+  real(wp), allocatable                     :: y_ref_list(:)
+
   logical                                   :: adjust_xz = .false.
   character(len=max_char_len), allocatable  :: type_span_list(:)
   integer                                   :: n_type_span
@@ -201,11 +207,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! - the point around which the sections are rotated to impose twist
 
 
-  ! Section parameters
-  ! already there (few lines above) as a characteristic of the whole component !!!
-  ! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section 
-  !                (as a fraction of the chord)',&
-  !               multiple=.true.);
+  !> Section parameters
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
                 multiple=.true.)
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
@@ -224,15 +226,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
                 & fixed part', '1/8', multiple=.false.)
   call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
-                & fixed part', '1/7.0', multiple=.false.)
+                & fixed part', '1/7', multiple=.false.)
   call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
                 & moving part', '1/7', multiple=.false.)
   call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                & moving part', '1/7', multiple=.false.) 
-  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
                 & moving part', '1/10', multiple=.false.) 
   call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
-                '1/2', multiple=.false.)
+                '0.5', multiple=.false.)
 
   !> Region parameters
   call pmesh_prs%CreateRealOption(    'span', 'region span',&
@@ -248,13 +248,11 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                 multiple=.true.)
 
   !> geoseries parameters (region)
-  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
+  call pmesh_prs%CreateRealOption('r_in', 'growth ratio of the elements inboard', &
                 multiple=.true.)
-  call pmesh_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
+  call pmesh_prs%CreateRealOption('r_ob', 'growth ratio of the elements at outboard', &
                 multiple=.true.)
-  call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
-                multiple=.true.)
-  call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
+  call pmesh_prs%CreateRealOption('y_refinement', 'spanwise station to which the refinement start', &
                 multiple=.true.) 
   
   !> Read the parameters
@@ -266,6 +264,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   nSections = countoption(pmesh_prs, 'chord')
   nRegions  = countoption(pmesh_prs, 'span')
   aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
+
+  !> geometric series parameters 
+  r = getreal(pmesh_prs, 'r')
+  r_le = getreal(pmesh_prs, 'r_le')
+  r_te = getreal(pmesh_prs, 'r_te')
+  r_le_fix = getreal(pmesh_prs, 'r_le_fix')
+  r_te_fix = getreal(pmesh_prs, 'r_te_fix')
+  r_le_moving = getreal(pmesh_prs, 'r_le_moving')
+  r_te_moving = getreal(pmesh_prs, 'r_te_moving')
+  x_refinement = getreal(pmesh_prs, 'x_refinement')
+
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Unconsistent input: &
@@ -287,6 +296,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
         &number of "sweep" different from number of regions.')
+
   if(countoption(pmesh_prs,'twist') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
         &number of "twist" different from number of sections.')
@@ -299,13 +309,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(      span_list(nRegions));         span_list = 0.0_wp
   allocate(     sweep_list(nRegions));        sweep_list = 0.0_wp
   allocate(     dihed_list(nRegions));        dihed_list = 0.0_wp
+  allocate(    r_span_list(nRegions));       r_span_list = 0.0_wp
+  allocate(     y_ref_list(nRegions));        y_ref_list = 0.0_wp
+  allocate(      r_in_list(nRegions));         r_in_list = 0.0_wp
+  allocate(      r_ob_list(nRegions));         r_ob_list = 0.0_wp 
 
   nelem_span_tot = 0
   do iRegion = 1,nRegions
     nelem_span_list(iRegion) = getint(pmesh_prs,'nelem_span')
-    span_list(iRegion)  = getreal(pmesh_prs,    'span' )
-    sweep_list(iRegion) = getreal(pmesh_prs,    'sweep')
-    dihed_list(iRegion) = getreal(pmesh_prs,    'dihed')
+    span_list(iRegion)       = getreal(pmesh_prs,    'span' )
+    sweep_list(iRegion)      = getreal(pmesh_prs,    'sweep')
+    dihed_list(iRegion)      = getreal(pmesh_prs,    'dihed')
     nelem_span_tot = nelem_span_tot + nelem_span_list(iRegion)
   enddo
 
@@ -319,15 +333,25 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   else if ( n_type_span .eq. nRegions ) then
     do iRegion = 1 , nRegions
       type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
+      !> check geometry series type 
+      if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
+        y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
+        r_in_list(iRegion)       = getreal(pmesh_prs,   'r_in')
+        r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
+      elseif (trim(type_span_list(iRegion)) .eq. 'geoseriesIB') then 
+        r_in_list(iRegion)       = getreal(pmesh_prs,   'r_in')
+      elseif (trim(type_span_list(iRegion)) .eq. 'geoseriesOB') then
+        r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob')
+      endif
     end do
   else
-  write(*,*) ' Mesh file   : ' , trim(mesh_file)
-  write(*,*) ' Number of span element distribution type definitions &
-              &(type_span): ' , n_type_span
-  write(*,*) ' Number of regions : ' , nRegions
-  call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-          & the number of type of span element distribution defined is &
-          &different from the number of span regions')
+    write(*,*) ' Mesh file   : ' , trim(mesh_file)
+    write(*,*) ' Number of span element distribution type definitions &
+                &(type_span): ' , n_type_span
+    write(*,*) ' Number of regions : ' , nRegions
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+            & the number of type of span element distribution defined is &
+            &different from the number of span regions')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
@@ -473,8 +497,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
               !> hinge node adimensional location along chord
               hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
-              
-
           endif    
 
           if ((hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1)) .and. & 
@@ -560,7 +582,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         delta_x(ia) = csi_hinge(ia)
         point_region(ia) = floor(real(nelem_chord,wp)*delta_x(ia))
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
-        call define_division(type_chord, point_region(ia), csi_adim)
+        call define_division(type_chord, point_region(ia), csi_adim, & 
+                            r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
+
         chord_fraction(1:point_region(ia) + 1) = delta_x(ia)*csi_adim 
         deallocate(csi_adim)
 
@@ -571,7 +595,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         point_region(ia) = nelem_chord - sum(point_region(1:ia - 1)) 
         
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
-        call define_division(type_chord, point_region(ia), csi_adim)
+        call define_division(type_chord, point_region(ia), csi_adim , &
+                            r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
+
         chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region) + 1) ) = & 
             (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)  
         deallocate(csi_adim) 
@@ -583,7 +609,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         point_region(ia) = floor(real(nelem_chord,wp)*delta_x_no_off(ia)) 
         
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
-        call define_division(type_chord, point_region(ia), csi_adim)
+        call define_division(type_chord, point_region(ia), csi_adim, & 
+                            r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement) 
+
         chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region(1:ia)) + 1) ) = & 
             (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)   
       
@@ -592,7 +620,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     enddo 
     deallocate(point_region, ac_line, rrv_le, rrv_te)
   else
-    call define_division(type_chord, nelem_chord, chord_fraction)
+    call define_division(type_chord, nelem_chord, chord_fraction, & 
+                        r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
   endif 
   
   ! Initialize the span division to the maximum dimension
@@ -766,24 +795,24 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
           do j = 1, npoint_chord_tot
-            call geoseries_both(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 0.5_wp,& 
-                                1/10.0_wp, 1/10.0_wp, division)  
+            call geoseries_both(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), & 
+                                y_ref_list(iRegion), r_in_list(iRegion), r_ob_list(iRegion), division)  
             rr(2, ista + j - 1) = division(i1 + 1)
           enddo 
           adjust_xz = .true.
 
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
           do j = 1, npoint_chord_tot
-            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 1/10.0_wp, &
-                          divisionIB, divisionOB)  
+            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), & 
+                          r_ob_list(iRegion), divisionIB, divisionOB)  
             rr(2, ista + j - 1) = divisionOB(i1 + 1)
           enddo 
           adjust_xz = .true.
 
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
           do j = 1, npoint_chord_tot
-            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), 1/10.0_wp, &
-                          divisionIB, divisionOB)  
+            call geoseries(rrSection1(2,j), rrSection2(2,j), nelem_span_list(iRegion), &
+                          r_in_list(iRegion), divisionIB, divisionOB)  
             rr(2, ista + j - 1) = divisionIB(i1 + 1)
           enddo 
           adjust_xz = .true.
@@ -841,13 +870,15 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
           interp_weight = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp))
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
-          call geoseries_both(0.0_wp, 1.0_wp, nelem_span_list(iRegion), 0.5_wp, 1/10.0_wp, 1/10.0_wp, division)
+          call geoseries_both(0.0_wp, 1.0_wp, nelem_span_list(iRegion), &
+                              y_ref_list(iRegion), r_in_list(iRegion), r_ob_list(iRegion), division)
           interp_weight = division(i1 + 1) 
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesOB' ) then
-          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), 1/10.0_wp, divisionIB, divisionOB)
+          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), & 
+            r_ob_list(iRegion), divisionIB, divisionOB)
           interp_weight = divisionOB(i1 + 1) 
         elseif ( trim(type_span_list(iRegion)) .eq. 'geoseriesIB' ) then
-          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), 1/10.0_wp, divisionIB, divisionOB)
+          call geoseries(0.0_wp, 1.0_wp, nelem_span_list(iRegion), r_in_list(iRegion), divisionIB, divisionOB)
           interp_weight = divisionIB(i1 + 1) 
         else
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
@@ -1741,21 +1772,24 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
 end subroutine read_airfoil
 
 !-------------------------------------------------------------------------------
-subroutine define_division(type_mesh, nelem, division)
+subroutine define_division(type_mesh, nelem, division, &
+                          r, r_le, r_te, r_le_aft, r_te_aft, r_le_fore, r_te_fore, xh)
 
   integer, intent(in)                :: nelem
+  real(wp), intent(in)               :: r, r_le, r_te, r_le_aft
+  real(Wp), intent(in)               :: r_te_aft, r_le_fore, r_te_fore, xh
   character(len=*), intent(in)       :: type_mesh
   real(wp), allocatable, intent(out) :: division(:)
 
   real(wp),        allocatable       :: division_(:)
-  real(wp),        parameter         :: r = 1/8.0_wp
-  real(wp),        parameter         :: r_le = 1/7.0_wp
-  real(wp),        parameter         :: r_te = 1/15.0_wp
-  real(wp),        parameter         :: r_le_aft = 1/8.0_wp
-  real(wp),        parameter         :: r_te_aft = 1/7.0_wp
-  real(wp),        parameter         :: r_le_fore = 1/7.0_wp
-  real(wp),        parameter         :: r_te_fore = 1/7.0_wp
-  real(wp),        parameter         :: xh = 0.75_wp
+  !real(wp),        parameter         :: r = 1/8.0_wp
+  !real(wp),        parameter         :: r_le = 1/7.0_wp
+  !real(wp),        parameter         :: r_te = 1/15.0_wp
+  !real(wp),        parameter         :: r_le_aft = 1/8.0_wp
+  !real(wp),        parameter         :: r_te_aft = 1/7.0_wp
+  !real(wp),        parameter         :: r_le_fore = 1/7.0_wp
+  !real(wp),        parameter         :: r_te_fore = 1/7.0_wp
+  !real(wp),        parameter         :: xh = 0.75_wp
   real(wp)                           :: step
   integer                            :: iPoint
   character(len=*), parameter        :: this_sub_name = 'define_division'
