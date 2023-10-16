@@ -34,17 +34,31 @@ in most Linux distributions.
 
 #### Compilers
   ```bash
-  $ sudo apt install gcc g++ gfortran
+  sudo apt install gcc g++ gfortran
   ```
 </details>
 
 <details>
   <summary markdown="span">Libraries</summary>
 
-#### Libraries
+#### Libraries (Ubuntu)
   ```bash
-  $ sudo apt install liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
+  sudo apt install cmake liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
   ```
+
+#### Libraries (Apple) 
+
+  ```bash
+  brew install cmake lapack blas openblas cgns hdf5 llvm
+  ```
+Then export llvm libraries: 
+
+  ```bash
+  export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+  export LDFLAGS="-I/opt/homebrew/opt/llvm/include" 
+  echo 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"' >> ~/.zshrc 
+  ```
+
 </details>
 
 <details>
@@ -61,11 +75,22 @@ in most Linux distributions.
 - Configure cmake with standard options:
 
   ```bash
-  $ cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
+  cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
   ```
   where:
   - **$CMAKE_BUILD_TYPE** can be **Release** or **Debug**
   - **$WITH_PRECICE** can be **YES** or **NO**
+
+  For example: 
+
+  ```bash
+  cmake -DCMAKE_BUILD_TYPE=Release -DWITH_PRECICE=NO ../
+  ```
+  - For Apple compiler, the CGNS folder is located in /opt/homebrew, therefore the cmake command will be:
+
+  ```bash
+  cmake -DCMAKE_BUILD_TYPE=Release -DWITH_PRECICE=NO -DCGNS_LIB=/opt/homebrew/lib -DCGNS_LIB=/opt/homebrew/include ../
+  ```
 
 - If you want to compile with intel MKL libraries first:
   ```bash
@@ -73,19 +98,19 @@ in most Linux distributions.
   ```
   then: 
   ```bash
-  $ cmake -DDUST_MKL=YES ../ 
+  cmake -DDUST_MKL=YES ../ 
   ``` 
   
 - Build DUST:
 
   ```bash
-  $ make
+  make
   ```
 
 - Install DUST (with root privileges if needed):
 
   ```bash
-  $ sudo make install
+  sudo make install
   ```
   The default install folder should be /usr/local/bin
 
