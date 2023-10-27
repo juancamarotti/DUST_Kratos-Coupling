@@ -55,6 +55,9 @@ use mod_param, only: &
 
 use mod_handling, only: &
   error, warning, printout
+
+use mod_basic_io, only: &
+  read_real_array_from_file  
   
 use mod_hdf5_io, only: &
   h5loc, write_hdf5_attr, open_hdf5_file, close_hdf5_file, read_hdf5
@@ -272,6 +275,14 @@ type t_sim_param
   logical :: reset_time
 
   !Variable wind
+  !> Use time-varying free stream velocity
+  logical  :: variable_u_inf
+    !> Filename for time-varying free stream velocity
+    character(len=max_char_len) :: u_inf_filen
+    real(wp), allocatable :: u_inf_mat(:,:)
+    real(wp), allocatable :: u_inf_comps(:,:)
+    real(wp), allocatable :: u_inf_time(:)
+    integer                 :: nt_u_inf
   !> Gust
   logical :: use_gust
   !> Gust type
@@ -360,7 +371,7 @@ subroutine create_param_main(prms)
   call prms%CreateRealOption('rho_inf', "free stream density", '1.225')   
   call prms%CreateRealOption('a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
   call prms%CreateRealOption('mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
-  
+
   !> Wake 
   call prms%CreateIntOption('n_wake_panels', 'number of wake panels','1')
   call prms%CreateIntOption('n_wake_particles', 'number of wake particles', '10000')
@@ -497,8 +508,10 @@ subroutine create_param_main(prms)
   call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
   
   !> Variable wind
+  call prms%CreateLogicalOption('variable_u_inf', "Use time-varying free stream velocity", 'F')
+  call prms%CreateStringOption('variable_u_inf_file', "file .dat containing time + time-varying Ux, Uy, Uz")
   call prms%CreateLogicalOption('gust','Gust perturbation','F')
-  call prms%CreateStringOption('gust_type','Gust model','ACM')
+  call prms%CreateStringOption('gust_type','Gust model','AMC')
   call prms%CreateRealArrayOption('gust_origin','Gust origin point')
   call prms%CreateRealArrayOption('gust_front_direction','Gust front direction vector')
   call prms%CreateRealOption('gust_front_speed','Gust front speed')
@@ -647,6 +660,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%mu_inf              = getreal(prms,'mu_inf')
   sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
   sim_param%u_inf               = getrealarray(prms, 'u_inf', 3)
+  
   !> Check on reference velocity
   if ( countoption(prms,'u_ref') .gt. 0 ) then
     sim_param%u_ref = getreal(prms, 'u_ref')
@@ -842,6 +856,21 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   endif
 
   !> Variable_wind
+  sim_param%variable_u_inf      = getlogical(prms,'variable_u_inf')
+  if ( sim_param%variable_u_inf) then
+    if ( countoption(prms,'variable_u_inf_file') .eq. 0 ) then
+      call error('dust', 'init_sim_param','Time-varying u_inf file .dat not defined')
+    end if
+    sim_param%u_inf_filen = trim(getstr(prms,'variable_u_inf_file'))
+    call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
+    sim_param%nt_u_inf = size(sim_param%u_inf_mat,1)
+    allocate(sim_param%u_inf_comps(3,sim_param%nt_u_inf))
+    allocate(sim_param%u_inf_time(sim_param%nt_u_inf)) 
+    ! Read time and u_inf components
+    sim_param%u_inf_time  = sim_param%u_inf_mat(:,1)
+    sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
+  end if
+
   sim_param%use_gust                      = getlogical(prms, 'gust')
 
   if(sim_param%use_gust) then
@@ -916,6 +945,21 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%n_timesteps = sim_param%n_timesteps + 1
                             !add one for the first step
   endif
+  !> If use variable u_inf is active, check the .dat file time consistency with simulation time
+  if ( sim_param%variable_u_inf) then
+    if ( sim_param%u_inf_time(1) .gt. sim_param%t0 ) then
+      write(*,*) ' beginning of the time of variable u_inf : ' , sim_param%u_inf_time(1)
+      write(*,*) ' beginning of the simulation time : ' , sim_param%t0
+      call error('dust','init_sim_param','Error in variable u_inf. &
+        & Initial time value of the .dat file greater than initial simulation time.')
+    end if
+    if ( sim_param%u_inf_time(size(sim_param%u_inf_time)) .lt. sim_param%tend ) then
+        write(*,*) ' end of the time of variable u_inf' , sim_param%u_inf_time(size(sim_param%u_inf_time))
+        write(*,*) ' end of the time in simulation time : ' , sim_param%tend
+        call error('dust','init_sim_param','Error in variable u_inf. &
+          & Final time value of the .dat file lower than final simulation time.')
+    end if
+  end if
 
 end subroutine init_sim_param
 

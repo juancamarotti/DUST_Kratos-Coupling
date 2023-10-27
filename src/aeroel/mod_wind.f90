@@ -42,6 +42,8 @@
 !!
 !! Authors:
 !!          Andrea Colli
+!!          Federico Gentile
+!!          Matteo Dall'Ora
 !!=========================================================================
 
 module mod_wind
@@ -51,6 +53,9 @@ use mod_param, only: &
 
 use mod_sim_param, only: &
   sim_param
+
+use mod_math, only: &
+  linear_interp
 !----------------------------------------------------------------------
 
 implicit none
@@ -71,12 +76,19 @@ function variable_wind(pos, time) result(wind)
   real(wp) :: wind(3)
 
   real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
-              gust_u_des, gust_perturb_direction(3), gust_gradient, &
-              gust_time, gust_perturbation(3)
+              gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time, gust_perturbation(3)
 
   real(wp) :: s
-
+  integer  :: ii
+  
   wind = sim_param%u_inf
+  
+  if (sim_param%variable_u_inf) then
+    !Interpolation of Uinf from file on DUST time
+    do ii = 1,3
+      call linear_interp( sim_param%u_inf_comps(ii,:), sim_param%u_inf_time , time , wind(ii)) 
+    end do 
+  end if
 
   if (sim_param%use_gust) then
     gust_origin = sim_param%gust_origin
@@ -109,6 +121,7 @@ function variable_wind(pos, time) result(wind)
       case default
     end select
   end if
+
 
 end function variable_wind
 

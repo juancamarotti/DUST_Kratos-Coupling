@@ -1853,7 +1853,7 @@ subroutine check_input_from_file( ref_tag_str , pol_rot_str , time_from_file , s
         &from  file in reference frame with Reference_Tag'//trim(ref_tag_str)//&
         &'. Initial time value of the motion greater than initial simulation time.')
   end if
-  if ( time_from_file(size(time_from_file)) .gt. sim_param_time(size(sim_param_time)) ) then
+  if ( time_from_file(size(time_from_file)) .lt. sim_param_time(size(sim_param_time)) ) then
       write(*,*) ' end of the time in motion specification' , time_from_file(size(time_from_file))
       write(*,*) ' end of the time in simulation time : ' , sim_param_time(size(sim_param_time))
       call error(this_sub_name, this_mod_name, 'Error in motion specification &
