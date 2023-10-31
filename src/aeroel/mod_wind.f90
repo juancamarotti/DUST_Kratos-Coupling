@@ -85,12 +85,14 @@ function variable_wind(pos, time) result(wind)
   
   if (sim_param%time_varying_u_inf) then
     !Interpolation of Uinf from file on DUST time
-    do ii = 1,3
-      call linear_interp( sim_param%u_inf_comps(ii,:), sim_param%u_inf_time , time , wind(ii)) 
+    do ii = 1, 3
+      call linear_interp(sim_param%u_inf_comps(ii,:), sim_param%u_inf_time, &
+                          time , wind(ii)) 
     end do 
   else if (sim_param%non_uniform_u_inf) then
-    do ii = 1,3
-      call linear_interp( sim_param%u_inf_comps(ii,:), sim_param%u_inf_coord, pos(sim_param%non_uniform_u_inf_dir) , wind(ii)) 
+    do ii = 1, 3
+      call linear_interp( sim_param%u_inf_comps(ii,:), sim_param%u_inf_coord, &
+                          pos(sim_param%non_uniform_u_inf_dir) , wind(ii)) 
     end do
   end if
 
@@ -110,18 +112,18 @@ function variable_wind(pos, time) result(wind)
       case('ACM')
         ! penetration distance
         ! distance from the gust front, negative for the gust approaching
-        s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*&
-                      (time-gust_time)))*gust_front_direction)
+        s = -dot_product((pos-(gust_origin+gust_front_speed * gust_front_direction * &
+                          (time-gust_time))), gust_front_direction)
 
         if (s .ge. 0.0_wp .and. s .lt. 2.0_wp*gust_gradient) then
           wind = wind + gust_perturbation/2*(1.0_wp-cos(pi*s/gust_gradient))
         end if
 
       case('linear') ! for testing
-        s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/&
-                                                            norm2(sim_param%u_inf)
+        s = dot_product((pos-(gust_origin+sim_param%u_inf*time)), &
+                        sim_param%u_inf)/norm2(sim_param%u_inf)
 
-        wind = wind + real(pos(1),wp)*(/0.0_wp, 0.0_wp, 0.1_wp/) !s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
+        wind = wind + real(pos(1),wp)*(/0.0_wp, 0.0_wp, 0.1_wp/) 
       case default
     end select
   end if

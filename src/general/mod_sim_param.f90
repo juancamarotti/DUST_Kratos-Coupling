@@ -281,13 +281,13 @@ type t_sim_param
   logical  :: non_uniform_u_inf
     !> Filename for time-varying or non-uniform free stream velocity
     character(len=max_char_len) :: u_inf_filen
-    real(wp), allocatable :: u_inf_mat(:,:)
-    real(wp), allocatable :: u_inf_comps(:,:)
-    real(wp), allocatable :: u_inf_time(:)
-    real(wp), allocatable :: u_inf_coord(:)
-    integer                 :: non_uniform_u_inf_dir
-    integer                 :: nt_u_inf
-    integer                 :: nc_u_inf
+    real(wp), allocatable       :: u_inf_mat(:,:)
+    real(wp), allocatable       :: u_inf_comps(:,:)
+    real(wp), allocatable       :: u_inf_time(:)
+    real(wp), allocatable       :: u_inf_coord(:)
+    integer                     :: non_uniform_u_inf_dir
+    integer                     :: nt_u_inf
+    integer                     :: nc_u_inf
   !> Gust
   logical :: use_gust
   !> Gust type
@@ -330,7 +330,7 @@ contains
 end type t_sim_param
 
 type(t_sim_param) :: sim_param
-
+character(len=*), parameter     :: this_mod_name = 'mod_sim_param'
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -647,10 +647,12 @@ end subroutine create_param_post
 
 !> Initialize all the parameters reading them from the the input file
 subroutine init_sim_param(sim_param, prms, nout, output_start)
-  class(t_sim_param)      :: sim_param
-  type(t_parse)           :: prms
-  integer, intent(inout)  :: nout
-  logical, intent(inout)  :: output_start
+  class(t_sim_param)          :: sim_param
+  type(t_parse)               :: prms
+  integer, intent(inout)      :: nout
+  logical, intent(inout)      :: output_start
+
+  character(len=*), parameter :: this_sub_name = 'init_sim_param'
   
   !> Timing
   sim_param%t0                  = getreal(prms, 'tstart')
@@ -674,7 +676,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   else
     sim_param%u_ref = norm2(sim_param%u_inf)
     if (sim_param%u_ref .le. 0.0_wp) then
-      call error('dust','dust','No reference velocity u_ref provided but &
+      call error(this_mod_name, this_sub_name,'No reference velocity u_ref provided but &
       &zero free stream velocity. Provide a non-zero reference velocity. &
       &Stopping now before producing invalid results')
     endif
@@ -702,7 +704,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !> Check on wake panels
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
-    call warning('dust','dust','imposed a number of wake panels rows &
+    call warning(this_mod_name, this_sub_name,'imposed a number of wake panels rows &
                 &LOWER THAN 1. At least one row of panels is mandatory, &
                 &the simulation will proceed with "n_wake_panels = 1"')
   endif
@@ -710,7 +712,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
       sim_param%rigid_wake_vel    = getrealarray(prms, 'rigid_wake_vel',3)
     else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
-      call warning('dust','dust','no rigid_wake_vel parameter set, &
+      call warning(this_mod_name, this_sub_name,'no rigid_wake_vel parameter set, &
             &with rigid_wake = T; rigid_wake_vel = u_inf')
       sim_param%rigid_wake_vel    = sim_param%u_inf
     end if
@@ -726,15 +728,15 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%ReferenceFile         = getstr(prms, 'reference_file')
 
   !> Method parameters
-  sim_param%FarFieldRatioDoublet  = getreal(prms, 'far_field_ratio_doublet')
-  sim_param%FarFieldRatioSource   = getreal(prms, 'far_field_ratio_source')
-  sim_param%DoubletThreshold      = getreal(prms, 'doublet_threshold')
-  sim_param%RankineRad            = getreal(prms, 'rankine_rad')
-  sim_param%VortexRad             = getreal(prms, 'vortex_rad')
-  sim_param%KVortexRad             = getreal(prms, 'k_vortex_rad')
-  sim_param%CutoffRad             = getreal(prms, 'cutoff_rad')
-  sim_param%first_panel_scaling   = getreal(prms, 'implicit_panel_scale')
-  sim_param%min_vel_at_te         = getreal(prms, 'implicit_panel_min_vel')
+  sim_param%FarFieldRatioDoublet  = getreal(prms,    'far_field_ratio_doublet')
+  sim_param%FarFieldRatioSource   = getreal(prms,    'far_field_ratio_source')
+  sim_param%DoubletThreshold      = getreal(prms,    'doublet_threshold')
+  sim_param%RankineRad            = getreal(prms,    'rankine_rad')
+  sim_param%VortexRad             = getreal(prms,    'vortex_rad')
+  sim_param%KVortexRad            = getreal(prms,    'k_vortex_rad')
+  sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
+  sim_param%first_panel_scaling   = getreal(prms,    'implicit_panel_scale')
+  sim_param%min_vel_at_te         = getreal(prms,    'implicit_panel_min_vel')
   sim_param%use_vs                = getlogical(prms, 'vortstretch')
   sim_param%vs_elems              = getlogical(prms, 'vortstretch_from_elems')
   sim_param%use_vd                = getlogical(prms, 'diffusion')
@@ -762,10 +764,9 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'll_artificial_viscosity_adaptive')
   sim_param%llLoadsAVL                      = getlogical(prms, 'll_loads_avl')
   !> check LL inputs
-  if ((trim(sim_param%llSolver) .ne. 'GammaMethod') .and. &
-      (trim(sim_param%llSolver) .ne. 'AlphaMethod')) then
+  if (trim(sim_param%llSolver) .ne. 'GammaMethod') then
     write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
-    call warning('dust','init_sim_param',' Wrong string for LLsolver. &
+    call warning(this_mod_name, this_sub_name,' Wrong string for LLsolver. &
                 &This parameter is set equal to "GammaMethod" (default) &
                 &in init_sim_param() routine.')
     sim_param%llSolver = 'GammaMethod'
@@ -773,7 +774,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 
   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then
     if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
-      call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
+      call warning(this_mod_name, this_sub_name,'LLartificialViscoisty set as an input, &
           & different from zero, but ll regularisation available only if&
           & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
       sim_param%llArtificialViscosity = 0.0_wp
@@ -782,7 +783,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
     end if
     if ( sim_param%llArtificialViscosityAdaptive ) then
-      call warning('dust','init_sim_param','LLartificialViscosityAdaptive set&
+      call warning(this_mod_name, this_sub_name,'LLartificialViscosityAdaptive set&
           & as an input, but ll adaptive regularisation available only if&
           & LLsolver = AlphaMethod')
     end if
@@ -793,7 +794,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     if (sim_param%llArtificialViscosityAdaptive) then
       if ((countoption(prms,'ll_artificial_viscosity_adaptive_alpha')  .eq. 0) .or. &
           (countoption(prms,'ll_artificial_viscosity_adaptive_dalpha') .eq. 0)) then
-        call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
+        call error(this_mod_name, this_sub_name,'LLartificialViscosityAdaptive_Alpha or&
           & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
           & is set equal to T. Set these parameters [deg].')
       else
@@ -867,34 +868,36 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%non_uniform_u_inf       = getlogical(prms,'non_uniform_u_inf')
   
   if ( sim_param%time_varying_u_inf .and. sim_param%non_uniform_u_inf ) then
-    call error('dust', 'init_sim_param','u_inf can not be both non-uniform and time-varying')
+    call error(this_mod_name, this_sub_name,'u_inf can not be both non-uniform and time-varying')
   end if
 
   if ( sim_param%time_varying_u_inf) then
     if ( countoption(prms,'u_inf_file') .eq. 0 ) then
-      call error('dust', 'init_sim_param','Time-varying u_inf file .dat not defined')
+      call error(this_mod_name, this_sub_name,'Time-varying u_inf file .dat not defined')
     end if
     sim_param%u_inf_filen = trim(getstr(prms,'u_inf_file'))
+    !>  Read time and u_inf components
     call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
     sim_param%nt_u_inf = size(sim_param%u_inf_mat,1)
     allocate(sim_param%u_inf_comps(3,sim_param%nt_u_inf))
     allocate(sim_param%u_inf_time(sim_param%nt_u_inf)) 
-    ! Read time and u_inf components
+    
     sim_param%u_inf_time  = sim_param%u_inf_mat(:,1)
     sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
-  else if ( sim_param%non_uniform_u_inf) then
+
+  elseif (sim_param%non_uniform_u_inf) then
     if ( countoption(prms,'u_inf_file') .eq. 0 ) then
-      call error('dust', 'init_sim_param','Non-uniform u_inf file .dat not defined')
+      call error(this_mod_name, this_sub_name, 'Non-uniform u_inf file .dat not defined')
     end if 
     sim_param%u_inf_filen = trim(getstr(prms,'u_inf_file'))
     if ( countoption(prms,'non_uniform_u_inf_dir') .eq. 0 ) then
-      call error('dust', 'init_sim_param','Non uniform u_inf direction of variation not provided in dust.in')
+      call error(this_mod_name, this_sub_name, 'Non uniform u_inf direction of variation not provided in dust.in')
     end if
     sim_param%non_uniform_u_inf_dir = getint(prms, 'non_uniform_u_inf_dir')
-    if ( sim_param%non_uniform_u_inf_dir .ne. 1 .and. &
-        & sim_param%non_uniform_u_inf_dir .ne. 2 .and. &
-        & sim_param%non_uniform_u_inf_dir .ne. 3 ) then
-      call error('dust', 'init_sim_param','Non uniform u_inf direction of variation provided is neither 1, 2 or 3')
+    if (sim_param%non_uniform_u_inf_dir .ne. 1 .and. &
+        sim_param%non_uniform_u_inf_dir .ne. 2 .and. &
+        sim_param%non_uniform_u_inf_dir .ne. 3 ) then
+      call error(this_mod_name, this_sub_name, 'Non uniform u_inf direction of variation provided is neither 1, 2 or 3')
     end if
     call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
     sim_param%nc_u_inf = size(sim_param%u_inf_mat,1)
@@ -904,15 +907,15 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%u_inf_coord  = sim_param%u_inf_mat(:,1)
     sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
     if ( sim_param%u_inf_coord(1) .gt. sim_param%u_inf_coord(sim_param%nc_u_inf)) then
-      call error('dust', 'init_sim_param','Please, provide u_inf file&
+      call error(this_mod_name, this_sub_name,'Please, provide u_inf file&
                 & with coordinate column spanning from lower to greater values')
     end if
     if ( sim_param%u_inf_coord(1) .gt. sim_param%particles_box_min(sim_param%non_uniform_u_inf_dir)) then
-      call error('dust', 'init_sim_param','Velocity profile coordinates list must start& 
+      call error(this_mod_name, this_sub_name, 'Velocity profile coordinates list must start& 
                 & before or at the relative particle_box_min coordinate')
     else if (sim_param%u_inf_coord(sim_param%nc_u_inf) .lt. &
             & sim_param%particles_box_max(sim_param%non_uniform_u_inf_dir)) then
-      call error('dust', 'init_sim_param','Velocity profile coordinates list must end&
+      call error( this_mod_name, this_sub_name, 'Velocity profile coordinates list must end&
                 & after or at the relative particle_box_max coordinate')
     end if
   end if
@@ -975,8 +978,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !> Check the number of timesteps
   if(CountOption(prms,'dt') .gt. 0) then
     if( CountOption(prms,'timesteps') .gt. 0) then
-      call error('init_sim_param','dust','Both number of timesteps and dt are&
-      & set, but only one of the two can be specified')
+      call error(this_mod_name, this_sub_name, 'Both number of timesteps and dt are&
+                                              & set, but only one of the two can be specified')
     else
       !> get dt and compute number of timesteps
       sim_param%dt     = getreal(prms, 'dt')
@@ -996,13 +999,13 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     if ( sim_param%u_inf_time(1) .gt. sim_param%t0 ) then
       write(*,*) ' beginning of the time of variable u_inf : ' , sim_param%u_inf_time(1)
       write(*,*) ' beginning of the simulation time : ' , sim_param%t0
-      call error('dust','init_sim_param','Error in variable u_inf. &
+      call error(this_mod_name, this_sub_name,'Error in variable u_inf. &
         & Initial time value of the .dat file greater than initial simulation time.')
     end if
     if ( sim_param%u_inf_time(size(sim_param%u_inf_time)) .lt. sim_param%tend ) then
         write(*,*) ' end of the time of variable u_inf' , sim_param%u_inf_time(size(sim_param%u_inf_time))
         write(*,*) ' end of the time in simulation time : ' , sim_param%tend
-        call error('dust','init_sim_param','Error in variable u_inf. &
+        call error(this_mod_name, this_sub_name, 'Error in variable u_inf. &
           & Final time value of the .dat file lower than final simulation time.')
     end if
   end if
