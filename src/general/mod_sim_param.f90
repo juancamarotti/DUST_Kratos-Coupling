@@ -276,13 +276,18 @@ type t_sim_param
 
   !Variable wind
   !> Use time-varying free stream velocity
-  logical  :: variable_u_inf
-    !> Filename for time-varying free stream velocity
+  logical  :: time_varying_u_inf
+  !> Use non-uniform free stream velocity (along one direction)
+  logical  :: non_uniform_u_inf
+    !> Filename for time-varying or non-uniform free stream velocity
     character(len=max_char_len) :: u_inf_filen
     real(wp), allocatable :: u_inf_mat(:,:)
     real(wp), allocatable :: u_inf_comps(:,:)
     real(wp), allocatable :: u_inf_time(:)
+    real(wp), allocatable :: u_inf_coord(:)
+    integer                 :: non_uniform_u_inf_dir
     integer                 :: nt_u_inf
+    integer                 :: nc_u_inf
   !> Gust
   logical :: use_gust
   !> Gust type
@@ -508,8 +513,10 @@ subroutine create_param_main(prms)
   call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
   
   !> Variable wind
-  call prms%CreateLogicalOption('variable_u_inf', "Use time-varying free stream velocity", 'F')
-  call prms%CreateStringOption('variable_u_inf_file', "file .dat containing time + time-varying Ux, Uy, Uz")
+  call prms%CreateLogicalOption('time_varying_u_inf', "Use time-varying free stream velocity", 'F')
+  call prms%CreateLogicalOption('non_uniform_u_inf', "Use non-uniform free stream velocity", 'F')
+  call prms%CreateIntOption('non_uniform_u_inf_dir','Direction of variation of non-uniform u_inf')
+  call prms%CreateStringOption('u_inf_file', "file .dat containing time/coordinates + variable Ux, Uy, Uz")
   call prms%CreateLogicalOption('gust','Gust perturbation','F')
   call prms%CreateStringOption('gust_type','Gust model','AMC')
   call prms%CreateRealArrayOption('gust_origin','Gust origin point')
@@ -856,12 +863,18 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   endif
 
   !> Variable_wind
-  sim_param%variable_u_inf      = getlogical(prms,'variable_u_inf')
-  if ( sim_param%variable_u_inf) then
-    if ( countoption(prms,'variable_u_inf_file') .eq. 0 ) then
+  sim_param%time_varying_u_inf      = getlogical(prms,'time_varying_u_inf')
+  sim_param%non_uniform_u_inf       = getlogical(prms,'non_uniform_u_inf')
+  
+  if ( sim_param%time_varying_u_inf .and. sim_param%non_uniform_u_inf ) then
+    call error('dust', 'init_sim_param','u_inf can not be both non-uniform and time-varying')
+  end if
+
+  if ( sim_param%time_varying_u_inf) then
+    if ( countoption(prms,'u_inf_file') .eq. 0 ) then
       call error('dust', 'init_sim_param','Time-varying u_inf file .dat not defined')
     end if
-    sim_param%u_inf_filen = trim(getstr(prms,'variable_u_inf_file'))
+    sim_param%u_inf_filen = trim(getstr(prms,'u_inf_file'))
     call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
     sim_param%nt_u_inf = size(sim_param%u_inf_mat,1)
     allocate(sim_param%u_inf_comps(3,sim_param%nt_u_inf))
@@ -869,6 +882,39 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     ! Read time and u_inf components
     sim_param%u_inf_time  = sim_param%u_inf_mat(:,1)
     sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
+  else if ( sim_param%non_uniform_u_inf) then
+    if ( countoption(prms,'u_inf_file') .eq. 0 ) then
+      call error('dust', 'init_sim_param','Non-uniform u_inf file .dat not defined')
+    end if 
+    sim_param%u_inf_filen = trim(getstr(prms,'u_inf_file'))
+    if ( countoption(prms,'non_uniform_u_inf_dir') .eq. 0 ) then
+      call error('dust', 'init_sim_param','Non uniform u_inf direction of variation not provided in dust.in')
+    end if
+    sim_param%non_uniform_u_inf_dir = getint(prms, 'non_uniform_u_inf_dir')
+    if ( sim_param%non_uniform_u_inf_dir .ne. 1 .and. &
+        & sim_param%non_uniform_u_inf_dir .ne. 2 .and. &
+        & sim_param%non_uniform_u_inf_dir .ne. 3 ) then
+      call error('dust', 'init_sim_param','Non uniform u_inf direction of variation provided is neither 1, 2 or 3')
+    end if
+    call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
+    sim_param%nc_u_inf = size(sim_param%u_inf_mat,1)
+    allocate(sim_param%u_inf_comps(3,sim_param%nc_u_inf))
+    allocate(sim_param%u_inf_coord(sim_param%nc_u_inf)) 
+    ! Read coordinates and u_inf components
+    sim_param%u_inf_coord  = sim_param%u_inf_mat(:,1)
+    sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
+    if ( sim_param%u_inf_coord(1) .gt. sim_param%u_inf_coord(sim_param%nc_u_inf)) then
+      call error('dust', 'init_sim_param','Please, provide u_inf file&
+                & with coordinate column spanning from lower to greater values')
+    end if
+    if ( sim_param%u_inf_coord(1) .gt. sim_param%particles_box_min(sim_param%non_uniform_u_inf_dir)) then
+      call error('dust', 'init_sim_param','Velocity profile coordinates list must start& 
+                & before or at the relative particle_box_min coordinate')
+    else if (sim_param%u_inf_coord(sim_param%nc_u_inf) .lt. &
+            & sim_param%particles_box_max(sim_param%non_uniform_u_inf_dir)) then
+      call error('dust', 'init_sim_param','Velocity profile coordinates list must end&
+                & after or at the relative particle_box_max coordinate')
+    end if
   end if
 
   sim_param%use_gust                      = getlogical(prms, 'gust')
@@ -946,7 +992,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
                             !add one for the first step
   endif
   !> If use variable u_inf is active, check the .dat file time consistency with simulation time
-  if ( sim_param%variable_u_inf) then
+  if ( sim_param%time_varying_u_inf) then
     if ( sim_param%u_inf_time(1) .gt. sim_param%t0 ) then
       write(*,*) ' beginning of the time of variable u_inf : ' , sim_param%u_inf_time(1)
       write(*,*) ' beginning of the simulation time : ' , sim_param%t0

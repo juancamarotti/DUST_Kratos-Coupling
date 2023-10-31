@@ -83,11 +83,15 @@ function variable_wind(pos, time) result(wind)
   
   wind = sim_param%u_inf
   
-  if (sim_param%variable_u_inf) then
+  if (sim_param%time_varying_u_inf) then
     !Interpolation of Uinf from file on DUST time
     do ii = 1,3
       call linear_interp( sim_param%u_inf_comps(ii,:), sim_param%u_inf_time , time , wind(ii)) 
     end do 
+  else if (sim_param%non_uniform_u_inf) then
+    do ii = 1,3
+      call linear_interp( sim_param%u_inf_comps(ii,:), sim_param%u_inf_coord, pos(sim_param%non_uniform_u_inf_dir) , wind(ii)) 
+    end do
   end if
 
   if (sim_param%use_gust) then
