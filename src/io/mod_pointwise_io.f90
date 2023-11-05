@@ -133,7 +133,7 @@ contains
 !----------------------------------------------------------------------
 !> read pointwise input file and build ee, rr arrays of connectivity
 !  and point coordinates
-subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
+subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
                               npoints_chord_tot , nelem_span_tot, &
                               airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                               aero_table_out, thickness)
@@ -152,9 +152,9 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   type(t_parse) , pointer                                           :: point_prs , line_prs
   logical, intent(out), optional                                    :: aero_table_out
   logical                                                           :: aero_table
-  integer                                                           :: nelem_chord
+  integer, intent(in)                                               :: nelem_chord
   character(max_char_len)                                           :: type_chord
-  character                                                         :: ElType
+  character, intent(in)                                             :: ElType
   real(wp)                                                          :: ref_chord_fraction
 
   real(wp), allocatable                                             :: chord_fraction(:)
@@ -182,6 +182,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   real(wp) , allocatable                                            :: xy1(:,:) , xy2(:,:) , xy(:,:)
   real(wp) , allocatable                                            :: rr_s(:,:)
   real(wp)                                                          :: twist_rad , theta
+  real(wp), allocatable                                             :: dummy(:,:)
 
   real(wp)                                                          :: w1 , w2
   integer                                                           :: i , i1 , i2, j
@@ -201,9 +202,8 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   !> Enable option reading
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
-
-  nelem_chord = getint(pmesh_prs,'nelem_chord')
   type_chord  = getstr(pmesh_prs,'type_chord')
+
   !> geo series mesh 
   r = getreal(pmesh_prs,'r')
   r_le = getreal(pmesh_prs,'r_le')
@@ -214,7 +214,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   r_te_moving = getreal(pmesh_prs,'r_te_moving')
   x_refinement = getreal(pmesh_prs,'x_refinement')
   !> end geo series mesh
-  ElType = trim(getstr(pmesh_prs,'ElType'))
+
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   aero_table = getlogical(pmesh_prs,     'airfoil_table_correction')
   
@@ -296,31 +296,54 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   endif
   
   !> first point
-  call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
+  if (ElType .eq. 'v') then
+
+    call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
                       points(1)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section)
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , dummy, points(1)%xy, thickness_section )
+  else
+    call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
+                      points(1)%theta , ElType , nelem_chord             , &
+                      type_chord , chord_fraction , ref_chord_fraction   , &
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, dummy, thickness_section )
+  end if
+
   if (present(thickness)) thickness(1,1) = thickness_section 
   if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
   !> last point
   i = size(points)
 
-  call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                      points(i)%theta , ElType , nelem_chord             , &
-                      type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section)
+  if (ElType .eq. 'v') then
+    call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                          points(i)%theta , ElType , nelem_chord             , &
+                          type_chord , chord_fraction , ref_chord_fraction   , &
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , dummy, points(i)%xy, thickness_section )
+  else
+    call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                          points(i)%theta , ElType , nelem_chord             , &
+                          type_chord , chord_fraction , ref_chord_fraction   , &
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, dummy, thickness_section )
+  end if
+  
   if (present(thickness)) thickness(1,i) = thickness_section 
   if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy ) 
 
   do i = 2 , size(points)-1
 
     if ( trim(points(i)%airfoil) .ne. 'interp' ) then
-
-      call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                          points(i)%theta , ElType , nelem_chord             , &
-                          type_chord , chord_fraction , ref_chord_fraction   , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
+      if (ElType .eq. 'v') then
+        call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                            points(i)%theta , ElType , nelem_chord             , &
+                            type_chord , chord_fraction , ref_chord_fraction   , &
+                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , dummy,  points(i)%xy, thickness_section )
+      else
+        call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                            points(i)%theta , ElType , nelem_chord             , &
+                            type_chord , chord_fraction , ref_chord_fraction   , &
+                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, dummy, thickness_section )
+      end if
       if (present(thickness)) thickness(1,i) = thickness_section
       if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy   )
 
@@ -344,14 +367,25 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
     !> compute the xy coordinates of the neighboring points w/o interp attribute
     !> interpolate the shape only:
     !> -----> unitary chord, theta = 0.0, ref_chord fraction = 0.0_wp
-    call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil)) , &
-                          0.0_wp , ElType , nelem_chord              , &
-                          type_chord , chord_fraction , 0.0_wp       , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, thickness_section )
-    call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil)) , &
-                          0.0_wp , ElType , nelem_chord              , &
-                          type_chord , chord_fraction , 0.0_wp       , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, thickness_section )
+    if (ElType .eq. 'v') then
+      call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil))  , &
+                            0.0_wp , ElType , nelem_chord              , &
+                            type_chord , chord_fraction , 0.0_wp       , &
+                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , dummy,  xy1, thickness_section )
+      call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil))  , &
+                            0.0_wp , ElType , nelem_chord              , &
+                            type_chord , chord_fraction , 0.0_wp       , &
+                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , dummy, xy2, thickness_section )
+    else 
+      call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil))  , &
+                            0.0_wp , ElType , nelem_chord              , &
+                            type_chord , chord_fraction , 0.0_wp       , &
+                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, dummy, thickness_section )
+      call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil))  , &
+                            0.0_wp , ElType , nelem_chord              , &
+                            type_chord , chord_fraction , 0.0_wp       , &
+                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, dummy, thickness_section )
+    end if
 
     if ( points(i1)%flip_sec ) call flip_section( ElType , xy1 )
     if ( points(i2)%flip_sec ) call flip_section( ElType , xy2 )
@@ -374,13 +408,13 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
     
     allocate(points(i)%xy(size(xy,1),size(xy,2))) ; points(i)%xy = xy
 
-  end if
+    end if
 
   end do
 
   ! === define the desired (output) points of the geometry ===
   allocate( rr( 3 , rr_size ) ) ; rr = 0.0_wp
-  allocate( rr_s ( 2 , size(points(1)%xy,2) ) )
+  allocate( rr_s ( 2 , size(points(1)%xy,2) ) )  
 
   do i = 1 , npoint_span_tot
 
@@ -495,7 +529,7 @@ end subroutine read_mesh_pointwise
 ! - read_mesh_ll (io/mod_ll_io) -> airfoil_table as Input,
 !                                  i_airtoil_e ,  normalised_coord_e ,
 !                                  chord_p , theta_p
-subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
+subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, ElType, &
                         airfoil_list_actual, nelem_span_list, &
                         i_airfoil_e , normalised_coord_e    , &
                         npoints_chord_tot , nelem_span_tot  , &
@@ -518,7 +552,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   type(t_parse), pointer                                    :: point_prs, line_prs
   !>
   integer                                                   :: nelem_chord
-  character                                                 :: ElType
+  character, intent(in)                                     :: ElType
   logical                                                   :: mesh_flat 
 
   !> point and line structures
@@ -559,7 +593,6 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
   nelem_chord     = 1 ! nelem_chord = 1 and no type_chord for liftlin
   nelem_chord_tot = 1
-  ElType = trim(getstr(pmesh_prs,'ElType'))
   if ( eltype .ne. 'l' ) then
     write(*,*) ' Error in mod_pointwise_io: read_mesh_pointwise_ll. '
     write(*,*) ' expected ElType = "l", but got: ', Eltype
@@ -1514,50 +1547,41 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   type(t_parse)           , intent(out) :: pmesh_prs
   type(t_parse) , pointer , intent(out) :: point_prs , line_prs
 
-
-  ! === Prepare fields to be read by the parser ===
-  call pmesh_prs%CreateStringOption('el_type', &
-                'element type (temporary) p panel v vortex ring', &
-                multiple=.false.)
-  ! if eltype = 'p','v' -> nelem_chord, type_chord, = 'l' -> no *_chord* field
   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
-    call pmesh_prs%CreateIntOption('nelem_chord',  &
-                  'number of chord-wise elements', &
-                  multiple=.false.)
 
     call pmesh_prs%CreateStringOption('type_chord', &
-                  'type of chord-wise division: uniform, cosine, &
-                  &cosineLE, cosineTE, geoseries, geoseriesLE, &
-                  &geoseriesTE, geoseries_hi', 'uniform', & 
-                  multiple=.false.)
-    
-    !> geometric series parameters 
-  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '1/8', &
-                  multiple=.false.)
+                    'type of chord-wise division: uniform, cosine, &
+                    &cosineLE, cosineTE, geoseries, geoseriesLE, &
+                    &geoseriesTE, geoseries_hi', 'uniform', & 
+                    multiple=.false.)
+      
+      !> geometric series parameters 
+    call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '1/8', &
+                    multiple=.false.)
 
-  call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
-                  '1/7.0', multiple=.false.)
+    call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
+                    '1/7.0', multiple=.false.)
 
-  call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
-                  '1/15', multiple=.false.)
+    call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
+                    '1/15', multiple=.false.)
 
-  call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
-                  & fixed part', '1/8', multiple=.false.)
+    call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
+                    & fixed part', '1/8', multiple=.false.)
 
-  call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
-                  & fixed part', '1/7.0', multiple=.false.)
+    call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
+                    & fixed part', '1/7.0', multiple=.false.)
 
-  call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
-                  & moving part', '1/7', multiple=.false.)
+    call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
+                    & moving part', '1/7', multiple=.false.)
 
-  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                  & moving part', '1/7', multiple=.false.) 
+    call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                    & moving part', '1/7', multiple=.false.) 
 
-  call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                  & moving part', '1/10', multiple=.false.) 
+    call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
+                    & moving part', '1/10', multiple=.false.) 
 
-  call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
-                  '1/2', multiple=.false.)
+    call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
+                    '1/2', multiple=.false.)
     
     call pmesh_prs%CreateRealOption('reference_chord_fraction',&
                   'Reference chord fraction', &
@@ -1576,8 +1600,8 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
   call point_prs%CreateIntOption('Id', 'Point Id.' )
   call point_prs%CreateRealArrayOption('Coordinates', &
-                'coordinates of the points used to define the comp' )
-
+                'coordinates of the points used to define the comp' ) 
+                
   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
     call point_prs%CreateStringOption( 'airfoil', 'section airfoil' ) 
     call point_prs%CreateStringOption(  'airfoil_table', 'section airfoil' )

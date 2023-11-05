@@ -84,8 +84,12 @@ type :: t_precice_rbf
 
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
+  !> Grid virtual nodes connectivity
+  type(t_rbf_conn) :: nod_virtual
   !> Elem centers connectivity
   type(t_rbf_conn) :: cen
+  !> Elem virtual centers connectivity
+  type(t_rbf_conn) :: cen_virtual
   !> Ac stripe connectivity (for vl corrected) 
   type(t_rbf_conn) :: ctr_pt 
   !> Generic point 

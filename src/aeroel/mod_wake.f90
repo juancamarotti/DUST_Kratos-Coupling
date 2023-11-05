@@ -2318,17 +2318,17 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
           !do not perform any modification
           if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
 
-            !get the time at which the particle hits the surface
-            !make sure not to go back in time
-            dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
-            !if it is lower than the timestep (i.e. the particles hits the surface
-            !within next step) start the correction
-            if (dt_part .gt. sim_param%dt) cycle
-            !Get the position at the time in which the particle hits the
-            !surface plane
-            pos2  = part%cen+relvel*dt_part
-            dist2 = pos2 - ( elem%cen )
-            dist2_nor = sum(dist2 * n)
+          !get the time at which the particle hits the surface
+          !make sure not to go back in time
+          dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
+          !if it is lower than the timestep (i.e. the particles hits the surface
+          !within next step) start the correction
+          if (dt_part .gt. sim_param%dt) cycle
+          !Get the position at the time in which the particle hits the
+          !surface plane
+          pos2  = part%cen+relvel*dt_part
+          dist2 = pos2 - ( elem%cen )
+          dist2_nor = sum(dist2 * n)
             
           if(dist2_nor .le. blthick) then
             dist2_tan = norm2(dist2-(n*dist2_nor))

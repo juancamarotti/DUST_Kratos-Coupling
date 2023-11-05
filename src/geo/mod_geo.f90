@@ -1352,7 +1352,7 @@ subroutine load_components(geo, in_file, out_file, te)
 
           !> transfer index and weight matrix 
           geo%components(i_comp)%rbf%nod%ind = geo%components(i_comp)%rbf%point%ind
-          geo%components(i_comp)%rbf%nod%wei = geo%components(i_comp)%rbf%point%wei         
+          geo%components(i_comp)%rbf%nod%wei = geo%components(i_comp)%rbf%point%wei                 
           deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
 
           !> Update offset of precice/dust coupling nodes

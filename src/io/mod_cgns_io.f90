@@ -89,12 +89,12 @@ contains
 !! WARNING: this is still experimental and based on an incomplete reverse
 !! engineering of cgns mesh files, it shall be extended to be more reliable
 !! and general
-subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
+subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_virtual)
 
  character(len=*), intent(in) :: mesh_file
  character(len=*), intent(in) :: sectionNamesUsed(:)
- integer, allocatable, intent(out) :: ee(:,:)
- real(wp) , allocatable, intent(out) :: rr(:,:)
+ integer, allocatable, intent(out) :: ee(:,:), ee_virtual(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:), rr_virtual(:,:)
 
 
 
@@ -299,6 +299,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     call printout(trim(msg))
 
     allocate(ee(4,nelem_zone)) ; ee = 0
+    allocate(ee_virtual(4,nelem_zone)) ; ee_virtual = 0
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -393,6 +394,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1
             I = I + nnod + 1
           end do
+          ee_virtual = ee
 
           deallocate(nmixed)
 
@@ -401,6 +403,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
             ielem = ielem + 1
             ee(1:nnod,ielem) = int(elemcg(:,idl),4)
           end do
+          ee_virtual = ee
         end if
 
 
@@ -447,6 +450,9 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         enddo
 
       enddo
+      ! Virtual mesh
+      allocate(rr_virtual(ndim,nNodesUsed))
+      rr_virtual = rr;
 
     ! No selection of sections performed, read all nodes
     else
@@ -467,12 +473,16 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         rr(i,:) = coordinateList
 
       enddo
+      ! Virtual mesh
+      allocate(rr_virtual(ndim,nNodes))
+      rr_virtual = rr;
 
     endif
 
   end do ! Loop on zones
+  
 
-
+  
 
 end subroutine read_mesh_cgns
 
