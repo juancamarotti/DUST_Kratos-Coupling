@@ -671,19 +671,19 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       !> TODO : actually it is possible to define the parameters in the GeoFile
       !> directly, find a good way to do this
-
+    
       !> Construction of the virtual panels for collision avoidance
       call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, nelem_chord_virtual, 'p', &
                                 npoints_chord_tot_virtual, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                                 nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
                                 aero_table, thickness) 
-
+      
       !> Construction of the actual VL elements                         
       call read_mesh_parametric(trim(mesh_file), ee, rr, nelem_chord, ElType, &
                               npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                               nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
                               aero_table, thickness)  
-
+      
       !> Write additional fields for vl correction
       if (aero_table) then 
 

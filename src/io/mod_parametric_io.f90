@@ -395,7 +395,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
   enddo
 
   allocate(rr(3,rr_size)) ; rr = 0.0_wp
-  
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
 
@@ -618,12 +617,16 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
     call define_division(type_chord, nelem_chord, chord_fraction, & 
                         r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
   endif 
-  
+
+  if (allocated(rrSection1))  deallocate(rrSection1)
+  if (allocated(rrSection2)) deallocate(rrSection2) 
   ! Initialize the span division to the maximum dimension
   allocate(span_fraction(maxval(nelem_span_list))) ; span_fraction = 0.0_wp
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
-
+  write(*,*) 'npoin_chord_tot',npoint_chord_tot
+  write(*,*) 'shape:rrSection1',shape(rrSection1)
+  write(*,*) 'shape:rrSection2',shape(rrSection2)
   ! Initialise dr_ref for the definition of the actual reference_point
   !  of each bay (by updating)
   dx_ref = ref_point(1)       ! 0.0_wp
@@ -645,7 +648,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
   iend = npoint_chord_tot
   ! Loop over regions
   do iRegion = 1, nRegions
-
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
       thickness_section1(iRegion) = thickness_section2(iRegion-1)      
@@ -653,22 +655,21 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
-                          ref_point, xySection1, points_mean_line1, thickness_section)
-      if (Eltype .eq. 'v') then
-        rrSection1(1,:) = points_mean_line1(1,:) + ref_point(1)
-        rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
-        rrSection1(3,:) = points_mean_line1(2,:) + ref_point(3)
-      else 
+                          ref_point, xySection1, thickness_section)
+      !if (Eltype .eq. 'v') then
+      !  rrSection1(1,:) = points_mean_line1(1,:) + ref_point(1)
+      !  rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
+      !  rrSection1(3,:) = points_mean_line1(2,:) + ref_point(3)
+      !else 
         rrSection1(1,:) = xySection1(1,:) + ref_point(1)
         rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
         rrSection1(3,:) = xySection1(2,:) + ref_point(3)
-      end if
+      !end if
       ! Update rr
       rr(:,ista:iend) = rrSection1
       thickness_section1(iRegion) = thickness_section
     end if
-
-
+    
     ! It is possible to define the airfoils on some of the sections only.
     !  When the shape of the airfoil is not defined on a section, it is interpolated
     if ( trim(adjustl(airfoil_list(iRegion + 1))) .ne. 'interp' ) then  ! read the field 'airfoil'
@@ -676,7 +677,7 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
       call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
                             twist_list(iRegion+1), ElType, nelem_chord,                    &
                             type_chord , chord_fraction, ref_chord_fraction,               &
-                            ref_point, xySection2, points_mean_line2, thickness_section)
+                            ref_point, xySection2, thickness_section)
       thickness_section2(iRegion)         = thickness_section ! second section 
     else ! interpolation
       do iSec = iRegion + 1 , nRegions+1
@@ -694,8 +695,9 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
                             ref_point, xyAirfoil2)
 
       ! Compute the coordinates xySection2(), after removing the offset
-      if ( .not. allocated(xySection2) ) &
-                  allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
+      if ( allocated(xySection2) ) deallocate(xySection2)
+      
+      allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
 
       if ( allocated(xyAirfoil1) ) deallocate(xyAirfoil1)
 
@@ -736,16 +738,21 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
     end if
 
     !> save before update
-    dx_ref_1 = dx_ref ;  dy_ref_1 = dy_ref ;  dz_ref_1 = dz_ref
+    dx_ref_1 = dx_ref;  dy_ref_1 = dy_ref;  dz_ref_1 = dz_ref
 
     dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref
     dy_ref = span_list(iRegion)                                             + dy_ref
     dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref
-
+    write(*,*) 'shape:rrSection1',shape(rrSection1)
+    write(*,*) 'shape:rrSection2',shape(rrSection2)
+    write(*,*) 'shape:xySection1',shape(xySection1)
+    write(*,*) 'shape:xySection2',shape(xySection2) 
     rrSection2(1,:) = xySection2(1,:) + dx_ref
     rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
     rrSection2(3,:) = xySection2(2,:) + dz_ref
-
+    write(*,*) 'rrSection2(1,:) = ', rrSection2(1,:)
+    write(*,*) 'rrSection2(2,:) = ', rrSection2(2,:)
+    write(*,*) 'rrSection2(3,:) = ', rrSection2(3,:) 
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do i1 = 1 , nelem_span_list(iRegion)
 
@@ -905,7 +912,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
 
     end do ! iRegion 
 
-
   enddo ! iRegion 
   
   ! lots of deallocation missing causing memory leakage 
@@ -1007,10 +1013,9 @@ end subroutine read_mesh_parametric
 
 subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
                           type_chord , chord_fraction, reference_chord_fraction,&
-                          reference_point, point_list, points_mean_line, thickness)
+                          reference_point, point_list, thickness_out)
 
   real(wp), allocatable , intent(out)               :: point_list(:,:)
-  real(wp), allocatable, intent(out), optional      :: points_mean_line(:,:)
   real(wp), intent(in)                              :: reference_point(:) 
   real(wp), intent(inout)                           :: chord_fraction(:)
   character(len=*) , intent(in)                     :: type_chord
@@ -1018,8 +1023,10 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   integer, intent(in)                               :: nelem_chord
   character, intent(in)                             :: ElType
   character(len=*) , intent(in)                     :: airfoil
-  real(wp),  intent(out), optional                  :: thickness
+  real(wp),  intent(out), optional                  :: thickness_out
+  real(wp)                                          :: thickness
   real(wp)                                          :: twist_rad
+  real(wp), allocatable                             :: points_mean_line(:,:)
   integer                                           :: i, ascii
   character(len=*), parameter                       :: this_sub_name='define_section'
 
@@ -1034,7 +1041,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
 
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
-    call read_airfoil ( airfoil , ElType , nelem_chord , chord_fraction, points_mean_line, point_list, thickness)
+    call read_airfoil ( airfoil , ElType , nelem_chord , chord_fraction, point_list, thickness)
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
   
@@ -1060,6 +1067,9 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
       &NACA airfoils implemented. Check your input syntax or provide the coordinates&
       & of the airfoil as a .dat file ')    
     end if
+    if (ElType .eq. 'v') then 
+      point_list = points_mean_line
+    end if
   else
     call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
       &NACA airfoils implemented. Check your input syntax or provide the coordinates&
@@ -1069,19 +1079,21 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   ! Geometric transformation +++++++++++++++++++++++++++++++++++++++++++++++++++
   ! 1. translation : reference_chord_fraction (defined for a unit-chord airfoil)
   point_list(1,:) = point_list(1,:) - reference_chord_fraction
-  points_mean_line(1,:) = points_mean_line(1,:) - reference_chord_fraction
   ! 2. scaling     : chord
   point_list = point_list * chord
-  points_mean_line =  points_mean_line * chord
   ! 3. rotation    : twist
   point_list        = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
                                           sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                     point_list )
-  points_mean_line  = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-                                          sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                              points_mean_line )
+  !points_mean_line  = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+  !                                        sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+  !                                                            points_mean_line )
   thickness = thickness * chord 
-
+  write(*,*) 'shape:point_list', shape(point_list)
+  !> optional output
+  if (present(thickness_out)) then
+    thickness_out = thickness
+  end if
 end subroutine define_section
 
 !-------------------------------------------------------------------------------
@@ -1266,13 +1278,13 @@ endsubroutine naca5digits
 
 !-------------------------------------------------------------------------------
 
-subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, points_mean_line, points, thickness )
+subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness )
 
   character(len=*), intent(in)                :: filen
   character(len=*), intent(in)                :: ElType
   integer         , intent(in)                :: nelems_chord
   real(wp)        , intent(in)                :: csi_half(:)
-  real(wp), allocatable , intent(out)         :: points_mean_line(:,:), points(:,:)
+  real(wp), allocatable , intent(out)         :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
 
   real(wp) , allocatable      :: rr_dat(:,:) 
@@ -1711,12 +1723,17 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, points_mean_li
         endif
       enddo
     enddo
-    allocate(points(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); points = 0.0_wp 
-    points(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)), rr_geo_up(1,2:size(rr_geo_up,2))/) 
-    points(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)), rr_geo_up(2,2:size(rr_geo_up,2))/)
-    allocate(points_mean_line(2,size(rr_geo_mean, 2))); points_mean_line = 0.0_wp 
-    points_mean_line(1,:) = rr_geo_mean(1,:)
-    points_mean_line(2,:) = rr_geo_mean(2,:) 
+
+    if (ElType .eq. 'p') then 
+      allocate(rr(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); rr = 0.0_wp 
+      rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)), rr_geo_up(1,2:size(rr_geo_up,2))/) 
+      rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)), rr_geo_up(2,2:size(rr_geo_up,2))/)
+    elseif (ElType .eq. 'v') then 
+      allocate(rr(2,size(rr_geo_mean, 2))); rr = 0.0_wp 
+      rr(1,:) = rr_geo_mean(1,:)
+      rr(2,:) = rr_geo_mean(2,:) 
+    endif 
+
   end if !> old format 
 
   !> cleanup
