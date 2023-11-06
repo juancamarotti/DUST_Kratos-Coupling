@@ -69,7 +69,7 @@ use mod_geometry, only: &
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_elem_virtual_p
 
 use mod_doublet, only: &
   initialize_doublet
@@ -194,6 +194,8 @@ type(t_pot_elem_p), allocatable   :: elems_tot(:)
 type(t_pot_elem_p), allocatable   :: elems_non_corr(:)
 !> All the corrected vortex lattice elements 
 type(t_pot_elem_p), allocatable   :: elems_corr(:) 
+!> Elem virtual 
+type(t_elem_virtual_p), allocatable :: elems_virtual(:)
 
 !> Geometry
 type(t_geo)                       :: geo

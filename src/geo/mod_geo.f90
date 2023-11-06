@@ -202,7 +202,7 @@ type :: t_geo_component
   !! somewhere else
   class(c_pot_elem), allocatable     :: el(:)
 
-  type(t_elem_virtual_p), allocatable :: el_virtual(:)
+  class(c_elem_virtual), allocatable :: el_virtual(:)
 
   !> Global indexes of the points in the component
   integer, allocatable :: i_points(:)
@@ -1624,7 +1624,8 @@ subroutine load_components(geo, in_file, out_file, te)
           call error(this_sub_name, this_mod_name, &
             'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
-      allocate(t_elem_virtual_p::geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
+      !> not needed for the virtual elements 
+      !allocate(t_elem_virtual::geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
 
       !> fill (some) of the real elements fields
       do i2=1,size(ee,2)
