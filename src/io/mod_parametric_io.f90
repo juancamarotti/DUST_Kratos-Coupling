@@ -152,7 +152,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
   character, intent(in)                     :: ElType
   !> Sections 1. 2.
   real(wp), allocatable :: xySection1(:,:), xySection2(:,:), xyAirfoil1(:,:), xyAirfoil2(:,:)
-  real(wp), allocatable :: points_mean_line1(:,:), points_mean_line2(:,:)
   real(wp), allocatable :: rrSection1(:,:), rrSection2(:,:)
   real(wp)                                  :: dx_ref , dy_ref , dz_ref
   integer                                   :: ista, iend, i, j
@@ -656,15 +655,9 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ElType, &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
                           ref_point, xySection1, thickness_section)
-      !if (Eltype .eq. 'v') then
-      !  rrSection1(1,:) = points_mean_line1(1,:) + ref_point(1)
-      !  rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
-      !  rrSection1(3,:) = points_mean_line1(2,:) + ref_point(3)
-      !else 
         rrSection1(1,:) = xySection1(1,:) + ref_point(1)
         rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
         rrSection1(3,:) = xySection1(2,:) + ref_point(3)
-      !end if
       ! Update rr
       rr(:,ista:iend) = rrSection1
       thickness_section1(iRegion) = thickness_section

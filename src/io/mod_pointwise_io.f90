@@ -182,7 +182,6 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
   real(wp) , allocatable                                            :: xy1(:,:) , xy2(:,:) , xy(:,:)
   real(wp) , allocatable                                            :: rr_s(:,:)
   real(wp)                                                          :: twist_rad , theta
-  real(wp), allocatable                                             :: dummy(:,:)
 
   real(wp)                                                          :: w1 , w2
   integer                                                           :: i , i1 , i2, j
@@ -296,54 +295,29 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
   endif
   
   !> first point
-  if (ElType .eq. 'v') then
-
-    call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
-                      points(1)%theta , ElType , nelem_chord             , &
-                      type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section )
-  else
-    call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
-                      points(1)%theta , ElType , nelem_chord             , &
-                      type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section )
-  end if
-
+  call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
+                     points(1)%theta , ElType , nelem_chord             , &
+                     type_chord , chord_fraction , ref_chord_fraction   , &
+                     (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section )
   if (present(thickness)) thickness(1,1) = thickness_section 
   if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
   !> last point
   i = size(points)
-
-  if (ElType .eq. 'v') then
-    call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                          points(i)%theta , ElType , nelem_chord             , &
-                          type_chord , chord_fraction , ref_chord_fraction   , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
-  else
-    call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                          points(i)%theta , ElType , nelem_chord             , &
-                          type_chord , chord_fraction , ref_chord_fraction   , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
-  end if
-  
+  call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                      points(i)%theta , ElType , nelem_chord             , &
+                      type_chord , chord_fraction , ref_chord_fraction   , &
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
   if (present(thickness)) thickness(1,i) = thickness_section 
   if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy ) 
 
   do i = 2 , size(points)-1
 
     if ( trim(points(i)%airfoil) .ne. 'interp' ) then
-      if (ElType .eq. 'v') then
-        call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                            points(i)%theta , ElType , nelem_chord             , &
-                            type_chord , chord_fraction , ref_chord_fraction   , &
-                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
-      else
-        call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                            points(i)%theta , ElType , nelem_chord             , &
-                            type_chord , chord_fraction , ref_chord_fraction   , &
-                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
-      end if
+      call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                          points(i)%theta , ElType , nelem_chord             , &
+                          type_chord , chord_fraction , ref_chord_fraction   , &
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
       if (present(thickness)) thickness(1,i) = thickness_section
       if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy   )
 
@@ -367,26 +341,14 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
     !> compute the xy coordinates of the neighboring points w/o interp attribute
     !> interpolate the shape only:
     !> -----> unitary chord, theta = 0.0, ref_chord fraction = 0.0_wp
-    if (ElType .eq. 'v') then
-      call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil))  , &
-                            0.0_wp , ElType , nelem_chord              , & 
-                            type_chord , chord_fraction , 0.0_wp       , &
-                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, thickness_section )
-      call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil))  , &
-                            0.0_wp , ElType , nelem_chord              , &
-                            type_chord , chord_fraction , 0.0_wp       , &
-                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, thickness_section )
-    else 
-      call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil))  , &
-                            0.0_wp , ElType , nelem_chord              , &
-                            type_chord , chord_fraction , 0.0_wp       , &
-                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, thickness_section )
-      call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil))  , &
-                            0.0_wp , ElType , nelem_chord              , &
-                            type_chord , chord_fraction , 0.0_wp       , &
-                            (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, thickness_section )
-    end if
-
+    call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil))  , &
+                          0.0_wp , ElType , nelem_chord              , & 
+                          type_chord , chord_fraction , 0.0_wp       , &
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, thickness_section )
+    call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil))  , &
+                          0.0_wp , ElType , nelem_chord              , &
+                          type_chord , chord_fraction , 0.0_wp       , &
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, thickness_section )
     if ( points(i1)%flip_sec ) call flip_section( ElType , xy1 )
     if ( points(i2)%flip_sec ) call flip_section( ElType , xy2 )
 
