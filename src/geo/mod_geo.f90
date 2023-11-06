@@ -1626,7 +1626,7 @@ subroutine load_components(geo, in_file, out_file, te)
       end select
       !> not needed for the virtual elements 
       !allocate(t_elem_virtual::geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
-
+      allocate(geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
       !> fill (some) of the real elements fields
       do i2=1,size(ee,2)
 

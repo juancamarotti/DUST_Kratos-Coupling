@@ -110,7 +110,7 @@ type, abstract :: c_elem
 
 end type c_elem
 
-type, abstract :: c_elem_virtual
+type :: c_elem_virtual
 
   !> Center of the element
   real(wp) :: cen(3)
