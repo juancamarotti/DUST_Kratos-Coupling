@@ -380,7 +380,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           multiple=.false.);
   call geo_prs%CreateRealOption('reference_chord_fraction',&
           'Reference chord fraction', &
-          '0.0',&
+          '0.25',&
           multiple=.false.);
 
   !=====

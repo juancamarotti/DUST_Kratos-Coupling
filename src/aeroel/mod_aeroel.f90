@@ -58,8 +58,8 @@ use mod_param, only: &
 
 implicit none
 
-public :: c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-          t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+public :: c_elem, c_elem_virtual, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+          t_elem_p, t_elem_virtual_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 private
 
@@ -68,6 +68,10 @@ private
 !> Pointers to different levels of classes
 type :: t_elem_p
   class(c_elem), pointer :: p
+end type
+
+type :: t_elem_virtual_p
+  class(c_elem_virtual), pointer :: p
 end type
 
 type :: t_pot_elem_p
@@ -106,7 +110,73 @@ type, abstract :: c_elem
 
 end type c_elem
 
+type, abstract :: c_elem_virtual
 
+  !> Center of the element
+  real(wp) :: cen(3)
+
+  !> id of the component to which it belongs
+  integer :: comp_id
+
+  !> Id of the element, TODO consider removing this
+  integer :: id
+
+  !> Number of vertexes
+  integer :: n_ver
+
+  !> Vertexes coordinates
+  real(wp), allocatable :: ver(:,:)
+
+  !> Id of the vertexes
+  integer, allocatable :: i_ver(:)
+
+  !> Element area
+  real(wp) :: area
+
+  !> Element normal vector
+  real(wp) :: nor(3)
+
+  !> Element normal vector (at previous dt, to compute dn_dt)
+  real(wp) :: nor_old(3)
+
+  !> Element normal vector (at previous dt, to compute dn_dt)
+  real(wp) :: dn_dt(3)
+
+  !> Element tangential vectors
+  real(wp) :: tang(3,2) ! tangent unit vectors as in PANAIR
+
+  !> Vector of each edge
+  real(wp), allocatable :: edge_vec(:,:)
+
+  !> Length of each edge
+  real(wp), allocatable :: edge_len(:)
+
+  !> Unit vector of each edge
+  real(wp), allocatable :: edge_uni(:,:)
+
+  !> Body velocity at the centre
+  real(wp) :: ub(3)
+
+  !> Orientation vector of the center 
+  real(wp) :: ori(3)
+
+  !> Orientation matrix of the center 
+  real(wp) :: R_cen(3,3)
+  
+  !> Is the element moving during simulation?
+  logical  :: moving
+  
+  !> Hinge motion
+  ! Initialization to zero *** to do: restart??? ***
+  !> Delta position, due to hinge motion of the element center
+  real(wp) :: dcen_h(3)     ! = 0.0_wp
+  real(wp) :: dcen_h_old(3) ! = 0.0_wp
+  !> Delta velocity, due to hinge motion of the element center, evaluated
+  ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
+  real(wp) :: dvel_h(3) ! = 0.0_wp
+  real(wp) :: loc_ctr_pt(3)
+
+end type c_elem_virtual
 !----------------------------------------------------------------------
 
 !> Class (not abstract, but to be further expanded) to contain potential

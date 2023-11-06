@@ -75,8 +75,8 @@ use mod_parametric_io, only: &
   read_mesh_parametric
 
 use mod_aeroel, only: &
-  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  c_elem, c_elem_virtual, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_elem_virtual_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_surfpan, only: &
   t_surfpan
@@ -184,8 +184,14 @@ type :: t_geo_component
   !> Number of elements of the component
   integer :: nelems
 
+  !> Number of virtual elements of the component
+  integer :: nelems_virtual
+
   !> Number of elements in chord
   integer :: n_c
+  
+  !> Number of virtual elements in chord
+  integer :: n_c_virtual
 
   !> Number of elements in span
   integer :: n_s
@@ -194,10 +200,15 @@ type :: t_geo_component
   !> Elements of the group
   !! The main memory allocation happens here, they will be pointed from
   !! somewhere else
-  class(c_pot_elem), allocatable :: el(:)
+  class(c_pot_elem), allocatable     :: el(:)
+
+  type(t_elem_virtual_p), allocatable :: el_virtual(:)
 
   !> Global indexes of the points in the component
   integer, allocatable :: i_points(:)
+
+  !> Global indexes of the virtual points in the component
+  integer, allocatable :: i_points_virtual(:)
 
 #if USE_PRECICE
   !> Global PreCICE indices of the points for coupling
@@ -214,7 +225,7 @@ type :: t_geo_component
   integer :: ref_id
 
   !> Points in local reference frame
-  real(wp), allocatable :: loc_points(:,:) 
+  real(wp), allocatable :: loc_points(:,:), loc_points_virtual(:,:)  
   real(wp), allocatable :: loc_cen(:,:) 
   real(wp), allocatable :: loc_ctr_pt(:,:) 
   
@@ -315,10 +326,13 @@ type :: t_geo
   !> Points (element vertexes)
   real(wp), allocatable :: points(:,:)
 
+  !> Virtual points (element vertexes)
+  real(wp), allocatable :: points_virtual(:,:)
+
 #if USE_PRECICE
   !> Velocity of the points (element vertexes), to be used by
   ! coupled components
-  real(wp), allocatable :: points_vel(:,:)
+  real(wp), allocatable :: points_vel(:,:), points_vel_virtual(:,:)
 #endif
 
   !> All the reference frames of the geometry
@@ -401,7 +415,7 @@ contains
 !!    moving elements after, and in the total elements surface panels
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                      te, elems_impl, elems_expl, elems_ad, elems_ll, elems_corr, &
+                      te, elems_impl, elems_expl, elems_ad, elems_ll, elems_virtual, elems_corr, &
                       elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
   character(len=*),    intent(in)                    :: geo_file_name
   character(len=*),    intent(inout)                 :: ref_file_name
@@ -411,6 +425,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   type(t_expl_elem_p), allocatable, intent(out)      :: elems_expl(:)
   type(t_expl_elem_p), allocatable, intent(out)      :: elems_ad(:)
   type(t_liftlin_p),   allocatable, intent(out)      :: elems_ll(:)
+  type(t_elem_virtual_p), allocatable, intent(out)   :: elems_virtual(:)
   type(t_pot_elem_p),  allocatable, intent(out)      :: elems_tot(:)
   type(t_pot_elem_p),  allocatable, intent(out)      :: elems_corr(:)
   type(t_pot_elem_p),  allocatable, intent(out)      :: elems_non_corr(:)
@@ -813,15 +828,16 @@ end subroutine create_geometry
 !  The points and the elements are then genereated.
 !  Finally the trailing edge is created
 subroutine load_components(geo, in_file, out_file, te)
-  type(t_geo), intent(inout),target     :: geo
+  type(t_geo), intent(inout), target    :: geo
   character(len=*), intent(in)          :: in_file
   character(len=*), intent(in)          :: out_file
   type(t_tedge), intent(out)            :: te
   integer                               :: i1, i2, i3
-  integer, allocatable                  :: ee(:,:)
-  real(wp), allocatable                 :: rr(:,:)
+  integer, allocatable                  :: ee(:,:), ee_virtual(:,:)
+  real(wp), allocatable                 :: rr(:,:), rr_virtual(:,:)
   character(len=max_char_len)           :: comp_el_type, comp_name, comp_input
-  integer                               :: points_offset, n_vert , elems_offset
+  integer                               :: points_offset, points_offset_virtual, n_vert 
+  integer                               :: elems_offset, elems_offset_virtual
   real(wp), allocatable                 :: points_tmp(:,:)
   character(len=max_char_len)           :: ref_tag, ref_tag_m
   integer                               :: ref_id, iref
@@ -865,7 +881,7 @@ subroutine load_components(geo, in_file, out_file, te)
   character(len=2)                      :: hinge_id_str
   integer(h5loc)                        :: hloc, hiloc, hloc2
   !> Parametric elements
-  integer                               :: par_nelems_span , par_nelems_chor
+  integer                               :: par_nelems_span , par_nelems_chor, par_nelems_chor_virtual
   !> Trailing edge 
   integer , allocatable                 :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
   integer , allocatable                 :: neigh_te(:,:) , o_te(:,:)
@@ -943,6 +959,7 @@ subroutine load_components(geo, in_file, out_file, te)
   endif
 
   elems_offset = 0
+  elems_offset_virtual = 0
   n_comp_write = n_comp
 
 #if USE_PRECICE
@@ -1089,6 +1106,8 @@ subroutine load_components(geo, in_file, out_file, te)
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
+      call read_hdf5_al(ee_virtual   ,'ee_virtual'   ,geo_loc)
+      call read_hdf5_al(rr_virtual   ,'rr_virtual'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)
 
       !> element-specific reads
@@ -1355,6 +1374,14 @@ subroutine load_components(geo, in_file, out_file, te)
           geo%components(i_comp)%rbf%nod%wei = geo%components(i_comp)%rbf%point%wei                 
           deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
 
+          !> build connectivity for the rr_virtual nodes 
+          call geo%components(i_comp)%rbf%build_connectivity(rr_virtual, coupling_node_rot)        
+
+          !> transfer index and weight matrix 
+          geo%components(i_comp)%rbf%nod_virtual%ind = geo%components(i_comp)%rbf%point%ind
+          geo%components(i_comp)%rbf%nod_virtual%wei = geo%components(i_comp)%rbf%point%wei                 
+          deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+
           !> Update offset of precice/dust coupling nodes
           points_offset_precice = points_offset_precice + np_precice_tot
 
@@ -1378,8 +1405,10 @@ subroutine load_components(geo, in_file, out_file, te)
           trim(comp_input) .eq. 'pointwise') then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+        call read_hdf5(par_nelems_chor_virtual,'parametric_nelems_chor_virtual',geo_loc)
         geo%components(i_comp)%n_s = par_nelems_span
         geo%components(i_comp)%n_c = par_nelems_chor         
+        geo%components(i_comp)%n_c_virtual = par_nelems_chor_virtual   
       end if
 
       call close_hdf5_group(geo_loc)
@@ -1445,6 +1474,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
         call write_hdf5(ee   ,'ee'   ,geo_loc)
         call write_hdf5(rr   ,'rr'   ,geo_loc)
+        call write_hdf5(ee_virtual   ,'ee_virtual'   ,geo_loc)
+        call write_hdf5(rr_virtual   ,'rr_virtual'   ,geo_loc)
         call write_hdf5(neigh,'neigh',geo_loc)
 
 #if USE_PRECICE
@@ -1476,6 +1507,7 @@ subroutine load_components(geo, in_file, out_file, te)
           !> Write HDF5 fields
           call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
           call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+          call write_hdf5(par_nelems_chor_virtual,'parametric_nelems_chor_virtual',geo_loc)
         end if
 
         call close_hdf5_group(geo_loc)
@@ -1542,9 +1574,19 @@ subroutine load_components(geo, in_file, out_file, te)
         points_offset = 0
       endif
 
+      !> Treat the virtual points 
+      if(allocated(geo%points_virtual)) then
+        points_offset_virtual = size(geo%points_virtual,2)
+      else
+        points_offset_virtual = 0
+      endif
+
+
       !> store the read points into the local points
       allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
+      allocate(geo%components(i_comp)%loc_points_virtual(3,size(rr_virtual,2)))
       geo%components(i_comp)%loc_points = rr
+      geo%components(i_comp)%loc_points_virtual = rr_virtual
 
 
       !> Now for the moments the points are stored here without moving them,
@@ -1557,10 +1599,18 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%i_points = &
                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
+      allocate(points_tmp(3,size(rr_virtual,2)+points_offset_virtual))
+      if (points_offset_virtual .gt. 0) points_tmp(:,1:points_offset_virtual) = geo%points_virtual
+      points_tmp(:,points_offset_virtual+1:points_offset_virtual+size(rr_virtual,2)) = rr_virtual
+      call move_alloc(points_tmp, geo%points_virtual)
+      allocate(geo%components(i_comp)%i_points_virtual(size(rr_virtual,2)))
+      geo%components(i_comp)%i_points_virtual = &
+                        (/((i3),i3=points_offset_virtual+1,points_offset_virtual+size(rr_virtual,2))/)                      
 
       !> Treat the elements 
       !allocate the elements of the component of the right kind
       geo%components(i_comp)%nelems = size(ee,2)
+      geo%components(i_comp)%nelems_virtual = size(ee_virtual,2)
       select case(trim(geo%components(i_comp)%comp_el_type))
         case('p')
           allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
@@ -1574,8 +1624,9 @@ subroutine load_components(geo, in_file, out_file, te)
           call error(this_sub_name, this_mod_name, &
             'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
+      allocate(t_elem_virtual_p::geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
 
-      !> fill (some) of the elements fields
+      !> fill (some) of the real elements fields
       do i2=1,size(ee,2)
 
         !> vertices
@@ -1597,6 +1648,20 @@ subroutine load_components(geo, in_file, out_file, te)
 
         !> Motion
         geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
+
+      enddo
+
+      !> fill (some) of the virtual elements fields
+      do i2=1,size(ee_virtual,2)
+
+        !> vertices
+        n_vert = count(ee_virtual(:,i2).ne.0)
+        allocate(geo%components(i_comp)%el_virtual(i2)%i_ver(n_vert))
+        geo%components(i_comp)%el_virtual(i2)%n_ver = n_vert
+        geo%components(i_comp)%el_virtual(i2)%i_ver(1:n_vert) = &
+                                              ee_virtual(1:n_vert,i2) + points_offset_virtual
+        !> Motion
+        geo%components(i_comp)%el_virtual(i2)%moving = geo%components(i_comp)%moving
 
       enddo
 
@@ -1740,9 +1805,9 @@ subroutine load_components(geo, in_file, out_file, te)
 
       !> Update elems_offset for the next component
       elems_offset = elems_offset + size(ee,2)
-
+      elems_offset_virtual = elems_offset_virtual + size(ee_virtual,2)
       !> Cleanup
-      deallocate(ee,rr,neigh)
+      deallocate(ee, ee_virtual, rr, rr_virtual, neigh)
       i_comp = i_comp + 1
     enddo !i_mult
 
@@ -1764,11 +1829,13 @@ subroutine load_components(geo, in_file, out_file, te)
   do i_comp = 1 , size(geo%components)
     do i1 = 1 , size(geo%components(i_comp)%el)
       geo%components(i_comp)%el(i1)%comp_id = i_comp
+      geo%components(i_comp)%el_virtual(i1)%comp_id = i_comp
     end do
   end do
 
 #if USE_PRECICE
   allocate(geo%points_vel(3, size(geo%points,2))); geo%points_vel = 0.0_wp
+  allocate(geo%points_vel_virtual(3, size(geo%points_virtual,2))); geo%points_vel_virtual = 0.0_wp
 #endif
 
 

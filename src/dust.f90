@@ -356,7 +356,7 @@ target_file = trim(sim_param%basename)//'_geo.h5'
 
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                    elems_ll, elems_corr, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
+                    elems_ll, elems_virtual, elems_corr, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
