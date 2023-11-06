@@ -133,7 +133,7 @@ contains
 !----------------------------------------------------------------------
 !> read pointwise input file and build ee, rr arrays of connectivity
 !  and point coordinates
-subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
+subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ref_chord_fraction, ElType, &
                               npoints_chord_tot , nelem_span_tot, &
                               airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                               aero_table_out, thickness)
@@ -155,7 +155,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
   integer, intent(in)                                               :: nelem_chord
   character(max_char_len)                                           :: type_chord
   character, intent(in)                                             :: ElType
-  real(wp)                                                          :: ref_chord_fraction
+  real(wp), intent(in)                                              :: ref_chord_fraction
 
   real(wp), allocatable                                             :: chord_fraction(:)
   real(wp), allocatable, intent(out), optional                      :: thickness(:,:) 
@@ -214,7 +214,6 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ElType, &
   x_refinement = getreal(pmesh_prs,'x_refinement')
   !> end geo series mesh
 
-  ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   aero_table = getlogical(pmesh_prs,     'airfoil_table_correction')
   
   !> Read points and lines
@@ -1544,11 +1543,6 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
     call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
                     '1/2', multiple=.false.)
-    
-    call pmesh_prs%CreateRealOption('reference_chord_fraction',&
-                  'Reference chord fraction', &
-                  '0.0',&
-                  multiple=.false.)
 
     call pmesh_prs%CreateLogicalOption('airfoil_table_correction', &
                   'include presence of aerodynamic .c81 for corrections', &

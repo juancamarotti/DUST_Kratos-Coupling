@@ -46,6 +46,8 @@
 !!          Andrea Colli
 !!          Alessandro Cocco
 !!          Alberto Savino
+!!          Federico Gentile
+!!          Matteo Dall'Ora
 !!=========================================================================
 
 !> Module to generate the geometry from different kinds of inputs, from mesh
@@ -220,6 +222,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   !> Chord elements for parametric meshing
   integer          :: nelem_chord, nelem_chord_virtual
+  real(wp)         :: ref_chord_fraction
 
   !> Connectivity and te structures
   integer , allocatable                    :: neigh(:,:)
@@ -374,6 +377,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           multiple=.false.);
   call geo_prs%CreateIntOption('nelem_chord_virtual',&
           'number of virtual chord-wise elements', &
+          multiple=.false.);
+  call geo_prs%CreateRealOption('reference_chord_fraction',&
+          'Reference chord fraction', &
+          '0.0',&
           multiple=.false.);
 
   !=====
@@ -657,15 +664,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   case('parametric')
 
     if ((ElType .eq. 'v' .or. ElType .eq. 'p')) then
-      nelem_chord         = getint(geo_prs,'nelem_chord')  
+      nelem_chord = getint(geo_prs,'nelem_chord')  
       if (countoption(geo_prs, 'nelem_chord_virtual') .eq. 1) then
         nelem_chord_virtual = getint(geo_prs,'nelem_chord_virtual')
       else
         nelem_chord_virtual = nelem_chord
       end if
     end if
-
-    mesh_file = geo_file
+    ref_chord_fraction = getreal(geo_prs,'reference_chord_fraction')
+    mesh_file          = geo_file
 
     if ((ElType .eq. 'v')) then
 
@@ -673,16 +680,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       !> directly, find a good way to do this
     
       !> Construction of the virtual panels for collision avoidance
-      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, nelem_chord_virtual, 'p', &
-                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
-                                nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
-                                aero_table, thickness) 
+      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, & 
+                                nelem_chord_virtual, ref_chord_fraction, 'p', &
+                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges,  &
+                                mesh_mirror, mesh_symmetry, nelem_span_list, airfoil_list, & 
+                                i_airfoil_e, normalised_coord_e, aero_table, thickness) 
       
       !> Construction of the actual VL elements                         
-      call read_mesh_parametric(trim(mesh_file), ee, rr, nelem_chord, ElType, &
-                              npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
-                              nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table, thickness)  
+      call read_mesh_parametric(trim(mesh_file), ee, rr, & 
+                                nelem_chord, ref_chord_fraction, ElType, &
+                                npoints_chord_tot, nelems_span, hinges, n_hinges, & 
+                                mesh_mirror, mesh_symmetry, nelem_span_list, airfoil_list, & 
+                                i_airfoil_e, normalised_coord_e, aero_table, thickness)  
       
       !> Write additional fields for vl correction
       if (aero_table) then 
@@ -711,12 +720,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     elseif (ElType .eq. 'p') then
 
       !> Construction of the virtual panels for collision avoidance
-      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, nelem_chord_virtual, 'p', &
-      npoints_chord_tot_virtual, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry, nelem_span_list)
+      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, &
+                                nelem_chord_virtual, ref_chord_fraction, 'p', &
+                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges, &
+                                mesh_mirror, mesh_symmetry, nelem_span_list)
 
       !> Construction of the actual panels
-      call read_mesh_parametric(trim(mesh_file), ee, rr, nelem_chord, ElType, &
-                                npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry, nelem_span_list)
+      call read_mesh_parametric(trim(mesh_file), ee, rr, & 
+                                nelem_chord, ref_chord_fraction, ElType, &
+                                npoints_chord_tot, nelems_span, hinges, n_hinges, & 
+                                mesh_mirror, mesh_symmetry, nelem_span_list)
                                 
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
@@ -730,20 +743,21 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         end if
 
       !> Construction of the virtual panels for collision avoidance
-      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, nelem_chord_virtual, 'p', &
-                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
-                                nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
-                                aero_table, thickness)
+      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, &
+                                nelem_chord_virtual, 0.25_wp, 'p', &
+                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges,  &
+                                mesh_mirror, mesh_symmetry, nelem_span_list, airfoil_list, & 
+                                i_airfoil_e, normalised_coord_e, aero_table, thickness)
 
       !> Construction of the actual LL elements  
-      call read_mesh_ll(trim(mesh_file),ee,rr, &
+      call read_mesh_ll(trim(mesh_file), ee, rr, &
                         airfoil_list   , nelem_span_list   , &
                         i_airfoil_e    , normalised_coord_e, &
                         npoints_chord_tot, nelems_span, &
                         chord_p, theta_p, theta_e )
       
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
-      nelems_span_tot =   nelems_span
+      nelems_span_tot = nelems_span
 
       !> x_AC Offset
       xac_offset_io = getlogical(geo_prs,'Offset_xac')
@@ -785,7 +799,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     end if
     
   case('pointwise')
-
+    
     if ((ElType .eq. 'v' .or. ElType .eq. 'p')) then
       nelem_chord         = getint(geo_prs,'nelem_chord')  
       if (countoption(geo_prs, 'nelem_chord_virtual') .eq. 1) then
@@ -794,20 +808,23 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         nelem_chord_virtual = nelem_chord
       end if
     end if
-
+    
+    ref_chord_fraction = getreal(geo_prs,'reference_chord_fraction') 
     mesh_file = geo_file
 
     if ( ( ElType .eq. 'v' )) then  
 
       !> Construction of the virtual panels for collision avoidance
-      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual, nelem_chord_virtual, 'p', &
-                              npoints_chord_tot_virtual, nelems_span, &
+      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual,      & 
+                              nelem_chord_virtual, ref_chord_fraction, 'p',  &
+                              npoints_chord_tot_virtual, nelems_span,        &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
                               aero_table, thickness)  
 
       !> Construction of the actual VL elements
-      call read_mesh_pointwise(trim(mesh_file), ee, rr, nelem_chord, ElType, &
-                              npoints_chord_tot, nelems_span, &
+      call read_mesh_pointwise(trim(mesh_file), ee, rr,                      & 
+                              nelem_chord, ref_chord_fraction, ElType,       &
+                              npoints_chord_tot, nelems_span,                &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
                               aero_table, thickness)  
 
@@ -817,24 +834,26 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
         call write_hdf5('true',             'aero_table',         geo_loc)
-        call write_hdf5(thickness,          'thickness',         geo_loc)        
+        call write_hdf5(thickness,          'thickness',          geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif
 
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
-      nelems_span_tot =   nelems_span
+      nelems_span_tot = nelems_span
     
     elseif (( ElType .eq. 'p' ) ) then
 
       !> Construction of the virtual panels for collision avoidance
-      call read_mesh_pointwise( trim(mesh_file) , ee_virtual , rr_virtual , nelem_chord_virtual, 'p', &
-                                npoints_chord_tot_virtual, nelems_span )
+      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual,     & 
+                              nelem_chord_virtual, ref_chord_fraction, 'p', &
+                              npoints_chord_tot_virtual, nelems_span )
 
       !> Construction of the actual surface panels
-      call read_mesh_pointwise( trim(mesh_file) , ee , rr , nelem_chord, ElType, &
-                                npoints_chord_tot, nelems_span )
-      nelems_span_tot =   nelems_span
+      call read_mesh_pointwise(trim(mesh_file), ee, rr,                & 
+                              nelem_chord, ref_chord_fraction, ElType, &
+                              npoints_chord_tot, nelems_span )
+      nelems_span_tot = nelems_span
 
     elseif ( ElType .eq. 'l' ) then 
 
@@ -845,15 +864,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       end if
 
       !> Construction of the virtual panels for collision avoidance
-      call read_mesh_pointwise( trim(mesh_file) , ee_virtual , rr_virtual , nelem_chord_virtual, 'p', &
-                                npoints_chord_tot_virtual, nelems_span )
+      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual, & 
+                              nelem_chord_virtual, 0.25_wp, 'p',        &
+                              npoints_chord_tot_virtual, nelems_span )
 
       !> Construction of the actual LL elements
-      call read_mesh_pointwise_ll(trim(mesh_file), ee, rr, 'l', &
-                                  airfoil_list   , nelem_span_list   , &
-                                  i_airfoil_e    , normalised_coord_e, &
-                                  npoints_chord_tot, nelems_span, &
-                                  chord_p,theta_p,theta_e )
+      call read_mesh_pointwise_ll(trim(mesh_file), ee, rr, 'l',    &
+                                  airfoil_list, nelem_span_list,   &
+                                  i_airfoil_e, normalised_coord_e, &
+                                  npoints_chord_tot, nelems_span,  &
+                                  chord_p, theta_p, theta_e )
                                   
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
