@@ -430,6 +430,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   integer(h5loc)                                     :: floc
   integer                                            :: iSurfPan, iVortLatt
   character(len=max_char_len)                        :: msg
+  real(wp)                                           :: ac_ll(3)
   character(len=*), parameter                        :: this_sub_name='create_geometry'
 
   tstart = sim_param%t0
@@ -727,15 +728,26 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   do i_comp = 1, size(geo%components)
     if ((geo%components(i_comp)%coupling) .and. (trim(geo%components(i_comp)%coupling_type) .eq. 'rbf')) then 
-      !> build connectivity for the panel center 
+      !> build connectivity for the panel center
+      !> CAUTION: ll%cen is at 50% chord, but forces must be applied at 25% (cfr. mod_post_integral l. 297)
       allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
 
-      do i = 1, size(geo%components(i_comp)%el)
-        !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
-        ! to interface with coupling
-        cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
-          geo%components(i_comp)%el(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
-      end do 
+      if (geo%components(i_comp)%comp_el_type .eq. 'l') then 
+        do i = 1, size(geo%components(i_comp)%el)
+          !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+          ! to interface with coupling
+          ac_ll = sum ( geo%components(i_comp)%el(i)%ver(:,1:2),2 ) / 2.0_wp
+          cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+            ac_ll -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
+        end do 
+      else
+        do i = 1, size(geo%components(i_comp)%el)
+          !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+          ! to interface with coupling
+          cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+            geo%components(i_comp)%el(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
+        end do 
+      endif
       
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
       !> transfer index and weight matrix 
