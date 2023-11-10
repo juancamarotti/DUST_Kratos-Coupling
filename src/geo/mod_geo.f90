@@ -292,6 +292,9 @@ type :: t_geo
   !> Number of explicit elements
   integer :: nelem_expl
 
+  !> Number of virtual elements
+  integer :: nelem_virtual
+
   !> Number of surface panel elements
   integer :: nSurfPan
   !> Number of vortex ring elements
@@ -300,6 +303,7 @@ type :: t_geo
   integer :: nLiftLin
   !> Number of Actuator disk elements
   integer :: nActDisk
+
 
   ! Only for implicit elements (for slicing)
   !> Global id of surface panel elements
@@ -439,7 +443,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   real(wp), allocatable                              :: ctr_pt(:,:)
 
   integer :: i, j, is, im,  i_comp, i_ll, i_ad
-  integer :: i_non_corr, i_corr, i_tot, i_expl, i_impl
+  integer :: i_non_corr, i_corr, i_tot, i_expl, i_impl, i_virtual
   type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
   type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
   integer(h5loc)                                     :: floc
@@ -473,12 +477,13 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call import_aero_tab(geo, airfoil_data)
 
   ! Initialisation
-  geo%nelem_impl   = 0
-  geo%nelem_expl   = 0
-  geo%nstatic_impl = 0
-  geo%nmoving_impl = 0
-  geo%nstatic_expl = 0
-  geo%nmoving_expl = 0
+  geo%nelem_impl    = 0
+  geo%nelem_expl    = 0
+  geo%nelem_virtual = 0
+  geo%nstatic_impl  = 0
+  geo%nmoving_impl  = 0
+  geo%nstatic_expl  = 0
+  geo%nmoving_expl  = 0
   geo%nstatic_SurfPan = 0
   geo%nSurfPan   = 0
   geo%nVortLatt  = 0
@@ -496,8 +501,9 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
           geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
           geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
         endif
-        geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
-        geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
+        geo%nSurfPan      = geo%nSurfPan + geo%components(i_comp)%nelems
+        geo%nelem_impl    = geo%nelem_impl + geo%components(i_comp)%nelems
+        geo%nelem_virtual = geo%nelem_virtual + geo%components(i_comp)%nelems_virtual
 
       case('v')
         if(geo%components(i_comp)%moving) then
@@ -507,6 +513,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         endif
         geo%nVortLatt = geo%nVortLatt + geo%components(i_comp)%nelems
         geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
+        geo%nelem_virtual = geo%nelem_virtual + geo%components(i_comp)%nelems_virtual
 
       case('l')
         if(geo%components(i_comp)%moving) then
@@ -516,6 +523,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         endif
         geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
         geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+        geo%nelem_virtual = geo%nelem_virtual + geo%components(i_comp)%nelems_virtual
 
       case('a')
         if(geo%components(i_comp)%moving) then
@@ -569,7 +577,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   allocate(elems_impl(geo%nelem_impl), elems_expl(geo%nelem_expl),  &
             elems_tot(geo%nelem_impl+geo%nelem_expl))
   allocate(elems_ad(geo%nactdisk), elems_ll(geo%nLiftLin))
-  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_non_corr = 0; i_corr = 0;  i_tot=0
+  allocate(elems_virtual(geo%nelem_virtual))
+  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_non_corr = 0; i_corr = 0;  i_tot=0; i_virtual=0;
 
   !> First count the corrected elements 
   do i_comp = 1,size(geo%components)
@@ -586,6 +595,13 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   do i_comp = 1,size(geo%components)
     
+    if (trim(geo%components(i_comp)%comp_el_type) .ne. 'a') then ! virtual elements
+      do j = 1,size(geo%components(i_comp)%el_virtual)
+        i_virtual = i_virtual + 1
+        elems_virtual(i_virtual)%p => geo%components(i_comp)%el_virtual(j) 
+      enddo
+    end if
+
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then ! panels, implicit and not corrected
       do j = 1,size(geo%components(i_comp)%el)
         i_tot = i_tot+1
@@ -1929,6 +1945,7 @@ subroutine prepare_geometry(geo)
   integer                            :: i_comp, ie
   integer                            :: nsides
   class(c_pot_elem), pointer         :: elem
+  class(c_elem_virtual), pointer     :: elem_virtual
   character(len=*), parameter        :: this_sub_name = 'prepare_geometry'
 
   do i_comp = 1,size(geo%components)
@@ -1976,6 +1993,25 @@ subroutine prepare_geometry(geo)
       elem%dcen_h_old = 0.0_wp
       elem%dvel_h     = 0.0_wp
     enddo
+
+    do ie = 1,size(geo%components(i_comp)%el_virtual)
+      
+      elem_virtual => geo%components(i_comp)%el_virtual(ie)
+
+      nsides = size(elem_virtual%i_ver)
+
+      !> Fields common to each element
+      allocate(elem_virtual%ver(3,nsides))
+      allocate(elem_virtual%edge_vec(3,nsides))
+      allocate(elem_virtual%edge_len(nsides))
+      allocate(elem_virtual%edge_uni(3,nsides))
+
+      !> Position and velocity increment, due to hinge motion
+      elem_virtual%dcen_h     = 0.0_wp
+      elem_virtual%dcen_h_old = 0.0_wp
+      elem_virtual%dvel_h     = 0.0_wp
+    enddo
+    
   enddo
 
 end subroutine prepare_geometry
@@ -2474,16 +2510,25 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
             do ie = 1 , size(comp%el)
               comp%el(ie)%nor_old = comp%el(ie)%nor
             end do
+            do ie = 1 , size(comp%el_virtual)
+              comp%el_virtual(ie)%nor_old = comp%el_virtual(ie)%nor
+            end do
           end if
 
           !> Move points of the component
           geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                                         geo%refs(comp%ref_id)%R_g, &
                                         geo%refs(comp%ref_id)%of_g)
+          geo%points_virtual(:,comp%i_points) = move_points(comp%loc_points_virtual, &
+                                        geo%refs(comp%ref_id)%R_g, &
+                                        geo%refs(comp%ref_id)%of_g)                                       
 
           !> Update geometrical data of the elements, after geometry motion
           do ie = 1,size(comp%el)
             call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+          enddo
+          do ie = 1,size(comp%el_virtual)
+            call comp%el_virtual(ie)%calc_geo_data(geo%points_virtual(:,comp%el_virtual(ie)%i_ver))
           enddo
 
           !> Unit normal vector time derivative, dn_dt
@@ -2494,15 +2539,25 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
             do ie = 1,size(comp%el)
               comp%el(ie)%nor_old = comp%el(ie)%nor
             end do
+            do ie = 1,size(comp%el_virtual)
+              comp%el_virtual(ie)%nor_old = comp%el_virtual(ie)%nor
+            end do            
           end if
 
           do ie = 1 , size(comp%el)
             comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
           end do
+          do ie = 1 , size(comp%el)
+            comp%el_virtual(ie)%dn_dt = (comp%el_virtual(ie)%nor - comp%el_virtual(ie)%nor_old)/sim_param % dt
+          end do          
 
           !> Calculate the velocity of the centers to assing b.c.
           do ie = 1,size(comp%el)
             call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                          geo%refs(comp%ref_id)%f_g)
+          enddo
+          do ie = 1,size(comp%el_virtual)
+            call calc_geo_vel(comp%el_virtual(ie), geo%refs(comp%ref_id)%G_g, &
                                           geo%refs(comp%ref_id)%f_g)
           enddo
           !> Update stripe velocity 
@@ -2522,6 +2577,10 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
         do ie = 1,size(comp%el)
 
           comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param%dt
+        end do
+        do ie = 1,size(comp%el_virtual)
+
+          comp%el_virtual(ie)%dn_dt = (comp%el_virtual(ie)%nor - comp%el_virtual(ie)%nor_old)/sim_param%dt
         end do
 
       end if  ! if ( .not. comp%coupling )
@@ -2594,6 +2653,32 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
         !> Update time derivative of the unit normal vector
         comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
                             ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                                                                sim_param % dt
+      end do
+      do ie = 1,size(comp%el_virtual)
+
+        !> Save dcen_h at previous timestep
+        comp%el_virtual(ie)%dcen_h_old = comp%el_virtual(ie)%dcen_h
+
+        !> Save the position of the centre, before hinge rotation
+        comp%el_virtual(ie)%dcen_h = comp%el_virtual(ie)%cen
+
+        !> Update new position of the centers, taking into account hinge motions
+        call comp%el_virtual(ie)%calc_geo_data(geo%points_virtual(:,comp%el_virtual(ie)%i_ver))
+
+        !> Evaluate dcen_h, delta position due to hinge motion
+        comp%el_virtual(ie)%dcen_h = comp%el_virtual(ie)%cen - comp%el_virtual(ie)%dcen_h
+
+        !> Evaluate dvel_h, delta velocity due to hinge motion, with first
+        ! order finite difference
+        comp%el_virtual(ie)%dvel_h = ( comp%el_virtual(ie)%dcen_h - comp%el_virtual(ie)%dcen_h_old ) / &
+                                                                  sim_param % dt
+        !> Update on-body velocity
+        comp%el_virtual(ie)%ub = comp%el_virtual(ie)%ub + comp%el_virtual(ie)%dvel_h
+
+        !> Update time derivative of the unit normal vector
+        comp%el_virtual(ie)%dn_dt = comp%el_virtual(ie)%dn_dt + &
+                            ( comp%el_virtual(ie)%nor - comp%el_virtual(ie)%nor_old ) / &
                                                                 sim_param % dt
       end do
 
