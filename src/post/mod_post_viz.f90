@@ -121,7 +121,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   logical, intent(in)                                       :: average
 
   type(t_geo_component), allocatable                        :: comps(:)
-  character(len=max_char_len)                               :: filename
+  character(len=max_char_len)                               :: filename, filename_virtual
   integer(h5loc)                                            :: floc , ploc
   logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
   logical                                                   :: out_wake, out_surfvel, out_vrad
@@ -131,10 +131,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   integer                                                   :: n_var , i_var
   character(len=max_char_len), allocatable                  :: var_names(:)
   real(wp), allocatable                                     :: points(:,:), points_exp(:,:) , wpoints(:,:)
+  real(wp), allocatable                                     :: points_virtual(:,:), points_virtual_exp(:,:)
   real(wp), allocatable                                     :: vppoints(:,:), vpvort(:)
   real(wp), allocatable                                     :: vpvort_v(:,:), vpturbvisc(:), v_rad(:)
-  integer , allocatable                                     :: elems(:,:) , welems(:,:)
-  integer                                                   :: nelem , nelem_w, nelem_vp
+  integer , allocatable                                     :: elems(:,:) , elems_virtual(:,:), welems(:,:)
+  integer                                                   :: nelem , nelem_virtual, nelem_w, nelem_vp
 
   real(wp), allocatable                                     :: points_ave(:,:)
 
@@ -205,7 +206,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   ! Load the components (just once)
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                                 components_names, all_comp)
 
   call close_hdf5_file(floc)
@@ -238,10 +239,12 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     call load_refs(floc,refs_R,refs_off)
 
     !> Move the points
-    call update_points_postpro(comps, points, refs_R, refs_off, &
+    call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
                                 filen = trim(filename) )
     !> Expand the actuator disks
     call expand_actdisk_postpro(comps, points, points_exp, elems)
+    call expand_actdisk_postpro(comps, points_virtual, points_virtual_exp, elems_virtual)
+
     if(average .and. it .eq. an_avg) then
       ! Save the points of this iteration for the average visualization
         allocate(points_ave(size(points_exp,1),size(points_exp,2)))
@@ -409,17 +412,23 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         select case (trim(out_frmt))
           case ('tecplot')
             filename = trim(filename)//'.plt'
+            filename_virtual = trim(filename)//'_virtual.plt'
             call  tec_out_viz(filename, t, &
                       points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
                       vp_rr=vppoints, vp_vars=out_vars_vp)
+            call  tec_out_viz(filename_virtual, t, &
+                      points_virtual_exp, elems_virtual, out_vars)
           case ('vtk')
             filename = trim(filename)//'.vtu'
+            filename_virtual = trim(filename)//'_virtual.vtu'
             call  vtk_out_viz(filename, &
                         points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
                       vp_rr=vppoints, vp_vars=out_vars_vp, &
                       separate_wake = separate_wake)
+            call  vtk_out_viz(filename_virtual, &
+                      points_virtual_exp, elems_virtual, out_vars)
           case default
             call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
@@ -435,12 +444,18 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         select case (trim(out_frmt))
           case ('tecplot')
             filename = trim(filename)//'.plt'
+            filename_virtual = trim(filename)//'_virtual.plt'
             call  tec_out_viz(filename, t, &
                           points_exp, elems, out_vars)
+            call  tec_out_viz(filename_virtual, t, &
+                          points_virtual_exp, elems_virtual, out_vars)
           case ('vtk')
             filename = trim(filename)//'.vtu'
+            filename_virtual = trim(filename)//'_virtual.vtu'
             call  vtk_out_viz(filename, &
                           points_exp, elems, out_vars)
+            call  vtk_out_viz(filename_virtual, &
+                          points_virtual_exp, elems_virtual, out_vars)                          
           case default
             call error('dust_post','','Unknown format '//trim(out_frmt)//&
                         ' for visualization output')
@@ -490,7 +505,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     deallocate(points_ave)
   endif
 
-  deallocate(points)
+  deallocate(points, points_virtual)
   call destroy_elements(comps)
   deallocate(comps)
   deallocate(out_vars)

@@ -276,7 +276,7 @@ type :: t_geo_component
 
 
   !> Dimensions of parametric elements only
-  integer :: parametric_nelems_span , parametric_nelems_chor
+  integer :: parametric_nelems_span , parametric_nelems_chor, parametric_nelems_chor_virtual
 
 end type  t_geo_component
 
@@ -1693,6 +1693,7 @@ subroutine load_components(geo, in_file, out_file, te)
         geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
 
       enddo
+      n_vert = 0
 
       !> fill (some) of the virtual elements fields
       do i2=1,size(ee_virtual,2)

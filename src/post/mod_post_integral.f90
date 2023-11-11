@@ -119,8 +119,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
   type(t_geo_component), allocatable                       :: comps(:)
   integer(h5loc)                                           :: floc , ploc
-  real(wp), allocatable                                    :: points(:,:)
-  integer                                                  :: nelem
+  real(wp), allocatable                                    :: points(:,:), points_virtual(:,:)
+  integer                                                  :: nelem, nelem_virtual
 
   character(len=max_char_len)                              :: filename
   character(len=max_char_len), allocatable                 :: refs_tag(:)
@@ -158,7 +158,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   ! load the geo components just once just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
   !TODO: here get the run id
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                                 components_names,  all_comp)
   call close_hdf5_file(floc)
 
@@ -237,7 +237,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     ! Load the references and move the points ---
     call load_refs(floc,refs_R,refs_off)
     ! Move the points ---------------------------
-    call update_points_postpro(comps, points, refs_R, refs_off, &
+    call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
                                 filen = trim(filename) )
     ! Load the results --------------------------
     call load_res(floc, comps, vort, cp, t)
@@ -401,8 +401,8 @@ subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
   integer                                                   :: i_comp 
   type(t_geo_component), allocatable                        :: comps(:)
   integer(h5loc)                                            :: floc, ploc
-  real(wp), allocatable                                     :: points(:,:)
-  integer                                                   :: nelem, i_hinge
+  real(wp), allocatable                                     :: points(:,:), points_virtual(:,:)
+  integer                                                   :: nelem, nelem_virtual, i_hinge
   character(len=max_char_len)                               :: filename
   character(len=max_char_len), allocatable                  :: refs_tag(:)
   real(wp), allocatable                                     :: refs_R(:,:,:), refs_off(:,:)
@@ -439,7 +439,7 @@ subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
   
   !TODO: here get the run id
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
         components_names,  all_comp)
 
   ! Prepare_geometry_postpro
@@ -510,7 +510,7 @@ subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
 
     ! Load the references and move the points ---
     ! Move the points ---------------------------
-    call update_points_postpro(comps, points, refs_R, refs_off, &
+    call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
                                 filen = trim(filename) )
     ! Load the results --------------------------
     call load_res(floc, comps, vort, cp, t)

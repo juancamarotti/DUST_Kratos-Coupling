@@ -148,7 +148,8 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   real(wp), allocatable , target                           :: sol(:)
   integer(h5loc)                                           :: floc , ploc
   real(wp), allocatable                                    :: points(:,:), points_old(:,:)
-  integer                                                  :: nelem
+  real(wp), allocatable                                    :: points_virtual(:,:), points_virtual_old(:,:)
+  integer                                                  :: nelem, nelem_virtual
 
   real(wp), allocatable                                    :: refs_R(:,:,:), refs_off(:,:)
   real(wp), allocatable                                    :: refs_G(:,:,:), refs_f(:,:)
@@ -223,7 +224,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   ! load the geo components just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
   !TODO: here get the run id    !todo????
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                                 components_names,  all_comp)
   call close_hdf5_file(floc)
 
@@ -233,7 +234,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   if (probe_p) then
     ! Prepare also comp_old etc for previous timestep solution
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
-    call load_components_postpro(comps_old, points_old, nelem,  floc, &
+    call load_components_postpro(comps_old, points_old, points_virtual_old, nelem, nelem_virtual, floc, &
                                 components_names,  all_comp)  
     call close_hdf5_file(floc)
     call prepare_geometry_postpro(comps_old)    
@@ -351,7 +352,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
     ! Load the references and move the points ---
     call load_refs(floc,refs_R,refs_off,refs_G,refs_f)
 
-    call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f, &
+    call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, refs_G, refs_f, &
                                 filen = trim(filename) )
 
     ! Load the results --------------------------
@@ -391,7 +392,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
       call open_hdf5_file(trim(filename),floc)
       call load_refs(floc,refs_R,refs_off)
         
-      call update_points_postpro(comps_old, points_old, refs_R, refs_off, &
+      call update_points_postpro(comps_old, points_old, points_virtual_old, refs_R, refs_off, &
                                 filen = trim(filename) )
       ! Load the results --------------------------
       call load_res(floc, comps_old, vort_old, cp_old, t_old)

@@ -534,27 +534,27 @@ subroutine vtk_out_viz (out_filename, &
                         rr, ee, vars, &
                         w_rr, w_ee, w_vars, &
                         vp_rr, vp_vars, separate_wake)
- character(len=*), intent(in) :: out_filename
- real(wp), intent(in) :: rr(:,:)
- integer, intent(in) :: ee(:,:)
- type(t_output_var), intent(in) :: vars(:)
- real(wp), intent(in), optional :: w_rr(:,:)
- integer, intent(in), optional :: w_ee(:,:)
- type(t_output_var), intent(in), optional :: w_vars(:)
- real(wp), intent(in), optional :: vp_rr(:,:)
- type(t_output_var), intent(in), optional :: vp_vars(:)
- logical, intent(in), optional :: separate_wake
+  character(len=*), intent(in)              :: out_filename
+  real(wp), intent(in)                      :: rr(:,:)
+  integer, intent(in)                       :: ee(:,:) 
+  type(t_output_var), intent(in)            :: vars(:)
+  real(wp), intent(in), optional            :: w_rr(:,:)
+  integer, intent(in), optional             :: w_ee(:,:)
+  type(t_output_var), intent(in), optional  :: w_vars(:)
+  real(wp), intent(in), optional            :: vp_rr(:,:)
+  type(t_output_var), intent(in), optional  :: vp_vars(:)
+  logical, intent(in), optional             :: separate_wake
 
- integer :: fu, ierr
- integer :: npoints, ncells, ne
- integer :: offset
- integer :: slen
- character(len=200) :: buffer
- character(len=1)  :: lf
+  integer :: fu, ierr
+  integer :: npoints, ncells, ne
+  integer :: offset
+  integer :: slen
+  character(len=200) :: buffer
+  character(len=1)  :: lf
 
- integer :: ie, nquad, ntria, nquad_w, ntria_w, nvp
- integer :: npoints_w, nw
- logical :: got_wake, got_particles, swake
+  integer :: ie, nquad, ntria, nquad_w, ntria_w, nvp
+  integer :: npoints_w, nw
+  logical :: got_wake, got_particles, swake
 
   got_wake = present(w_vars)
   got_particles = got_wake .and. (size(vp_rr,2) .gt. 0)
