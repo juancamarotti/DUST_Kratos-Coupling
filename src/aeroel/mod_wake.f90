@@ -79,6 +79,9 @@ use mod_vortlatt, only: &
 use mod_liftlin, only: &
   t_liftlin
 
+use mod_virtual, only: &
+  c_elem_virtual, t_elem_virtual_p
+
 use mod_vortline, only: &
   t_vortline
 
@@ -1276,10 +1279,11 @@ end subroutine update_wake
 !! Completes the updating to the next time step begun in update_wake
 !! first and second row are updated to the next step and new particles are
 !! created if necessary; they will appear at the save_date in the next time step
-subroutine complete_wake(wake, geo, elems, te)
+subroutine complete_wake(wake, geo, elems, elems_virtual, te)
   type(t_wake), target, intent(inout)   :: wake
   type(t_geo), intent(in)               :: geo
   type(t_pot_elem_p), intent(in)        :: elems(:)
+  type(t_elem_virtual_p), intent(in)    :: elems_virtual(:)
   type(t_tedge), intent(inout)          :: te
 
   integer                               :: p1, p2
@@ -1392,10 +1396,9 @@ subroutine complete_wake(wake, geo, elems, te)
   n_part = wake%n_prt
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
-
     if(sim_param%use_pa) then
       vel_in = wake%part_p(ip)%p%vel
-      call avoid_collision(elems, wake, &
+      call avoid_collision(elems_virtual, wake, &
                         wake%part_p(ip)%p, vel_in, vel_out)
       wake%part_p(ip)%p%vel = vel_out
     endif
@@ -2258,8 +2261,8 @@ function get_joined_intensity(wake, iw, side) result(ave)
 end function get_joined_intensity
 
 
-subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
-  type(t_pot_elem_p), intent(in)      :: elems(:)
+subroutine avoid_collision(elems_virtual, wake, part, vel_in, vel_out)
+  type(t_elem_virtual_p), intent(in)  :: elems_virtual(:)
   type(t_wake), intent(inout)         :: wake
   type(t_vortpart), intent(inout)     :: part
   real(wp), intent(in)                :: vel_in(3)
@@ -2290,157 +2293,69 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
   !starting position
   pos1 = part%cen
   vel = vel_in
-
+  write(*,*) 'ciao'
   !Cycle on all the elements
-  do ie=1,size(elems)
-
-    select type( elem => elems(ie)%p )
-
-      class is (t_surfpan)
-        !Get the position of the particle with respect to the element
-        dist1 = pos1-(elem%cen)
-        elrad = maxval(elem%edge_len)*r2d2
-        check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
-        distn = norm2(dist1)
-
-        !if it is in the check radius perform calculations
-        if ((distn .lt. check_radius) ) then
-
-          !use the relative velocity to take into account also the element
-          !movement
-          relvel = vel - elem%ub
-          n = elem%nor
-          dist1_nor = sum(dist1 * n)
-          dist1_tan = norm2(dist1-(n*dist1_nor))
-          normvel = sum(relvel*n)
-
-          !If it is on the opposite side of the element, or it is moving away,
-          !do not perform any modification
-          if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
-
-          !get the time at which the particle hits the surface
-          !make sure not to go back in time
-          dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
-          !if it is lower than the timestep (i.e. the particles hits the surface
-          !within next step) start the correction
-          if (dt_part .gt. sim_param%dt) cycle
-          !Get the position at the time in which the particle hits the
-          !surface plane
-          pos2  = part%cen+relvel*dt_part
-          dist2 = pos2 - ( elem%cen )
-          dist2_nor = sum(dist2 * n)
-            
-          if(dist2_nor .le. blthick) then
-            dist2_tan = norm2(dist2-(n*dist2_nor))
-
-            if (dist2_tan .lt. elrad_mult*elrad) then
-
-              !correct the normal velocity to avoid penetration
-              if (dt_part .lt. sim_param%dt) then
-                normvel_corr = -dist1_nor/ &
-                                (sim_param%dt*real(sim_param%ndt_update_wake,wp))
-              else
-                dampf = (dist2_nor/blthick)
-                normvel_corr = normvel + (blthick-dist2_nor)/ &
-                              (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
-              endif
-
-              ! should be
-              ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
-              ! but simplifying
-              newvel = vel + (normvel_corr-normvel)*n
-
-              !fix the tangential velocity to keep the magnitude constant
-              normvel_corr = sum(newvel*n)
-              normvel  = sum(vel*n)
-              tanvel   = vel - normvel*n
-              tanvel2  = sum(tanvel**2)
-              nveldiff = normvel**2-normvel_corr**2+tanvel2
-              if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
-                                                      nveldiff.ge.0.0_wp) then
-                tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
-              endif
-              !reconstruct the velocity
-              vel = tanvel + normvel_corr*n
+  do ie=1,size(elems_virtual)
+      !Get the position of the particle with respect to the element
+      dist1 = pos1-(elems_virtual(ie)%p%cen)
+      elrad = maxval(elems_virtual(ie)%p%edge_len)*r2d2
+      check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
+      distn = norm2(dist1)
+      !if it is in the check radius perform calculations
+      if ((distn .lt. check_radius) ) then
+        !use the relative velocity to take into account also the element
+        !movement
+        relvel = vel - elems_virtual(ie)%p%ub
+        n = elems_virtual(ie)%p%nor
+        dist1_nor = sum(dist1 * n)
+        dist1_tan = norm2(dist1-(n*dist1_nor))
+        normvel = sum(relvel*n)
+        !If it is on the opposite side of the element, or it is moving away,
+        !do not perform any modification
+        if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
+        !get the time at which the particle hits the surface
+        !make sure not to go back in time
+        dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
+        !if it is lower than the timestep (i.e. the particles hits the surface
+        !within next step) start the correction
+        if (dt_part .gt. sim_param%dt) cycle
+        !Get the position at the time in which the particle hits the
+        !surface plane
+        pos2  = part%cen+relvel*dt_part
+        dist2 = pos2 - ( elems_virtual(ie)%p%cen )
+        dist2_nor = sum(dist2 * n)
+          
+        if(dist2_nor .le. blthick) then
+          dist2_tan = norm2(dist2-(n*dist2_nor))
+          if (dist2_tan .lt. elrad_mult*elrad) then
+            !correct the normal velocity to avoid penetration
+            if (dt_part .lt. sim_param%dt) then
+              normvel_corr = -dist1_nor/ &
+                              (sim_param%dt*real(sim_param%ndt_update_wake,wp))
+            else
+              dampf = (dist2_nor/blthick)
+              normvel_corr = normvel + (blthick-dist2_nor)/ &
+                            (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
             endif
-          endif
-
-        endif
-
-      class is ( t_vortlatt )
-        !Get the position of the particle with respect to the element
-        dist1 = pos1-(elem%cen)
-        elrad = maxval(elem%edge_len)*r2d2
-        check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
-        distn = norm2(dist1)
-
-        !if it is in the check radius perform calculations
-        if ((distn .lt. check_radius) ) then
-
-          !use the relative velocity to take into account also the element
-          !movement
-          relvel = vel - elem%ub
-          n = elem%nor
-          dist1_nor = norm2(dist1 * n)
-          dist1_tan = norm2(dist1-(n*dist1_nor))
-          normvel = sum(relvel*n)
-
-          !If it is moving away, do not perform any modification
-          if (sum(dist1 * n)*normvel .ge. 0.0_wp) cycle
-
-            !get the time at which the particle hits the surface
-            !make sure not to go back in time
-            dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
-            !if it is lower than the timestep (i.e. the particles hits the surface
-            !within next step) start the correction
-            if (dt_part .gt. sim_param%dt) cycle
-
-            !Get the position at the time in which the particle hits the
-            !surface plane
-            pos2  = part%cen+relvel*dt_part
-            dist2 = pos2 - ( elem%cen )
-            dist2_nor = norm2(dist2 * n)
-            blthick = 2.0_wp*blthick
-          if(dist2_nor .le. blthick) then
-            dist2_tan = norm2(dist2-(n*dist2_nor))
-
-            if (dist2_tan .lt. elrad_mult*elrad) then
-
-              !correct the normal velocity to avoid penetration
-              if (dt_part .lt. sim_param%dt) then
-                normvel_corr = -dist1_nor/ &
-                                (sim_param%dt*real(sim_param%ndt_update_wake,wp))
-              else
-                dampf = (dist2_nor/blthick)
-                normvel_corr = normvel + (blthick-dist2_nor)/ &
-                              (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
-              endif
-
-              newvel = vel + (normvel_corr-normvel)*n
-
-              !fix the tangential velocity to keep the magnitude constant
-              normvel_corr = sum(newvel*n)
-              normvel  = sum(vel*n)
-              tanvel   = vel - normvel*n
-              tanvel2  = sum(tanvel**2)
-              nveldiff = normvel**2-normvel_corr**2+tanvel2
-              if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
-                                                      nveldiff.ge.0.0_wp) then
-                tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
-              endif
-              !reconstruct the velocity
-              vel = tanvel + normvel_corr*n
+            ! should be
+            ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
+            ! but simplifying
+            newvel = vel + (normvel_corr-normvel)*n
+            !fix the tangential velocity to keep the magnitude constant
+            normvel_corr = sum(newvel*n)
+            normvel  = sum(vel*n)
+            tanvel   = vel - normvel*n
+            tanvel2  = sum(tanvel**2)
+            nveldiff = normvel**2-normvel_corr**2+tanvel2
+            if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
+                                                    nveldiff.ge.0.0_wp) then
+              tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
             endif
+            !reconstruct the velocity
+            vel = tanvel + normvel_corr*n
           endif
-
         endif
-
-      class is ( t_liftlin )
-
-      class default
-
-    end select
-
+      endif
   enddo
 
   vel_out = vel

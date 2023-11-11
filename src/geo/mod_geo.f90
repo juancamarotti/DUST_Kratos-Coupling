@@ -229,7 +229,7 @@ type :: t_geo_component
 
   !> Points in local reference frame
   real(wp), allocatable :: loc_points(:,:), loc_points_virtual(:,:)  
-  real(wp), allocatable :: loc_cen(:,:) 
+  real(wp), allocatable :: loc_cen(:,:), loc_cen_virtual(:,:)
   real(wp), allocatable :: loc_ctr_pt(:,:) 
   
   !> Number of surface panels in the component
@@ -442,7 +442,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   character(len=*), intent(in)                       :: target_file
   integer, intent(in)                                :: run_id(10)
   real(wp)                                           :: tstart
-  real(wp), allocatable                              :: cen(:,:)
+  real(wp), allocatable                              :: cen(:,:), cen_virtual(:,:)
   real(wp), allocatable                              :: ctr_pt(:,:)
 
   integer :: i, j, is, im,  i_comp, i_ll, i_ad
@@ -784,6 +784,29 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
       deallocate(cen)
 
+      !> build connectivity for the virtual panel center 
+      allocate(cen_virtual(3, size(geo%components(i_comp)%el_virtual))); cen_virtual = 0.0_wp 
+
+      do i = 1, size(geo%components(i_comp)%el_virtual)
+        !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+        ! to interface with coupling
+        cen_virtual(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+          geo%components(i_comp)%el_virtual(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
+      end do 
+      
+      call geo%components(i_comp)%rbf%build_connectivity(cen_virtual, geo%components(i_comp)%coupling_node_rot)
+      !> transfer index and weight matrix 
+      geo%components(i_comp)%rbf%cen_virtual%ind = geo%components(i_comp)%rbf%point%ind
+      geo%components(i_comp)%rbf%cen_virtual%wei = geo%components(i_comp)%rbf%point%wei
+      
+      !> store the read points into the local cen  
+      allocate(geo%components(i_comp)%loc_cen_virtual(3,size(cen_virtual,2)))
+      geo%components(i_comp)%loc_cen_virtual = cen_virtual 
+
+      !> cleanup 
+      deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+      deallocate(cen_virtual)
+      
       !> build connectivity for the stripe (vl_corrected) for velocity evaluation 
       if (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
           trim(geo%components(i_comp)%aero_correction) .eq. 'true') then 
@@ -2531,7 +2554,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
           geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                                         geo%refs(comp%ref_id)%R_g, &
                                         geo%refs(comp%ref_id)%of_g)
-          geo%points_virtual(:,comp%i_points) = move_points(comp%loc_points_virtual, &
+          geo%points_virtual(:,comp%i_points_virtual) = move_points(comp%loc_points_virtual, &
                                         geo%refs(comp%ref_id)%R_g, &
                                         geo%refs(comp%ref_id)%of_g)                                       
 
