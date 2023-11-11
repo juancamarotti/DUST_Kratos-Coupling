@@ -75,8 +75,8 @@ use mod_parametric_io, only: &
   read_mesh_parametric
 
 use mod_aeroel, only: &
-  c_elem, c_elem_virtual, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_elem_virtual_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_surfpan, only: &
   t_surfpan
@@ -92,6 +92,9 @@ use mod_liftlin, only: &
 
 use mod_actuatordisk, only: &
   t_actdisk
+
+use mod_virtual, only: &
+  c_elem_virtual, t_elem_virtual_p
 
 use mod_c81, only: &
   t_aero_tab , read_c81_table , interp_aero_coeff
@@ -132,7 +135,7 @@ implicit none
 public :: t_geo, t_geo_component, t_tedge, &
           create_geometry, update_geometry, destroy_geometry, &
           calc_geo_data_pan, calc_geo_data_ll, calc_geo_data_ad,&
-          calc_node_vel , calc_geo_vel, destroy_elements
+          calc_node_vel , calc_geo_vel, calc_geo_vel_virtual, destroy_elements
 
 private
 
@@ -2251,6 +2254,14 @@ subroutine calc_geo_vel(elem, G, f)
 
 end subroutine calc_geo_vel
 
+subroutine calc_geo_vel_virtual(elem, G, f)
+  class(c_elem_virtual), intent(inout)  :: elem
+  real(wp), intent(in)              :: f(3), G(3,3)
+
+  elem%ub = f + matmul(G,elem%cen)
+
+end subroutine calc_geo_vel_virtual
+
 !> Calculate velocity of a point whose coordinate is rr
 !! boundary condition
 !!
@@ -2490,6 +2501,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
   logical, intent(in) :: time_cycle
 
   real(wp), allocatable :: rr_hinge_contig(:,:)
+  real(wp), allocatable :: rr_hinge_contig_virtual(:,:)
   integer :: i_comp, ie, ih, i_el
 
   !> Update all the references
@@ -2528,7 +2540,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
             call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
           enddo
           do ie = 1,size(comp%el_virtual)
-            call comp%el_virtual(ie)%calc_geo_data(geo%points_virtual(:,comp%el_virtual(ie)%i_ver))
+            call comp%el_virtual(ie)%calc_geo_data_virtual(geo%points_virtual(:,comp%el_virtual(ie)%i_ver))
           enddo
 
           !> Unit normal vector time derivative, dn_dt
@@ -2557,7 +2569,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
                                           geo%refs(comp%ref_id)%f_g)
           enddo
           do ie = 1,size(comp%el_virtual)
-            call calc_geo_vel(comp%el_virtual(ie), geo%refs(comp%ref_id)%G_g, &
+            call calc_geo_vel_virtual(comp%el_virtual(ie), geo%refs(comp%ref_id)%G_g, &
                                           geo%refs(comp%ref_id)%f_g)
           enddo
           !> Update stripe velocity 
@@ -2623,6 +2635,41 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
 
     end do
 
+    do ih = 1, comp%n_hinges
+      !> Update:
+      ! - hinge node coordinates, act%rr
+      ! - hinge node orientation (unit vectors h,v,n)
+      ! - hinge rotation angle, theta
+      ! for non-coupled components only (so far)
+      if ( (.not. comp%coupling) ) then
+        
+        !> hinge nodes, points and orientation
+        call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
+                                                geo%refs(comp%ref_id)%of_g )
+        !> hinge rotation, theta
+        call comp%hinge(ih)%update_theta( t )
+        
+        !> Allocating contiguous array to pass to %hinge_deflection procedure
+        allocate(rr_hinge_contig_virtual(3,size(comp%i_points_virtual)))
+        rr_hinge_contig_virtual = geo%points_virtual(:, comp%i_points_virtual)
+        
+        if (comp%moving .or. update_static) then 
+          call comp%hinge(ih)%hinge_deflection(comp%i_points_virtual, rr_hinge_contig_virtual,  t, te%i, te%t_hinged )
+        endif
+        
+        geo%points_virtual(:, comp%i_points_virtual) = rr_hinge_contig_virtual
+        
+        deallocate(rr_hinge_contig_virtual)
+
+      else
+
+        !> Updated in mod_precice/update_elems
+
+      end if
+
+
+    end do
+
     ! *** to do ***
     ! Update surface velocity, considering both hinges with prescribed motion
     ! and those coupled with the structural components
@@ -2664,7 +2711,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
         comp%el_virtual(ie)%dcen_h = comp%el_virtual(ie)%cen
 
         !> Update new position of the centers, taking into account hinge motions
-        call comp%el_virtual(ie)%calc_geo_data(geo%points_virtual(:,comp%el_virtual(ie)%i_ver))
+        call comp%el_virtual(ie)%calc_geo_data_virtual(geo%points_virtual(:,comp%el_virtual(ie)%i_ver))
 
         !> Evaluate dcen_h, delta position due to hinge motion
         comp%el_virtual(ie)%dcen_h = comp%el_virtual(ie)%cen - comp%el_virtual(ie)%dcen_h

@@ -69,7 +69,7 @@ use mod_geometry, only: &
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_elem_virtual_p
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_doublet, only: &
   initialize_doublet
@@ -90,6 +90,9 @@ use mod_liftlin, only: &
 
 use mod_actuatordisk, only: &
   update_actdisk
+
+use mod_virtual, only: &
+  c_elem_virtual, t_elem_virtual_p
 
 use mod_vortline, only: &
   initialize_vortline
