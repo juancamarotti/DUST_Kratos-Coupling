@@ -618,9 +618,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   allocate(span_fraction(maxval(nelem_span_list))) ; span_fraction = 0.0_wp
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
-  write(*,*) 'npoin_chord_tot',npoint_chord_tot
-  write(*,*) 'shape:rrSection1',shape(rrSection1)
-  write(*,*) 'shape:rrSection2',shape(rrSection2)
   ! Initialise dr_ref for the definition of the actual reference_point
   !  of each bay (by updating)
   dx_ref = ref_point(1)       ! 0.0_wp
@@ -731,16 +728,11 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
     dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref
     dy_ref = span_list(iRegion)                                             + dy_ref
     dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref
-    write(*,*) 'shape:rrSection1',shape(rrSection1)
-    write(*,*) 'shape:rrSection2',shape(rrSection2)
-    write(*,*) 'shape:xySection1',shape(xySection1)
-    write(*,*) 'shape:xySection2',shape(xySection2) 
+
     rrSection2(1,:) = xySection2(1,:) + dx_ref
     rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
     rrSection2(3,:) = xySection2(2,:) + dz_ref
-    write(*,*) 'rrSection2(1,:) = ', rrSection2(1,:)
-    write(*,*) 'rrSection2(2,:) = ', rrSection2(2,:)
-    write(*,*) 'rrSection2(3,:) = ', rrSection2(3,:) 
+
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do i1 = 1 , nelem_span_list(iRegion)
 
@@ -1073,11 +1065,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   point_list        = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
                                           sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                     point_list )
-  !points_mean_line  = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-  !                                        sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-  !                                                            points_mean_line )
   thickness = thickness * chord 
-  write(*,*) 'shape:point_list', shape(point_list)
   !> optional output
   if (present(thickness_out)) then
     thickness_out = thickness

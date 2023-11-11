@@ -364,7 +364,6 @@ subroutine load_components_postpro(comps, points, points_virtual, nelem, nelem_v
       comps(i_comp)%loc_points = rr
       allocate(comps(i_comp)%loc_points_virtual(3,size(rr_virtual,2)))
       comps(i_comp)%loc_points_virtual = rr_virtual
-      
       !Now for the moments the points are stored here without moving them,
       !will be moved later, consider not storing them here at all
       allocate(points_tmp(3,size(rr,2)+points_offset))
@@ -816,19 +815,22 @@ end subroutine update_points_postpro
 
 !----------------------------------------------------------------------
 
-subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
-  type(t_geo_component), intent(in)  :: comps(:)
-  real(wp), intent(in)               :: points(:,:)
-  real(wp), allocatable, intent(out) :: points_exp(:,:)
-  integer, allocatable, intent(out)  :: elems(:,:)
+subroutine expand_actdisk_postpro(comps, points, points_virtual, points_exp, & 
+                                  points_virtual_exp, elems, elems_virtual)
 
-  real(wp), allocatable              :: pt_tmp(:,:)
-  integer, allocatable               :: ee_tmp(:,:)
+  type(t_geo_component), intent(in)  :: comps(:)
+  real(wp), intent(in)               :: points(:,:), points_virtual(:,:)
+  real(wp), allocatable, intent(out) :: points_exp(:,:), points_virtual_exp(:,:)
+  integer, allocatable, intent(out)  :: elems(:,:), elems_virtual(:,:)
+
+  real(wp), allocatable              :: pt_tmp(:,:), pt_tmp_virtual(:,:)
+  integer, allocatable               :: ee_tmp(:,:), ee_tmp_virtual(:,:)
   integer                            :: i_comp, ie, extra_offset, iv, ipt, ipt1
   integer                            :: start_pts, start_cen
 
   extra_offset = 0
   allocate(points_exp(3,0), elems(4,0))
+  allocate(points_virtual_exp(3,0), elems_virtual(4,0))
   do i_comp = 1,size(comps)
     associate(cmp=>comps(i_comp))
     select type(el => cmp%el)
@@ -881,6 +883,20 @@ subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
                                                   el(ie)%i_ver+extra_offset
         enddo
         call move_alloc(ee_tmp, elems)
+
+        allocate(pt_tmp_virtual(3,size(points_virtual_exp,2)+size(cmp%loc_points_virtual,2)))
+        pt_tmp_virtual(:,1:size(points_virtual_exp,2)) = points_virtual_exp
+        pt_tmp_virtual(:,size(points_virtual_exp,2)+1:size(pt_tmp_virtual,2)) = points_virtual(:,cmp%i_points_virtual)
+        call move_alloc(pt_tmp_virtual, points_virtual_exp)
+
+        allocate(ee_tmp_virtual(4,size(elems_virtual,2)+cmp%nelems_virtual))
+        ee_tmp_virtual(:,1:size(elems_virtual,2)) = elems_virtual
+        ee_tmp_virtual(:,size(elems_virtual,2)+1:size(ee_tmp_virtual,2)) = 0
+        do ie = 1,cmp%nelems_virtual
+          ee_tmp_virtual(1:cmp%el_virtual(ie)%n_ver,size(elems_virtual,2)+ie) =  &
+                                                  cmp%el_virtual(ie)%i_ver + extra_offset
+        enddo
+        call move_alloc(ee_tmp_virtual, elems_virtual)
 
       end select
     end associate

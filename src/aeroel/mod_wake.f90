@@ -2293,7 +2293,6 @@ subroutine avoid_collision(elems_virtual, wake, part, vel_in, vel_out)
   !starting position
   pos1 = part%cen
   vel = vel_in
-  write(*,*) 'ciao'
   !Cycle on all the elements
   do ie=1,size(elems_virtual)
       !Get the position of the particle with respect to the element

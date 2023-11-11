@@ -121,7 +121,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   logical, intent(in)                                       :: average
 
   type(t_geo_component), allocatable                        :: comps(:)
-  character(len=max_char_len)                               :: filename, filename_virtual
+  character(len=max_char_len)                               :: filename, filename_virtual, filename_in
   integer(h5loc)                                            :: floc , ploc
   logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
   logical                                                   :: out_wake, out_surfvel, out_vrad
@@ -149,9 +149,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
   type(t_output_var), allocatable                           :: out_vars(:), ave_out_vars(:)
   type(t_output_var), allocatable                           :: out_vars_w(:), out_vars_vp(:)
+  type(t_output_var), allocatable                           :: out_vars_virtual(:)
   integer                                                   :: nprint , nprint_w, nelem_out
 
-  integer                                                   :: it, ires
+  integer                                                   :: it, ires, ii
   real(wp)                                                  :: t
   character(len=*), parameter                               :: this_sub_name='post_viz'
 
@@ -194,7 +195,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_dmom)      nprint = nprint+1 
   
   allocate(out_vars(nprint))
-  
+  allocate(out_vars_virtual(0))
+
   if(average) allocate(ave_out_vars(nprint))
   
   if(out_wake) then
@@ -225,8 +227,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     ires = ires+1
 
     ! Open the file
-    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
-    call open_hdf5_file(trim(filename),floc)
+    write(filename_in,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+    call open_hdf5_file(trim(filename_in),floc)
 
     ! Load free-stream parameters
     call open_hdf5_group(floc,'Parameters',ploc)
@@ -240,10 +242,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
     !> Move the points
     call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
-                                filen = trim(filename) )
+                                filen = trim(filename_in) )
     !> Expand the actuator disks
-    call expand_actdisk_postpro(comps, points, points_exp, elems)
-    call expand_actdisk_postpro(comps, points_virtual, points_virtual_exp, elems_virtual)
+    call expand_actdisk_postpro(comps, points, points_virtual, points_exp, points_virtual_exp, elems, elems_virtual)
 
     if(average .and. it .eq. an_avg) then
       ! Save the points of this iteration for the average visualization
@@ -316,7 +317,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
     if(.not. average) then
       ! Output filename
-      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
+      write(filename_in,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
 
       if (out_wake) then
 
@@ -411,24 +412,24 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         !Output the results (with wake)
         select case (trim(out_frmt))
           case ('tecplot')
-            filename = trim(filename)//'.plt'
-            filename_virtual = trim(filename)//'_virtual.plt'
+            filename = trim(filename_in)//'.plt'
+            filename_virtual = trim(filename_in)//'_virtual.plt'
             call  tec_out_viz(filename, t, &
                       points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
                       vp_rr=vppoints, vp_vars=out_vars_vp)
             call  tec_out_viz(filename_virtual, t, &
-                      points_virtual_exp, elems_virtual, out_vars)
+                      points_virtual_exp, elems_virtual, out_vars_virtual)
           case ('vtk')
-            filename = trim(filename)//'.vtu'
-            filename_virtual = trim(filename)//'_virtual.vtu'
+            filename = trim(filename_in)//'.vtu'
+            filename_virtual = trim(filename_in)//'_virtual.vtu'
             call  vtk_out_viz(filename, &
                         points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
                       vp_rr=vppoints, vp_vars=out_vars_vp, &
                       separate_wake = separate_wake)
             call  vtk_out_viz(filename_virtual, &
-                      points_virtual_exp, elems_virtual, out_vars)
+                      points_virtual_exp, elems_virtual, out_vars_virtual)
           case default
             call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
@@ -443,19 +444,19 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         !Output the results (without wake)
         select case (trim(out_frmt))
           case ('tecplot')
-            filename = trim(filename)//'.plt'
-            filename_virtual = trim(filename)//'_virtual.plt'
+            filename = trim(filename_in)//'.plt'
+            filename_virtual = trim(filename_in)//'_virtual.plt'
             call  tec_out_viz(filename, t, &
                           points_exp, elems, out_vars)
             call  tec_out_viz(filename_virtual, t, &
-                          points_virtual_exp, elems_virtual, out_vars)
+                          points_virtual_exp, elems_virtual, out_vars_virtual)
           case ('vtk')
-            filename = trim(filename)//'.vtu'
-            filename_virtual = trim(filename)//'_virtual.vtu'
+            filename = trim(filename_in)//'.vtu'
+            filename_virtual = trim(filename_in)//'_virtual.vtu'
             call  vtk_out_viz(filename, &
                           points_exp, elems, out_vars)
             call  vtk_out_viz(filename_virtual, &
-                          points_virtual_exp, elems_virtual, out_vars)                          
+                          points_virtual_exp, elems_virtual, out_vars_virtual)                          
           case default
             call error('dust_post','','Unknown format '//trim(out_frmt)//&
                         ' for visualization output')
@@ -489,11 +490,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     !Output the results (without wake)
     select case (trim(out_frmt))
       case ('tecplot')
-        filename = trim(filename)//'.plt'
+        filename = trim(filename_in)//'.plt'
         call  tec_out_viz(filename, t, &
                     points_ave, elems, ave_out_vars)
       case ('vtk')
-        filename = trim(filename)//'.vtu'
+        filename = trim(filename_in)//'.vtu'
         call  vtk_out_viz(filename, &
                     points_ave, elems, ave_out_vars)
       case default
