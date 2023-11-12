@@ -80,7 +80,7 @@ use mod_liftlin, only: &
   t_liftlin
 
 use mod_virtual, only: &
-  c_elem_virtual, t_elem_virtual_p
+  t_elem_virtual_p
 
 use mod_vortline, only: &
   t_vortline

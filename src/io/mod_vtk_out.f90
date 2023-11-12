@@ -76,160 +76,154 @@ contains
 ! subroutine vtk_out_viz
 
 !> RectilinearGrid: binary xml .vtr file
-!!
-!!
+
 subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
- character(len=*), intent(in) :: filen
- real(wp), intent(in) :: x(:) , y(:) , z(:)
- integer , intent(in) :: vars_n(:)
- character(len=*), intent(in) :: vars_name(:)
- real(wp), intent(in) :: vars(:,:)
+  character(len=*), intent(in) :: filen
+  real(wp), intent(in) :: x(:) , y(:) , z(:)
+  integer , intent(in) :: vars_n(:)
+  character(len=*), intent(in) :: vars_name(:)
+  real(wp), intent(in) :: vars(:,:)
 
- integer :: nx , ny , nz , n_points
- integer :: n_vars
- character(len=200) :: buffer
- character(len=20)  :: str1 , ostr , istr
- character(len=1)   :: lf
- integer :: offset , nbytes
- integer :: fid , ierr , i1 , i2 , irow
+  integer :: nx , ny , nz , n_points
+  integer :: n_vars
+  character(len=200) :: buffer
+  character(len=20)  :: str1 , ostr , istr
+  character(len=1)   :: lf
+  integer :: offset , nbytes
+  integer :: fid , ierr , i1 , i2 , irow
 
- character(len=*), parameter :: this_sub_name = 'wtr_write'
+  character(len=*), parameter :: this_sub_name = 'wtr_write'
 
 
- lf = char(10) !line feed char
+  lf = char(10) !line feed char
 
- nx = size(x) ; ny = size(y) ; nz = size(z)
- n_points = nx * ny * nz
- n_vars = size(vars_n)
+  nx = size(x) ; ny = size(y) ; nz = size(z)
+  n_points = nx * ny * nz
+  n_vars = size(vars_n)
 
- call new_file_unit(fid,ierr)
+  call new_file_unit(fid,ierr)
 
- open(fid,file=trim(filen), &
-       status='replace',access='stream',iostat=ierr)
+  open(fid,file=trim(filen), &
+      status='replace',access='stream',iostat=ierr)
 
- ! Header
- buffer = '<?xml version="1.0"?>'//lf ; write(fid) trim(buffer)
- buffer = '<VTKFile type="RectilinearGrid" version="0.1"&
+  ! Header
+  buffer = '<?xml version="1.0"?>'//lf ; write(fid) trim(buffer)
+  buffer = '<VTKFile type="RectilinearGrid" version="0.1"&
           & byte_order="LittleEndian">'//lf ; write(fid) trim(buffer)
- write(str1,'(I0,a,I0,a,I0,a,I0,a,I0,a,I0)') &
+  write(str1,'(I0,a,I0,a,I0,a,I0,a,I0,a,I0)') &
             0,' ',size(x)-1,' ',0,' ',size(y)-1, ' ',0,' ',size(z)-1
-!           0,' ',1,' ',0,' ',-1, ' ',0,' ',size(z)
- buffer = ' <RectilinearGrid WholeExtent="'//trim(str1)//'">'//lf ; write(fid) trim(buffer)
- buffer = '  <Piece Extent="'//trim(str1)//'">'//lf ; write(fid) trim(buffer)
- ! Coordinates
- buffer = '   <Coordinates>'//lf ; write(fid) trim(buffer)
- offset = 0
- write(ostr,'(I0)') offset
- buffer = '    <DataArray type="Float32" Name="x" format="appended"&
+  buffer = ' <RectilinearGrid WholeExtent="'//trim(str1)//'">'//lf ; write(fid) trim(buffer)
+  buffer = '  <Piece Extent="'//trim(str1)//'">'//lf ; write(fid) trim(buffer)
+  ! Coordinates
+  buffer = '   <Coordinates>'//lf ; write(fid) trim(buffer)
+  offset = 0
+  write(ostr,'(I0)') offset
+  buffer = '    <DataArray type="Float32" Name="x" format="appended"&
           & offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
- offset = offset + vtk_isize + vtk_fsize*size(x)
- write(ostr,'(I0)') offset
- buffer = '    <DataArray type="Float32" Name="y" format="appended"&
+  offset = offset + vtk_isize + vtk_fsize*size(x)
+  write(ostr,'(I0)') offset
+  buffer = '    <DataArray type="Float32" Name="y" format="appended"&
           & offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
- offset = offset + vtk_isize + vtk_fsize*size(y)
- write(ostr,'(I0)') offset
- buffer = '    <DataArray type="Float32" Name="z" format="appended"&
+  offset = offset + vtk_isize + vtk_fsize*size(y)
+  write(ostr,'(I0)') offset
+  buffer = '    <DataArray type="Float32" Name="z" format="appended"&
           & offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
- offset = offset + vtk_isize + vtk_fsize*size(z)
- buffer = '   </Coordinates>'//lf ; write(fid) trim(buffer)
- write(ostr,'(I0)') offset
- ! Data
- buffer = '   <PointData>'//lf ; write(fid) trim(buffer)
- do i1 = 1 , n_vars
-  if ( vars_n(i1) .eq. 1 ) then ! Scalar variable
+  offset = offset + vtk_isize + vtk_fsize*size(z)
+  buffer = '   </Coordinates>'//lf ; write(fid) trim(buffer)
+  write(ostr,'(I0)') offset
+  ! Data
+  buffer = '   <PointData>'//lf ; write(fid) trim(buffer)
+  do i1 = 1 , n_vars
+    if ( vars_n(i1) .eq. 1 ) then ! Scalar variable
 
-   buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
-            & format="appended" offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
-   offset = offset + vtk_isize + vtk_fsize*size(x)*size(y)*size(z)
-   write(ostr,'(I0)') offset
+      buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
+              & format="appended" offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
+      offset = offset + vtk_isize + vtk_fsize*size(x)*size(y)*size(z)
+      write(ostr,'(I0)') offset
 
-  elseif ( vars_n(i1) .eq. 3 ) then ! Vector variable
+    elseif ( vars_n(i1) .eq. 3 ) then ! Vector variable
 
-   buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
-            & NumberOfComponents="3" format="appended" offset="'//trim(ostr)//'"/>'//lf
-   write(fid) trim(buffer)
-   offset = offset + vtk_isize + 3*vtk_fsize*size(x)*size(y)*size(z)
-   write(ostr,'(I0)') offset
+      buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
+              & NumberOfComponents="3" format="appended" offset="'//trim(ostr)//'"/>'//lf
+      write(fid) trim(buffer)
+      offset = offset + vtk_isize + 3*vtk_fsize*size(x)*size(y)*size(z)
+      write(ostr,'(I0)') offset
 
- !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
+    !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
 
-  else
-   write(istr,'(I0)') i1
-   call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
-  end if
+    else
+      write(istr,'(I0)') i1
+      call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
+    end if
+  end do
+  buffer = '   </PointData>'//lf ; write(fid) trim(buffer)
+  buffer = '  </Piece>'//lf ; write(fid) trim(buffer)
+  buffer = ' </RectilinearGrid>'//lf; write(fid) trim(buffer)
+  ! Appended data
+  buffer = ' <AppendedData encoding="raw">'//lf ; write(fid) trim(buffer)
+  buffer = '_'; write(fid) trim(buffer) !mark the beginning of the data
+  ! Coordinates
+  nbytes = vtk_fsize * nx
+  write(fid) nbytes
+  write(fid) real(x,vtk_fsize)
+  nbytes = vtk_fsize * ny
+  write(fid) nbytes
+  write(fid) real(y,vtk_fsize)
+  nbytes = vtk_fsize * nz
+  write(fid) nbytes
+  write(fid) real(z,vtk_fsize)
+  ! Data
+  irow = 1
+  do i1 = 1 , n_vars
+    if ( vars_n(i1) .eq. 1 ) then
+      nbytes = vtk_fsize * n_points
+      write(fid) nbytes
+      write(fid) real( vars(irow,:) , vtk_fsize )
+      irow = irow + 1
+    elseif ( vars_n(i1) .eq. 3 ) then
+      nbytes = vtk_fsize * 3 * n_points
+      write(fid) nbytes
+      do i2 = 1 , n_points
+        write(fid) real( vars(irow:irow+2,i2) , vtk_fsize )
+      end do
+      irow = irow + 3
+    !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
+    else
+      write(istr,'(I0)') i1
+      call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
+    end if
+  end do
+  buffer = ' </AppendedData>'//lf ; write(fid) trim(buffer)
+  buffer = '</VTKFile>' ; write(fid) trim(buffer)
 
- end do
- buffer = '   </PointData>'//lf ; write(fid) trim(buffer)
- buffer = '  </Piece>'//lf ; write(fid) trim(buffer)
- buffer = ' </RectilinearGrid>'//lf; write(fid) trim(buffer)
- ! Appended data
- buffer = ' <AppendedData encoding="raw">'//lf ; write(fid) trim(buffer)
- buffer = '_'; write(fid) trim(buffer) !mark the beginning of the data
- ! Coordinates
- nbytes = vtk_fsize * nx
- write(fid) nbytes
- write(fid) real(x,vtk_fsize)
- nbytes = vtk_fsize * ny
- write(fid) nbytes
- write(fid) real(y,vtk_fsize)
- nbytes = vtk_fsize * nz
- write(fid) nbytes
- write(fid) real(z,vtk_fsize)
- ! Data
- irow = 1
- do i1 = 1 , n_vars
-  if ( vars_n(i1) .eq. 1 ) then
-   nbytes = vtk_fsize * n_points
-   write(fid) nbytes
-   write(fid) real( vars(irow,:) , vtk_fsize )
-   irow = irow + 1
-  elseif ( vars_n(i1) .eq. 3 ) then
-   nbytes = vtk_fsize * 3 * n_points
-   write(fid) nbytes
-   do i2 = 1 , n_points
-    write(fid) real( vars(irow:irow+2,i2) , vtk_fsize )
-   end do
-   irow = irow + 3
-
- !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
-
-   else
-    write(istr,'(I0)') i1
-    call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
-
-  end if
- end do
- buffer = ' </AppendedData>'//lf ; write(fid) trim(buffer)
- buffer = '</VTKFile>' ; write(fid) trim(buffer)
-
- close(fid)
+  close(fid)
 
 end subroutine vtr_write
 
 !---------------------------------------------------------------------
 
 !> Output the processed data into a binary xml  .vtu file
-!!
-!! This is a very preliminary version, it is set to take stupid ee and rr
-!! vectors, padded with zeros
+!
+! This is a very preliminary version, it is set to take stupid ee and rr
+! vectors, padded with zeros
 subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
- real(wp), intent(in) :: rr(:,:)
- integer, intent(in) :: ee(:,:)
- real(wp), intent(in) :: vort(:)
- real(wp), intent(in) :: w_rr(:,:)
- integer, intent(in) :: w_ee(:,:)
- real(wp), intent(in) :: w_vort(:)
- character(len=*), intent(in) :: out_filename
+  real(wp), intent(in)          :: rr(:,:)
+  integer, intent(in)           :: ee(:,:)
+  real(wp), intent(in)          :: vort(:)
+  real(wp), intent(in)          :: w_rr(:,:)
+  integer, intent(in)           :: w_ee(:,:)
+  real(wp), intent(in)          :: w_vort(:)
+  character(len=*), intent(in)  :: out_filename
 
- integer :: fu, ierr, i, i_shift
- integer :: npoints, ncells, ne
- integer :: offset, nbytes
- character(len=200) :: buffer
- character(len=20) :: ostr, str1, str2
- character(len=1)  :: lf
+  integer :: fu, ierr, i, i_shift
+  integer :: npoints, ncells, ne
+  integer :: offset, nbytes
+  character(len=200) :: buffer
+  character(len=20) :: ostr, str1, str2
+  character(len=1)  :: lf
 
- integer :: ie, nquad, ntria, etype
- integer npoints_w, nw
+  integer :: ie, nquad, ntria, etype
+  integer npoints_w, nw
 
   lf = char(10) !line feed char
   ne = size(ee,2) !number of elements
@@ -261,14 +255,14 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
   write(str1,'(I0)') npoints
   write(str2,'(I0)') ncells
   buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                   trim(str2)//'">'//lf; write(fu) trim(buffer)
+              trim(str2)//'">'//lf; write(fu) trim(buffer)
   offset = 0
   !Points
   buffer =  '   <Points>'//lf; write(fu) trim(buffer)
   write(ostr,'(I0)') offset
   buffer='    <DataArray type="Float32" Name="Coordinates" &
                   &NumberOfComponents="3" format="appended" &
-         &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
+          &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
 
   buffer =  '   </Points>'//lf; write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_fsize*size(rr,1)*size(rr,2)
@@ -278,7 +272,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+            &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad
 
@@ -307,47 +301,19 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   buffer = '   </CellData>'//lf; write(fu) trim(buffer)
 
-  !!Data
-  !buffer =  '   <PointData Scalars="scalars">'//lf;
-  !write(fu) trim(buffer)
-  !do ivar=1,pv_data%n_vars
-  !  if(pv_data%vars(ivar)%output) then
-  !    if(pv_data%vars(ivar)%vector) then
-  !      write(ostr,'(I0)') offset
-  !      buffer =  '    <DataArray type="Float32" Name="'// &
-  !        trim(pv_data%vars(ivar)%v_name) // &
-  !        '" NumberOfComponents="3" Format="appended" offset="'&
-  !                                              //trim(ostr)//'"/>'//lf
-  !      write(fu) trim(buffer)
-  !      offset = offset + vtk_isize + vtk_fsize*3*n_v4e*ne
-  !    else !not vector
-  !      write(ostr,'(I0)') offset
-  !      buffer = '    <DataArray type="Float32" Name="'// &
-  !        trim(pv_data%vars(ivar)%v_name) //'" Format="appended" &
-  !        &offset="'//trim(ostr)//'"/>'//lf
-  !      write(fu) trim(buffer)
-  !      offset = offset + vtk_isize + vtk_fsize*n_v4e*ne
-  !    endif !vector
-  !  endif !output
-  !enddo
-  !buffer = '   </PointData>'//lf; write(fu) trim(buffer)
-
   buffer = '  </Piece>'//lf; write(fu) trim(buffer)
-
-
-
 
   !WAKE ===
   write(str1,'(I0)') npoints_w
   write(str2,'(I0)') nw
   buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                   trim(str2)//'">'//lf; write(fu) trim(buffer)
+                    trim(str2)//'">'//lf; write(fu) trim(buffer)
   !Points
   buffer =  '   <Points>'//lf; write(fu) trim(buffer)
   write(ostr,'(I0)') offset
   buffer='    <DataArray type="Float32" Name="Coordinates" &
                   &NumberOfComponents="3" format="appended" &
-         &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
+          &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
 
   buffer =  '   </Points>'//lf; write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_fsize*size(w_rr,1)*size(w_rr,2)
@@ -357,26 +323,26 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+          &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize  + vtk_isize*4*nw
 
   write(ostr,'(I0)') offset
-  buffer =  '    <DataArray type="Int32" Name="offsets" &
-    &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+  buffer = '    <DataArray type="Int32" Name="offsets" &
+          &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_isize*nw
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="types" &
-    &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+          &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_isize*nw
 
-  buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
+  buffer = '   </Cells>'//lf; write(fu) trim(buffer)
 
   !Data
-  buffer =  '   <CellData Scalars="scalars">'//lf;
+  buffer = '   <CellData Scalars="scalars">'//lf;
   write(fu) trim(buffer)
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Float32" Name="Vort_intensity" &
@@ -386,11 +352,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   buffer = '   </CellData>'//lf; write(fu) trim(buffer)
 
-
   buffer = '  </Piece>'//lf; write(fu) trim(buffer)
-
-
-
 
   buffer = ' </UnstructuredGrid>'//lf; write(fu) trim(buffer)
 
@@ -399,11 +361,10 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
   buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data
 
   !Points
-  nbytes = vtk_fsize *  &
-               size(rr,1)*size(rr,2)
+  nbytes = vtk_fsize * size(rr,1) * size(rr,2)
   write(fu) nbytes
   do i=1,size(rr,2)
-   write(fu) real(rr(:,i),vtk_fsize)
+    write(fu) real(rr(:,i),vtk_fsize)
   enddo
 
   !Connectivity
@@ -445,22 +406,21 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
     write(fu) real(vort(i), vtk_fsize)
   enddo
 
-!=== Wake
-  !Points
-  nbytes = vtk_fsize *  &
-               size(w_rr,1)*size(w_rr,2)
+  !> Wake
+  ! Points
+  nbytes = vtk_fsize * size(w_rr,1)*size(w_rr,2)
   write(fu) nbytes
   do i=1,size(w_rr,2)
-   write(fu) real(w_rr(:,i),vtk_fsize)
+    write(fu) real(w_rr(:,i),vtk_fsize)
   enddo
 
-  !Connectivity
+  ! Connectivity
   nbytes = vtk_isize*4*nw; write(fu) nbytes
   do i=1,size(w_ee,2)
     write(fu) w_ee(1:4,i)-1
   enddo
 
-  !Offset
+  ! Offset
   nbytes =  vtk_isize*nw; write(fu) nbytes
   i_shift = 0
   do i=1,size(w_ee,2)
@@ -468,58 +428,21 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
     write(fu) i_shift
   enddo
 
-  !Cell types
+  ! Cell types
   nbytes = vtk_isize*nw; write(fu) nbytes
   do i=1,size(w_ee,2)
     etype = 9
     write(fu) etype
   enddo
 
-  !Doublet data
+  ! Doublet data
   nbytes =  vtk_fsize*nw; write(fu) nbytes
   do i=1,size(w_vort,1)
     write(fu) real(w_vort(i), vtk_fsize)
   enddo
 
-  !!All the variables data
-  !do ivar=1,pv_data%n_vars
-  !  if(pv_data%vars(ivar)%output) then
-  !    if(pv_data%vars(ivar)%vector) then
-  !      nbytes =  vtk_fsize*3*n_v4e*ne; write(fu) nbytes
-  !      do j=1,size(pv_data%Xi,3)
-  !        do i=1,size(pv_data%Xi,2)
-  !          write(fu) real(pv_data%vars(ivar)%n_var(:,i,j), vtk_fsize)
-  !        enddo
-  !      enddo
-  !    else !not vector
-  !      nbytes =  vtk_fsize*n_v4e*ne; write(fu) nbytes
-  !      do j=1,size(pv_data%Xi,3)
-  !        do i=1,size(pv_data%Xi,2)
-  !          write(fu) real(pv_data%vars(ivar)%n_var(1,i,j), vtk_fsize)
-  !        enddo
-  !      enddo
-  !    endif !vector
-  !  endif !output
-  !enddo
-
   buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
   buffer = '</VTKFile>'//lf; write(fu) trim(buffer)
-
-
-
-  !!Write all the variables
-  !write(fu,'(A)') '   <PointData Scalars="scalars">'
-
-
-
-
-  !!close the file
-  !write(fu,'(A)') '   </PointData>'
-  !write(fu,'(A)') '  </Piece>'
-  !write(fu,'(A)') ' </UnstructuredGrid>'
-  !write(fu,'(A)') '</VTKFile>'
-
-
 
   close(fu,iostat=ierr)
 
@@ -567,18 +490,14 @@ subroutine vtk_out_viz (out_filename, &
   npoints = size(rr,2)
   ncells = ne
 
- ! nvars = size(var_names)
   if(got_wake) then
     nw = size(w_ee,2) !number of wake elements
     npoints_w = size(w_rr,2)
- !   nvars_w = size(w_var_names)
   endif
 
   if(got_particles) then
     nvp = size(vp_rr,2)
-  !  nvars_vp = size(vp_var_names)
   else
-  !  nvars_vp = 0
     nvp = 0
   endif
 

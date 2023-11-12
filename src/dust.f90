@@ -384,7 +384,7 @@ call finalizeParameters(prms)
   call precice%initialize_mesh( geo )
   call precice%initialize_fields()
   call precicef_initialize(precice%dt_precice)
-  call precice%update_elems(geo, elems_tot, te ) 
+  call precice%update_elems(geo, elems_tot, elems_virtual, te ) 
 #endif
 
 !> Initialization 
@@ -483,12 +483,18 @@ end if
   end do
 
   !> Update dust geometry ( elems and first wake panels )
-  call precice%update_elems( geo, elems_tot, te )
+  call precice%update_elems( geo, elems_tot, elems_virtual, te )
 
   !> Update geo_data()
   do i_el = 1, size(elems_tot)
     call elems_tot(i_el)%p%calc_geo_data( &
                           geo%points(:,elems_tot(i_el)%p%i_ver) )
+  end do
+
+  !> Update geo_data()
+  do i_el = 1, size(elems_virtual)
+    call elems_virtual(i_el)%p%calc_geo_data_virtual( &
+              geo%points_virtual(:,elems_virtual(i_el)%p%i_ver) )
   end do
 
   !> Update near-field wake
@@ -630,12 +636,17 @@ it = 1
     end do
 
     !> Update dust geometry ( elems and first wake panels )
-    call precice%update_elems( geo, elems_tot, te )
+    call precice%update_elems( geo, elems_tot, elems_virtual, te )
 
     !> Update geo_data()
     do i_el = 1, size(elems_tot)
       call elems_tot(i_el)%p%calc_geo_data( &
                             geo%points(:,elems_tot(i_el)%p%i_ver) )
+    end do
+
+    do i_el = 1, size(elems_virtual)
+      call elems_virtual(i_el)%p%calc_geo_data_virtual( &
+                geo%points_virtual(:,elems_virtual(i_el)%p%i_ver) )
     end do
 
     !> Update near-field wake
@@ -1386,7 +1397,7 @@ end if
     end do
 
     !> Update dust geometry
-    call precice%update_elems( geo, elems_tot, te )
+    call precice%update_elems( geo, elems_tot,  elems_virtual, te)
 
     !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #endif
@@ -1456,6 +1467,10 @@ end if
     do i_el = 1, size(elems_tot)
       call elems_tot(i_el)%p%calc_geo_data( &
                             geo%points(:,elems_tot(i_el)%p%i_ver) )
+    end do
+    do i_el = 1, size(elems_virtual)
+      call elems_virtual(i_el)%p%calc_geo_data_virtual( &
+                            geo%points_virtual(:,elems_virtual(i_el)%p%i_ver) )
     end do
 
     !> Update near-field wake

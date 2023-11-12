@@ -65,6 +65,9 @@ use mod_geometry, only: &
 use mod_aeroel, only: &
   t_pot_elem_p
 
+use mod_virtual, only: &
+  t_elem_virtual_p
+
 use mod_wake, only: &
   t_wake, join_first_panels
 
@@ -647,22 +650,22 @@ end subroutine update_force_coupled_hinge
 
 !----------------------------------------------------------------
 !> Update force/moment fields
-subroutine update_elems( this, geo, elems, te )
-  class(t_precice)  , intent(inout) :: this
-  type(t_geo)       , intent(inout) :: geo
-  type(t_pot_elem_p), intent(inout) :: elems(:)
-  type(t_tedge), optional, intent(inout) :: te
+subroutine update_elems( this, geo, elems, elems_virtual, te )
+  class(t_precice)  , intent(inout)       :: this
+  type(t_geo)       , intent(inout)       :: geo
+  type(t_pot_elem_p), intent(inout)       :: elems(:)
+  type(t_elem_virtual_p), intent(inout)   :: elems_virtual(:)
+  type(t_tedge), optional, intent(inout)  :: te
 
-  integer :: i,j, i_comp, ip, iw, ih, ib, ii, it, il
-  real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
-  real(wp) :: r_drot(3), n_drot(3)
-  real(wp) :: theta
-  real(wp) :: Rot_mat(3,3)
-  real(wp) :: eps = 1.0e-9_wp
-  integer :: j_pos, j_vel, j_rot, j_ome
-  real(wp) :: th1, yc, xq, yq, thp, xqp, yqp
-
-  real(wp) :: Rot(3,3), nx(3,3)
+  integer   :: i,j, i_comp, ip, iw, ih, ib, ii, it, il
+  real(wp)  :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
+  real(wp)  :: r_drot(3), n_drot(3)
+  real(wp)  :: theta
+  real(wp)  :: Rot_mat(3,3)
+  integer   :: j_pos, j_vel, j_rot, j_ome
+  real(wp)  :: th1, yc, xq, yq, thp, xqp, yqp
+  real(wp),  parameter :: eps = 1.0e-9_wp
+  real(wp)             :: Rot(3,3), nx(3,3)
   
   ! Find rotation and angular velocity field id
   j_rot = 0; j_ome = 0
@@ -677,6 +680,7 @@ subroutine update_elems( this, geo, elems, te )
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do i_comp = 1, size(geo%components)
+
     associate( comp => geo%components(i_comp) )
 
     if ( comp%coupling ) then
@@ -752,11 +756,10 @@ subroutine update_elems( this, geo, elems, te )
           geo%points    (:,ip) = 0.0_wp
           geo%points_vel(:,ip) = 0.0_wp
         end do
-
+        
         !> Update surface quantities, as the weighted averages of the structure
         !  quantities, w/o considering rotations of the hinges
         do i = 1, size(comp%i_points)
-
 
           ip = comp%i_points(i)
           
@@ -799,6 +802,62 @@ subroutine update_elems( this, geo, elems, te )
             !> Velocity
             geo%points_vel(:, ip) = geo%points_vel(:, ip) + &
                                     comp%rbf%nod%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
+          end do
+
+        end do
+
+        !> Points virtual 
+        !> Reset, before accumulation, only nodes belonging to the component
+        do i = 1, size(comp%i_points_virtual)
+          ip = comp%i_points_virtual(i)
+          geo%points_virtual(:,ip) = 0.0_wp
+          geo%points_vel_virtual(:,ip) = 0.0_wp 
+        end do
+        
+        !> Update surface quantities, as the weighted averages of the structure
+        !  quantities, w/o considering rotations of the hinges
+        do i = 1, size(comp%i_points_virtual)
+
+          ip = comp%i_points_virtual(i)
+          
+          do iw = 1, size(comp%rbf%nod_virtual%ind,1)
+
+            ! === Coupling Node ===
+            !> Position of MBDyn nodes  
+            pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
+            comp%rbf%rrb(:,comp%rbf%nod_virtual%ind(iw,i)) = pos
+            !> Velocity
+            vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
+            !> Rotation
+            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
+            comp%rbf%rrb_rot(:,comp%rbf%nod_virtual%ind(iw,i)) = n_rot
+            
+            theta = norm2( n_rot )
+            if ( theta .lt. eps ) then
+              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+              theta = 0.0_wp
+            else
+              n_rot = n_rot / theta
+            end if
+
+            !> Angular velocity of the structural point
+            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
+
+            ! === Grid nodes of the components ===
+            !> Reference difference
+            chord = comp%loc_points_virtual(:,i) - comp%rbf%nodes(:,comp%rbf%nod_virtual%ind(iw,i))
+            
+            !> Rotated position difference
+            chord_rot =  cos(theta) * chord + &
+                         sin(theta) * cross( n_rot, chord ) + &
+                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+            
+            !> Position
+            geo%points_virtual(:, ip) = geo%points_virtual(:, ip) + &
+                                      comp%rbf%nod_virtual%wei(iw,i) * ( pos + chord_rot )
+            !> Velocity
+            geo%points_vel_virtual(:, ip) = geo%points_vel_virtual(:, ip) + &
+                                    comp%rbf%nod_virtual%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
           end do
 
         end do
@@ -862,6 +921,66 @@ subroutine update_elems( this, geo, elems, te )
             !> Orientation Matrix for surface panels 
             call vec2mat(comp%el(i)%ori, comp%el(i)%R_cen) 
             comp%el(i)%R_cen = matmul(comp%coupling_node_rot, comp%el(i)%R_cen)
+
+        end do
+
+        !> Center of panel virtual
+        !> Reset, before accumulation, only nodes belonging to the component
+        do i = 1, size(comp%el_virtual)
+          comp%el_virtual(i)%cen = 0.0_wp
+        end do
+
+        !> Update surface quantities, as the weighted averages of the structure
+        !  quantities, w/o considering rotations of the hinges
+        
+        do i = 1, size(comp%el_virtual) 
+          
+          do iw = 1, size(comp%rbf%cen_virtual%ind,1)
+
+            ! === Coupling Node ===
+            !> Position
+            pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%cen_virtual%ind(iw,i)))
+            !> Velocity
+            vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%cen_virtual%ind(iw,i)))
+            !> Rotation
+            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%cen_virtual%ind(iw,i)))
+
+            theta = norm2( n_rot )
+            if ( theta .lt. eps ) then
+              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+              theta = 0.0_wp
+            else
+              n_rot = n_rot / theta
+            end if
+            !> Angular velocity of the structural point
+            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%cen_virtual%ind(iw,i)))
+            
+            !> Reference difference
+            chord = comp%loc_cen_virtual(:,i) - comp%rbf%nodes(:,comp%rbf%cen_virtual%ind(iw,i))
+
+            !> Rotated position difference
+            chord_rot = cos(theta) * chord + &
+                        sin(theta) * cross(n_rot, chord ) + &
+                        (1.0_wp - cos(theta)) * sum(chord*n_rot ) * n_rot
+
+            !> Position
+            comp%el_virtual(i)%cen = comp%el_virtual(i)%cen + &
+                                comp%rbf%cen_virtual%wei(iw,i) * (pos + chord_rot)
+            
+            !> Orientation 
+            comp%el_virtual(i)%ori = comp%el_virtual(i)%ori + &
+                                comp%rbf%cen_virtual%wei(iw,i) * n_rot * theta  
+
+                                
+            !> Velocity
+            comp%el_virtual(i)%ub = comp%el_virtual(i)%ub + &
+                                comp%rbf%cen_virtual%wei(iw,i) * (vel + cross(omega, chord_rot))
+            
+          end do
+
+            !> Orientation Matrix for surface panels 
+            call vec2mat(comp%el_virtual(i)%ori, comp%el_virtual(i)%R_cen) 
+            comp%el_virtual(i)%R_cen = matmul(comp%coupling_node_rot, comp%el_virtual(i)%R_cen)
 
         end do
 
@@ -1209,34 +1328,6 @@ subroutine update_elems( this, geo, elems, te )
             write(*,*) ' comp%hinge(ih)%input_type must be equal to <coupling>. Stop '; stop
           end if
         end do
-
-        ! -------------------------------------------------------------------------------
-        !>  === Add hinge motion: END ===
-        ! -------------------------------------------------------------------------------
-
-        !> === Control nodes of the elements ===
-        ! *** to do *** avoid computing element quantities as the
-        ! average value of node quantities
-        !do i = 1, size(comp%el)
-        !  comp%el(i)%ub = 0.0_wp
-        !  !> Compute the velocity of the element centre as the
-        !  ! average value of the velocity of its nodes, by
-        !  ! accumulation
-        !  
-        !  do j = 1, comp%el(i)%n_ver
-        !    comp%el(i)%ub = comp%el(i)%ub + &
-        !        1.0_wp / dble(comp%el(i)%n_ver) * &
-        !        geo%points_vel(:, comp%el(i)%i_ver(j) )
-        !  end do
-
-        !  !> Velocity of the control point for LL components
-        !  !> (exploit implicit connectivity of LL components)
-        !  select type( el => comp%el(i) ); type is(t_liftlin)
-        !    el%vel_ctr_pt = 0.5_wp * ( &
-        !                    geo%points_vel(:, comp%i_points( 2*i-1 )) &
-        !                    + geo%points_vel(:, comp%i_points( 2*i+1 )))
-        !  end select
-        !end do
 
       else !
         call error('update_elems','mod_precice', &

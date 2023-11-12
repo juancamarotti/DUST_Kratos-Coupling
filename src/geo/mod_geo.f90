@@ -581,6 +581,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
             elems_tot(geo%nelem_impl+geo%nelem_expl))
   allocate(elems_ad(geo%nactdisk), elems_ll(geo%nLiftLin))
   allocate(elems_virtual(geo%nelem_virtual))
+
   i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_non_corr = 0; i_corr = 0;  i_tot=0; i_virtual=0;
 
   !> First count the corrected elements 
@@ -880,7 +881,7 @@ subroutine load_components(geo, in_file, out_file, te)
   character(len=max_char_len)           :: comp_el_type, comp_name, comp_input
   integer                               :: points_offset, points_offset_virtual, n_vert 
   integer                               :: elems_offset, elems_offset_virtual
-  real(wp), allocatable                 :: points_tmp(:,:)
+  real(wp), allocatable                 :: points_tmp(:,:), points_virtual_tmp(:,:)
   character(len=max_char_len)           :: ref_tag, ref_tag_m
   integer                               :: ref_id, iref
   character(len=max_char_len)           :: msg, cname, cname_write
@@ -906,6 +907,7 @@ subroutine load_components(geo, in_file, out_file, te)
   real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
   real(wp) :: comp_coupling_node_rot(3,3) = 0.0_wp    ! <- Initialization(?)
   logical :: comp_coupling
+
 #if USE_PRECICE
   real(wp), allocatable                 :: c_ref_p(:,:)
   real(wp), allocatable                 :: c_ref_c(:,:)
@@ -917,6 +919,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer                               :: n_nodes_coupling_hinges
   integer                               :: n_nodes_coupling_hinge_1
 #endif
+
   real(wp)                              :: coupling_node_rot(3,3) = 0.0_wp
   !> Hinges
   integer                               :: n_hinges, ih
@@ -1641,10 +1644,10 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%i_points = &
                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
-      allocate(points_tmp(3,size(rr_virtual,2)+points_offset_virtual))
-      if (points_offset_virtual .gt. 0) points_tmp(:,1:points_offset_virtual) = geo%points_virtual
-      points_tmp(:,points_offset_virtual+1:points_offset_virtual+size(rr_virtual,2)) = rr_virtual
-      call move_alloc(points_tmp, geo%points_virtual)
+      allocate(points_virtual_tmp(3,size(rr_virtual,2) + points_offset_virtual))
+      if (points_offset_virtual .gt. 0) points_virtual_tmp(:,1:points_offset_virtual) = geo%points_virtual
+      points_virtual_tmp(:,points_offset_virtual+1:points_offset_virtual+size(rr_virtual,2)) = rr_virtual
+      call move_alloc(points_virtual_tmp, geo%points_virtual)
       allocate(geo%components(i_comp)%i_points_virtual(size(rr_virtual,2)))
       geo%components(i_comp)%i_points_virtual = &
                         (/((i3),i3=points_offset_virtual+1,points_offset_virtual+size(rr_virtual,2))/)                      
@@ -1653,6 +1656,8 @@ subroutine load_components(geo, in_file, out_file, te)
       !allocate the elements of the component of the right kind
       geo%components(i_comp)%nelems = size(ee,2)
       geo%components(i_comp)%nelems_virtual = size(ee_virtual,2)
+      allocate(geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
+      
       select case(trim(geo%components(i_comp)%comp_el_type))
         case('p')
           allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
@@ -1666,12 +1671,9 @@ subroutine load_components(geo, in_file, out_file, te)
           call error(this_sub_name, this_mod_name, &
             'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
-      !> not needed for the virtual elements 
-      !allocate(t_elem_virtual::geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
-      allocate(geo%components(i_comp)%el_virtual(size(ee_virtual,2)))
+      
       !> fill (some) of the real elements fields
       do i2=1,size(ee,2)
-
         !> vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
@@ -2049,7 +2051,7 @@ end subroutine prepare_geometry
 !!
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! panel element (vortex ring or surface panel)
-subroutine calc_geo_data_pan(elem,vert)
+subroutine calc_geo_data_pan(elem, vert)
   class(c_pot_elem), intent(inout) :: elem
   real(wp), intent(in)             :: vert(:,:)
   integer                          :: nsides, is

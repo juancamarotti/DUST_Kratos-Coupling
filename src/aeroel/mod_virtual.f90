@@ -148,7 +148,7 @@ type :: c_elem_virtual
   real(wp) :: loc_ctr_pt(3)
 
   contains
-  procedure :: calc_geo_data_virtual
+  procedure, pass(this) :: calc_geo_data_virtual
   
 end type c_elem_virtual
 
