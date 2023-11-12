@@ -1381,20 +1381,18 @@ subroutine load_components(geo, in_file, out_file, te)
                     geo%components(i_comp)%rbf%rrb_rot  (3, np_precice))
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes(:,ind_coupling)
           geo%components(i_comp)%rbf%rrb   = -333.3_wp
-          
 
+          allocate(ind_h(n_nodes_coupling_hinges))
+          i3 = 1  
+          do ih = 1, n_hinges
+            if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
+              !> N. nodes of the actual hinge and update overall count
+              n_nodes_coupling_hinge_1 = size(geo%components(i_comp)%hinge(ih)%i_coupling_nodes,1)
 
-        allocate(ind_h(n_nodes_coupling_hinges))
-        i3 = 1  
-        do ih = 1, n_hinges
-          if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
-            !> N. nodes of the actual hinge and update overall count
-            n_nodes_coupling_hinge_1 = size(geo%components(i_comp)%hinge(ih)%i_coupling_nodes,1)
-
-            ind_h(i3:i3+n_nodes_coupling_hinge_1-1) = geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice
-            i3 = i3 +n_nodes_coupling_hinge_1
-          end if
-        end do  
+              ind_h(i3:i3+n_nodes_coupling_hinge_1-1) = geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice
+              i3 = i3 +n_nodes_coupling_hinge_1
+            end if
+          end do  
 
           do ih = 1, n_hinges
             if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
@@ -1430,7 +1428,6 @@ subroutine load_components(geo, in_file, out_file, te)
           !> Update offset of precice/dust coupling nodes
           points_offset_precice = points_offset_precice + np_precice_tot
 
-          ! *** to do *** cleaner implementation of different kinds of coupling
           allocate(geo%components(i_comp)%c_ref_c(0,0))
           allocate(geo%components(i_comp)%c_ref_p(0,0))
 
@@ -2270,6 +2267,7 @@ subroutine calc_geo_data_ad(elem,vert)
 
 end subroutine calc_geo_data_ad
 
+
 !> Calculate the local velocity on the panels to then enforce the
 !! boundary condition
 subroutine calc_geo_vel(elem, G, f)
@@ -2284,7 +2282,7 @@ subroutine calc_geo_vel_virtual(elem, G, f)
   class(c_elem_virtual), intent(inout)  :: elem
   real(wp), intent(in)              :: f(3), G(3,3)
 
-  elem%ub = f + matmul(G,elem%cen)
+  elem%ub = f + matmul(G, elem%cen)
 
 end subroutine calc_geo_vel_virtual
 

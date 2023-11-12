@@ -152,7 +152,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   type(t_output_var), allocatable                           :: out_vars_virtual(:)
   integer                                                   :: nprint , nprint_w, nelem_out
 
-  integer                                                   :: it, ires, ii
+  integer                                                   :: it, ires
   real(wp)                                                  :: t
   character(len=*), parameter                               :: this_sub_name='post_viz'
 
@@ -317,8 +317,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
     if(.not. average) then
       ! Output filename
-      write(filename_in,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
-
+      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
+      write(filename_virtual,'(A,I4.4)') trim(basename)//'_virtual_'//trim(an_name)//'-',it
       if (out_wake) then
 
         if(out_turbvisc) then
@@ -412,8 +412,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         !Output the results (with wake)
         select case (trim(out_frmt))
           case ('tecplot')
-            filename = trim(filename_in)//'.plt'
-            filename_virtual = trim(filename_in)//'_virtual.plt'
+            filename = trim(filename)//'.plt'
+            filename_virtual = trim(filename_virtual)//'.plt'
             call  tec_out_viz(filename, t, &
                       points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
@@ -421,8 +421,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
             call  tec_out_viz(filename_virtual, t, &
                       points_virtual_exp, elems_virtual, out_vars_virtual)
           case ('vtk')
-            filename = trim(filename_in)//'.vtu'
-            filename_virtual = trim(filename_in)//'_virtual.vtu'
+            filename = trim(filename)//'.vtu'
+            filename_virtual = trim(filename_virtual)//'.vtu'
             call  vtk_out_viz(filename, &
                         points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
@@ -444,15 +444,15 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         !Output the results (without wake)
         select case (trim(out_frmt))
           case ('tecplot')
-            filename = trim(filename_in)//'.plt'
-            filename_virtual = trim(filename_in)//'_virtual.plt'
+            filename = trim(filename)//'.plt'
+            filename_virtual = trim(filename_virtual)//'.plt'
             call  tec_out_viz(filename, t, &
                           points_exp, elems, out_vars)
             call  tec_out_viz(filename_virtual, t, &
                           points_virtual_exp, elems_virtual, out_vars_virtual)
           case ('vtk')
-            filename = trim(filename_in)//'.vtu'
-            filename_virtual = trim(filename_in)//'_virtual.vtu'
+            filename = trim(filename)//'.vtu'
+            filename_virtual = trim(filename_virtual)//'.vtu'
             call  vtk_out_viz(filename, &
                           points_exp, elems, out_vars)
             call  vtk_out_viz(filename_virtual, &
@@ -490,11 +490,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     !Output the results (without wake)
     select case (trim(out_frmt))
       case ('tecplot')
-        filename = trim(filename_in)//'.plt'
+        filename = trim(filename)//'.plt'
         call  tec_out_viz(filename, t, &
                     points_ave, elems, ave_out_vars)
       case ('vtk')
-        filename = trim(filename_in)//'.vtu'
+        filename = trim(filename)//'.vtu'
         call  vtk_out_viz(filename, &
                     points_ave, elems, ave_out_vars)
       case default

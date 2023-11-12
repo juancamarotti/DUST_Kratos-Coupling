@@ -825,12 +825,11 @@ subroutine update_elems( this, geo, elems, elems_virtual, te )
             ! === Coupling Node ===
             !> Position of MBDyn nodes  
             pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
-            comp%rbf%rrb(:,comp%rbf%nod_virtual%ind(iw,i)) = pos
+            
             !> Velocity
             vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
             !> Rotation
             n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%nod_virtual%ind(iw,i)))
-            comp%rbf%rrb_rot(:,comp%rbf%nod_virtual%ind(iw,i)) = n_rot
             
             theta = norm2( n_rot )
             if ( theta .lt. eps ) then
@@ -868,6 +867,7 @@ subroutine update_elems( this, geo, elems, elems_virtual, te )
           comp%el(i)%cen = 0.0_wp
           comp%el(i)%ub = 0.0_wp
           comp%el(i)%ori = 0.0_wp
+          comp%el(i)%R_cen = 0.0_wp
         end do
 
         !> Update surface quantities, as the weighted averages of the structure
@@ -928,6 +928,9 @@ subroutine update_elems( this, geo, elems, elems_virtual, te )
         !> Reset, before accumulation, only nodes belonging to the component
         do i = 1, size(comp%el_virtual)
           comp%el_virtual(i)%cen = 0.0_wp
+          comp%el_virtual(i)%ub = 0.0_wp
+          comp%el_virtual(i)%ori = 0.0_wp
+          comp%el_virtual(i)%R_cen = 0.0_wp
         end do
 
         !> Update surface quantities, as the weighted averages of the structure
@@ -971,14 +974,13 @@ subroutine update_elems( this, geo, elems, elems_virtual, te )
             comp%el_virtual(i)%ori = comp%el_virtual(i)%ori + &
                                 comp%rbf%cen_virtual%wei(iw,i) * n_rot * theta  
 
-                                
             !> Velocity
             comp%el_virtual(i)%ub = comp%el_virtual(i)%ub + &
                                 comp%rbf%cen_virtual%wei(iw,i) * (vel + cross(omega, chord_rot))
             
           end do
 
-            !> Orientation Matrix for surface panels 
+            !!> Orientation Matrix for surface panels 
             call vec2mat(comp%el_virtual(i)%ori, comp%el_virtual(i)%R_cen) 
             comp%el_virtual(i)%R_cen = matmul(comp%coupling_node_rot, comp%el_virtual(i)%R_cen)
 
