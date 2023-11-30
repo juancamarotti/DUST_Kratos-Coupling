@@ -1301,6 +1301,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
   real(wp), allocatable                 :: cen_sbprt(:,:), area_sbprt(:), mag_sbprt(:), dir_sbprt(:,:), rad_sbprt(:)
   real(wp), allocatable                 :: W(:,:), w_i(:)
   real(wp)                              :: vel_part(3), vertices(3,4)
+  real(wp)                              :: filt_eta
   ! flow separation variables
   integer                               :: i_comp , i_elem , n_elem
 
@@ -1413,10 +1414,11 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
 
         if(sim_param%use_vs .or. sim_param%use_vd) then
 
-          !add filtering
+          !add filtering (Pedrizzetti Relaxation)
           if(sim_param%use_divfilt) then
+            filt_eta = sim_param%alpha_divfilt/sim_param%dt
             wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-              sim_param%filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+              filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
               wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
           endif
 

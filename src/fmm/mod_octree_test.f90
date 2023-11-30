@@ -46,7 +46,7 @@
 
 
 !> Module to handle the octree grid
-module mod_octree
+module mod_octree_test
 
 use mod_param, only: &
   wp, nl, pi, max_char_len
@@ -54,7 +54,7 @@ use mod_param, only: &
 use mod_math, only: &
   cross
 
-use mod_sim_param, only: &
+use mod_test, only: &
   sim_param
 
 use mod_handling, only: &
@@ -76,8 +76,10 @@ use mod_wind, only: &
 implicit none
 
 public :: initialize_octree, destroy_octree, sort_particles, t_octree, &
-          calculate_multipole, apply_multipole, apply_multipole_panels
+          calculate_multipole, apply_multipole
+
           
+
 private
 
 !> Pointer to a cell
@@ -235,7 +237,7 @@ interface pull_ptr
 end interface
 
 !----------------------------------------------------------------------
-character(len=*), parameter :: this_mod_name='mod_octree'
+character(len=*), parameter :: this_mod_name='mod_octree_test'
 character(len=max_char_len) :: msg
 real(t_realtime) :: t1 , t0
 real(t_realtime) :: t11, t00
@@ -282,8 +284,6 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     call warning(this_sub_name, this_mod_name, 'Particles box bigger than octree box, particles box resized to the octree box')
   endif
 
-  octree%lvl_solid = sim_param%lvl_solid
-
   call set_multipole_param(sim_param%use_vs)
 
   min_part_4_cell = min_part
@@ -304,11 +304,9 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   ! times), then only the first nleaves will be employed
   allocate(octree%leaves(product(nbox)*8**(nlevels-1)))
 
-  if(sim_param%use_dyn_layers) then
-    allocate(octree%layers(sim_param%NMaxOctreeLevels))
-  else
-    allocate(octree%layers(nlevels))
-  endif
+
+  allocate(octree%layers(nlevels))
+
 
   !compute the number of cells in each direction, for each layer
   allocate(octree%ncl(3,sim_param%NMaxOctreeLevels))
@@ -700,10 +698,9 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(wparts, n_prt, elem, octree)
+subroutine sort_particles(wparts, n_prt, octree)
  type(t_vortpart), intent(inout), target :: wparts(:)
  integer, intent(inout) :: n_prt
- type(t_pot_elem_p), intent(in) :: elem(:)
  type(t_octree), intent(inout), target :: octree
 
  integer :: ip, ipp
@@ -771,127 +768,6 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
       wparts(ipp)%mag
 
   enddo
-
-
-  !Sort also all the elements
-  if(sim_param%use_pr .or. sim_param%use_fmm_pan) then
-    do ip=1,size(elem)
-      !check in which cell at the lowest level it is located
-      idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
-
-      !check that we are not sorting things outside the octree
-      if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
-        write(msg,*) 'Sorted element resulted outside octree box at: ',&
-                      elem(ip)%p%cen
-        if(sim_param%use_fmm_pan) then
-          call error(this_sub_name, this_mod_name, msg)
-        else
-          if(sim_param%debug_level.ge.5) &
-            call warning(this_sub_name, this_mod_name, msg)
-          cycle
-        endif
-      endif
-
-      !add the particle to the lowest level
-      octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
-                      octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
-      call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_pans&
-                    , elem(ip)%p)
-
-    enddo
-    !From the second to last level upwards, add the panels
-    do l = ll-1,1,-1
-      !cycle on the elements on the level
-!!!!!$omp parallel do collapse(3) private(i,j,k,child)
-      do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-
-        !cycle on the children, gather the number of particles and if are
-        !leaves
-        do child = 1,8
-          octree%layers(l)%lcells(i,j,k)%npan = &
-                octree%layers(l)%lcells(i,j,k)%npan + &
-                octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
-          !push all the panels pointers
-          call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_pans, &
-          octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_pans)
-        enddo !child
-      enddo; enddo; enddo !layer cells i,j,k
-!!!!!!$omp end parallel do
-    enddo
-  endif
-
-
-
-
-  ! --- Particles Redistribution ---
-  if(sim_param%use_pr) then
-
-    !Check if the cells contain a solid boundary at level lvl_solid
-    l = octree%lvl_solid
-    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-      !Check if the cell has solid boundaries in it
-      if (octree%layers(l)%lcells(i,j,k)%npan .gt. 0) &
-        call set_near_wall(octree%layers(l)%lcells(i,j,k))
-      !Check also that no neighbour has solid boundaries
-      do kc = -1,1; do jc = -1,1; do ic = -1,1
-        if(associated(octree%layers(l)%lcells(i,j,k)%&
-                                                neighbours(ic,jc,kc)%p)) then
-          if(octree%layers(l)%lcells(i,j,k)%neighbours(ic,jc,kc)%p%npan.gt.0) &
-            call set_near_wall(octree%layers(l)%lcells(i,j,k))
-        endif
-      enddo; enddo; enddo !layer cells in,jn,kn
-    enddo; enddo; enddo !layer cells i,j,k
-
-    !On the bottom level remove the too small particles
-    do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
-      if(.not. octree%layers(ll)%lcells(i,j,k)%near_wall) then
-        nprt = octree%layers(ll)%lcells(i,j,k)%npart
-        if (nprt .gt. 0) then
-          octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
-             octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
-        endif
-
-        ip = 1
-        !do ip=1,nprt
-        do while (ip.lt.nprt+1)
-          if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
-             1.0_wp/sim_param%part_redist_ratio *&
-             octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
-            !the particle is significantly smaller than the average in the cell
-            !redistribute it
-            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag*&
-                       octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
-                       / real(nprt,wp)
-            !free
-            octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
-            call pull_ptr(octree%layers(ll)%lcells(i,j,k)%cell_parts, ip)
-            octree%layers(ll)%lcells(i,j,k)%npart = &
-                                      octree%layers(ll)%lcells(i,j,k)%npart - 1
-            nprt = nprt -1
-            !lower also the global counter
-            n_prt = n_prt -1
-
-            do iq=1,nprt
-                if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
-                  vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
-                          octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir
-                  vort = vort + redistr
-                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag = norm2(vort)
-                  if(norm2(vort) .gt. 0.0_wp) then
-                    octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = &
-                                                     vort/norm2(vort)
-                  else
-                    octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = 0.0_wp
-                  endif
-                endif !not free particle
-            enddo !iq, rest of the particles
-          else
-            ip = ip + 1
-          endif !too small particle
-        enddo !ip, particles in cell
-      endif !near wall
-    enddo; enddo; enddo !layer cells i,j,k
-  endif !particles redistribution
 
   nl = 0
   !Bottom level: just check if are leaves
@@ -991,8 +867,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 
   !PROFILE
   t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
-  if(sim_param%debug_level.ge.5) call printout(msg)
+  
 end subroutine sort_particles
 
 
@@ -1136,13 +1011,9 @@ end subroutine calculate_multipole
 
 !> Apply the local expansion and calculate interaction, and also calculate
 !! the interaction from other elements (not particles)
-subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
+subroutine apply_multipole( part, octree )
  type(t_vortpart_p), intent(in), target :: part(:)
  type(t_octree), intent(inout) :: octree
- type(t_pot_elem_p), intent(in) :: elem(:)
- type(t_pot_elem_p), intent(in) :: wpan(:)
- type(t_pot_elem_p), intent(in) :: wrin(:)
- class(c_elem), intent(in) :: wvort(:)
 
  integer :: i, j, k, lv, ip, ipp, m, ie, iln
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
@@ -1347,67 +1218,16 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
         endif
       enddo
 
-      !Calculate the interactions with all the other elements
-      !calculate the influence of the solid bodies
-      do ie=1,size(elem)
-        call elem(ie)%p%compute_vel(pos,  v)
-        vel = vel + v/(4*pi)
-      enddo
-
-      ! calculate the influence of the wake panels
-      do ie=1,size(wpan)
-        call wpan(ie)%p%compute_vel(pos,  v)
-        vel = vel + v/(4*pi)
-      enddo
-
-      ! calculate the influence of the wake rings
-      do ie=1,size(wrin)
-        call wrin(ie)%p%compute_vel(pos,  v)
-        vel = vel+ v/(4*pi)
-      enddo
-
-      !calculate the influence of the end vortex
-      do ie=1,size(wvort)
-        call wvort(ie)%compute_vel(pos,  v)
-        vel = vel+ v/(4*pi)
-      enddo
-
       !at last, add the free stream velocity
       vel = vel + variable_wind(pos, sim_param%time)
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
-
-      !> Vortex stretching from other elements
-      if(sim_param%use_vs .and. sim_param%vs_elems) then
-        stretch_elem = 0.0_wp
-        ! Influence of the body elements
-        do ie=1,size(elem)
-          call elem(ie)%p%compute_grad(pos, grad_elem)
-          stretch_elem = stretch_elem + &
-              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
-        enddo
-        ! Influence of the wake panels
-        do ie=1,size(wpan)
-          call wpan(ie)%p%compute_grad(pos, grad_elem)
-          stretch_elem = stretch_elem + &
-              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
-        enddo
-        ! Influence of the end vortex
-        do ie=1,size(wvort)
-          call wvort(ie)%compute_grad(pos, grad_elem)
-          stretch_elem = stretch_elem + &
-              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
-        enddo
-        stretch = stretch + stretch_elem
-      endif
-
+ 
       !evolve the position in time
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
         if(sim_param%use_divfilt) octree%leaves(lv)%p%cell_parts(ip)%p%rotu = rotu
       endif
-
-
     endif
     enddo
     deallocate(velv, stretchv, rotuv)
@@ -1419,95 +1239,10 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   if(sim_param%debug_level.ge.5) call printout(msg)
   tend = dust_time()
   octree%t_lv = tend-tsta
-  if(sim_param%use_dyn_layers) then
-    if(real(octree%t_lv/octree%t_mp, wp) .gt. sim_param%LeavesTimeRatio .and. &
-       octree%nlevels .lt. sim_param%NMaxOctreeLevels) then
-      call add_layer(octree)
-    endif
-  endif
-
+  
 end subroutine apply_multipole
 
-!----------------------------------------------------------------------
 
-!> Apply multipole to the panels
-subroutine apply_multipole_panels(octree, elem)
- type(t_octree), intent(inout) :: octree
- type(t_pot_elem_p), intent(in) :: elem(:)
-
- integer :: i, j, k, lv, ip, ipp, m, ie, iln
- real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
- real(wp), allocatable :: velv(:,:), stretchv(:,:)
- real(wp) :: grad(3,3)
- real(t_realtime) :: tsta
- real(wp) :: turbvisc, ave_ros
-
- character(len=*), parameter :: this_sub_name = 'apply_multipole_panels'
-
-
-  tsta = dust_time()
-  !for all the leaves apply the local expansion and then local interactions
-  t0 = dust_time()
-!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
-  do lv = 1, octree%nleaves
-    !I am on a leaf, cycle on all the particles inside the leaf
-
-    do ip = 1,octree%leaves(lv)%p%npan
-
-      vel = 0.0_wp
-      pos = octree%leaves(lv)%p%cell_pans(ip)%p%cen
-
-      !first apply the local multipole expansion
-      do m = 1,size(octree%leaves(lv)%p%mp%b,2)
-        !velocity
-        vel = vel + &
-          octree%leaves(lv)%p%mp%b(:,m)* &
-          product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
-      enddo
-
-      !then interact with all the neighbouring cell particles
-      do k=-1,1; do j=-1,1; do i=-1,1
-        if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
-        if(octree%leaves(lv)%p%neighbours(i,j,k)%p%active) then
-          do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
-
-            call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_vel(pos, v)
-            vel = vel +v/(4.0_wp*pi)
-          enddo
-        endif
-        endif
-      enddo; enddo; enddo
-
-      !interact with the leaf neighbours
-      do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
-       do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
-
-         call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
-              %compute_vel(pos,  v)
-         vel = vel +v/(4.0_wp*pi)
-       enddo
-      enddo
-
-      !finally interact with the particles inside the cell
-      do ipp = 1,octree%leaves(lv)%p%npart
-        call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
-                                                      v)
-        vel = vel +v/(4.0_wp*pi)
-      enddo
-
-      octree%leaves(lv)%p%cell_pans(ip)%p%uvort = &
-      octree%leaves(lv)%p%cell_pans(ip)%p%uvort + vel
-    enddo
-  enddo
-!Don't ask me why, but without this pragma it is much faster!
-!$omp end parallel do
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Calculated panels interactions in: ' , t1 - t0,' s.'
-  if(sim_param%debug_level.ge.5) call printout(msg)
-
-end subroutine apply_multipole_panels
 !----------------------------------------------------------------------
 
 !! DISCONTINUED
@@ -1986,4 +1721,4 @@ subroutine reset_cell(cell)
 end subroutine reset_cell
 !----------------------------------------------------------------------
 
-end module mod_octree
+end module mod_octree_test

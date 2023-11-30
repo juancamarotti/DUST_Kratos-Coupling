@@ -176,6 +176,14 @@ add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
 
+add_executable(dust_test  ${PROJECT_SOURCE_DIR}/src/dust_test.f90)
+add_dependencies(dust_test dustlib)
+target_link_libraries(dust_test dustlib ${linkedlibs})
+
+add_executable(dust_post_test  ${PROJECT_SOURCE_DIR}/src/dust_post_test.f90)
+add_dependencies(dust_post_test dustlib)
+target_link_libraries(dust_post_test dustlib ${linkedlibs})
+
 # only for testing pipline! 
 install(TARGETS dust dust_pre dust_post DESTINATION bin)
 

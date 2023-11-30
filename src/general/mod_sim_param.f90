@@ -170,8 +170,8 @@ type t_sim_param
   logical :: vs_elems
   !> use the divergence filtering
   logical :: use_divfilt
-  !> time scale of the divergence filter
-  real(wp) :: filt_eta
+  !> Pedrizzetti relaxation coefficient for divergence filtering
+  real(wp):: alpha_divfilt
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not
@@ -488,7 +488,7 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('vortstretch_from_elems','Employ vortex stretching&
                                 & from geometry elements','F')
   call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering','T')
-  call prms%CreateRealOption('filter_time_scale','Filter timescale','40.0')
+  call prms%CreateRealOption('alpha_divfilt','Pedrizzetti relaxation coefficient','0.3')
   call prms%CreateLogicalOption('diffusion','Employ vorticity diffusion','T')
   call prms%CreateLogicalOption('turbulent_viscosity','Employ turbulent &
                                 &viscosity','F')
@@ -737,9 +737,11 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
   sim_param%first_panel_scaling   = getreal(prms,    'implicit_panel_scale')
   sim_param%min_vel_at_te         = getreal(prms,    'implicit_panel_min_vel')
+  sim_param%alpha_divfilt         = getreal(prms,    'alpha_divfilt')
   sim_param%use_vs                = getlogical(prms, 'vortstretch')
   sim_param%vs_elems              = getlogical(prms, 'vortstretch_from_elems')
   sim_param%use_vd                = getlogical(prms, 'diffusion')
+  sim_param%use_divfilt           = getlogical(prms, 'divergence_filtering')
   sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
   sim_param%use_ve                = getlogical(prms, 'viscosity_effects')
   sim_param%use_pa                = getlogical(prms, 'penetration_avoidance')
@@ -1052,7 +1054,7 @@ subroutine save_sim_param(this, loc)
   if(this%use_vs) then
     call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
     call write_hdf5_attr(this%use_divfilt, 'DivergenceFiltering', loc)
-    call write_hdf5_attr(1.0_wp/this%filt_eta*this%dt, 'FilterTimescale', loc)
+    call write_hdf5_attr(this%alpha_divfilt, 'AlphaDivFilt', loc)
   endif
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
   call write_hdf5_attr(this%use_tv, 'turbvort', loc)
