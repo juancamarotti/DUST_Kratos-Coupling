@@ -107,6 +107,13 @@ type t_sim_param
   real(wp) :: particles_box_min(3)
   real(wp) :: particles_box_max(3)
 
+  !> Wake initial condition
+  integer  :: part_n0 
+  real(wp) :: part_pos0(3)
+  real(wp) :: part_vel0(3)
+  real(wp) :: part_vort0_dir(3)
+  integer  :: part_vort0_mag
+
   !Method parameters
   !> Rankine Radius for vortices
   real(wp) :: RankineRad
@@ -229,6 +236,13 @@ subroutine init_sim_param(sim_param)
     sim_param%particles_box_min     = (/ -10.0_wp, -10.0_wp, -10.0_wp /)
     sim_param%particles_box_max     = (/ +10.0_wp, +10.0_wp, +10.0_wp /)
 
+    !> Wake initial condition
+    sim_param%part_n0               = 1
+    sim_param%part_vel0             = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+    sim_param%part_pos0             = (/ 0.0_wp, 0.0_wp, 0.0_wp /)
+    sim_param%part_vort0_dir        = (/ 0.0_wp, 0.0_wp, 1.0_wp /)
+    sim_param%part_vort0_mag        = 1.0_wp
+
     !> Names
     sim_param%basename              = 'Output'
   
@@ -242,7 +256,7 @@ subroutine init_sim_param(sim_param)
     sim_param%use_divfilt           = .true.
     sim_param%alpha_divfilt         = 0.3_wp
     !> Octree and FMM parameters
-    sim_param%use_fmm               = .true.
+    sim_param%use_fmm               = .false.
   
     if(sim_param%use_fmm) then
       sim_param%BoxLength           = 20

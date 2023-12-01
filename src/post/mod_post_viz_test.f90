@@ -174,7 +174,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_vrad)      nprint = nprint+1
   if(out_dforce)    nprint = nprint+1
   if(out_dmom)      nprint = nprint+1 
-   
+  write(*,*) 'nprint= ', nprint 
   if(out_wake) then
     allocate(out_vars_vp(nprint))
   endif

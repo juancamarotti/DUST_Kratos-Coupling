@@ -124,6 +124,7 @@ integer                           :: i
 !> octree parameters
 type(t_octree)                    :: octree
 
+dt_debug_out = sim_param%dt_out
 call printout(nl//'>>>>>> DUST_TEST beginning >>>>>>'//nl)
 
 t00 = dust_time()
@@ -167,7 +168,7 @@ endif
 
 call printout(nl//'====== Initializing Wake ======')
 
-call initialize_wake(wake, sim_param%n_wake_particles)
+call initialize_wake(wake)
 
 !=========================== Time Cycle ==============================
 !> General overview:

@@ -185,6 +185,6 @@ add_dependencies(dust_post_test dustlib)
 target_link_libraries(dust_post_test dustlib ${linkedlibs})
 
 # only for testing pipline! 
-install(TARGETS dust dust_pre dust_post DESTINATION bin)
+install(TARGETS dust dust_pre dust_post dust_test dust_post_test DESTINATION bin)
 
 

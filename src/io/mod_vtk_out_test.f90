@@ -225,6 +225,8 @@ subroutine vtk_out_viz (out_filename, &
 
 
   nvp = size(vp_rr,2)
+! write(*,*) 'nvp = ', nvp
+!  write(*,*) 'size vp_vars = ', shape(vp_vars)
 
   call new_file_unit(fu,ierr)
   open(fu,file=trim(out_filename), &

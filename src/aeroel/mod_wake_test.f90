@@ -156,30 +156,41 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize the particle wake
-subroutine initialize_wake(wake, nparts)
+subroutine initialize_wake(wake)
   type(t_wake), intent(out),target     :: wake
-  integer, intent(in)                  :: nparts
   integer                              :: ip
 
 
 allocate(t_free_wake::wake_movement)
 
 !Particles
-wake%nmax_prt = nparts
-allocate(wake%wake_parts(wake%nmax_prt))
-allocate(wake%prt_ivort(wake%nmax_prt))
-wake%n_prt = 0
-allocate(wake%part_p(0))
 
-do ip = 1,wake%nmax_prt
-  wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
+wake%n_prt = sim_param%part_n0
+allocate(wake%wake_parts(wake%n_prt))
+allocate(wake%prt_ivort(wake%n_prt))
+!Recreate the pointer vector
+if(allocated(wake%part_p)) then 
+  deallocate(wake%part_p)
+endif
+allocate(wake%part_p(wake%n_prt))
+
+
+do ip = 1,wake%n_prt
+   wake%wake_parts(ip)%mag      => wake%prt_ivort(ip)
+   wake%wake_parts(ip)%cen      = sim_param%part_pos0
+   wake%wake_parts(ip)%vel      = sim_param%part_vel0
+   wake%wake_parts(ip)%dir      = sim_param%part_vort0_dir
+   wake%wake_parts(ip)%mag      = sim_param%part_vort0_mag
+   wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+   wake%wake_parts(ip)%mag      => wake%prt_ivort(ip)
+   wake%part_p(ip)%p            => wake%wake_parts(ip)
 enddo
 
 wake%part_box_min = sim_param%particles_box_min
 wake%part_box_max = sim_param%particles_box_max
 
-allocate(wake%vort_p(0))
 
+allocate(wake%vort_p(wake%n_prt))
 end subroutine initialize_wake
 
 !----------------------------------------------------------------------
@@ -209,18 +220,11 @@ subroutine prepare_wake(wake, octree)
     endif
 
     allocate(wake%part_p(wake%n_prt))
-    allocate(wake%vort_p(wake%n_prt))
+
     
     !TODO: consider inverting these two cycles
-    k = 1
     do ip = 1, wake%n_prt
-      do ir=k,wake%nmax_prt
-        if(.not. wake%wake_parts(ir)%free) then
-          k = ir+1
-          wake%part_p(ip)%p => wake%wake_parts(ir)
-          exit
-        endif
-      enddo
+        wake%part_p(ip)%p => wake%wake_parts(ip)
     enddo
   endif
 end subroutine prepare_wake
