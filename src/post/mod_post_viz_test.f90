@@ -118,7 +118,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   logical                                                   :: out_wake, out_surfvel, out_vrad
   logical                                                   :: out_dforce, out_dmom
   logical                                                   :: out_turbvisc
-  logical                                                   :: separate_wake
   integer                                                   :: n_var , i_var
   character(len=max_char_len), allocatable                  :: var_names(:)
   real(wp), allocatable                                     :: points(:,:), points_exp(:,:)
@@ -147,7 +146,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
   ! Print the wake or not
   out_wake = getlogical(sbprms,'wake')
-  separate_wake = getlogical(sbprms,'separate_wake')
 
   !Check which variables to analyse
   out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
@@ -174,7 +172,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_vrad)      nprint = nprint+1
   if(out_dforce)    nprint = nprint+1
   if(out_dmom)      nprint = nprint+1 
-  write(*,*) 'nprint= ', nprint 
   if(out_wake) then
     allocate(out_vars_vp(nprint))
   endif
@@ -212,6 +209,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                             vpvort_v, v_rad)
       endif
       nelem_vp = size(vppoints,2)
+  
 
       i_var = 1
       if(out_vort) then

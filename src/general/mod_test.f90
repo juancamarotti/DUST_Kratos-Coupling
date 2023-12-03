@@ -56,6 +56,9 @@ use mod_hdf5_io, only: &
 use mod_handling, only: &
     error, warning, info, printout, dust_time, t_realtime, internal_error
 
+use mod_basic_io, only: &
+  read_real_array_from_file  
+
 implicit none
 
 public :: t_sim_param, sim_param, init_sim_param
@@ -109,10 +112,9 @@ type t_sim_param
 
   !> Wake initial condition
   integer  :: part_n0 
-  real(wp) :: part_pos0(3)
-  real(wp) :: part_vel0(3)
-  real(wp) :: part_vort0_dir(3)
-  integer  :: part_vort0_mag
+  real(wp), allocatable :: part_pos0(:,:)
+  real(wp), allocatable :: part_vort0_dir(:,:)
+  real(wp), allocatable :: part_vort0_mag(:)
 
   !Method parameters
   !> Rankine Radius for vortices
@@ -165,6 +167,8 @@ end type t_sim_param
 
 type(t_sim_param) :: sim_param
 
+
+real(wp), allocatable :: particlesMat(:,:)
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -217,7 +221,7 @@ subroutine init_sim_param(sim_param)
     !> Timing
     sim_param%t0                  = 0.0_wp
     sim_param%tend                = 1.0_wp
-    sim_param%dt                  = 0.001_wp
+    sim_param%dt                  = 0.01_wp
     sim_param%dt_out              = sim_param%dt
     sim_param%n_timesteps         = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
     sim_param%debug_level         = 1
@@ -237,23 +241,33 @@ subroutine init_sim_param(sim_param)
     sim_param%particles_box_max     = (/ +10.0_wp, +10.0_wp, +10.0_wp /)
 
     !> Wake initial condition
-    sim_param%part_n0               = 1
-    sim_param%part_vel0             = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
-    sim_param%part_pos0             = (/ 0.0_wp, 0.0_wp, 0.0_wp /)
-    sim_param%part_vort0_dir        = (/ 0.0_wp, 0.0_wp, 1.0_wp /)
-    sim_param%part_vort0_mag        = 1.0_wp
+!    sim_param%part_n0               = 1
+!    sim_param%part_vel0             = (/ 10.0_wp, 0.0_wp, 0.0_wp /)     ! Non sense, because vel is overwritten already in the first iteration
+!    sim_param%part_pos0             = (/ 0.0_wp, 0.0_wp, 0.0_wp /)
+!    sim_param%part_vort0_dir        = (/ 0.0_wp, 0.0_wp, 1.0_wp /)
+!    sim_param%part_vort0_mag        = 1.0_wp
+
+    call read_real_array_from_file ( 7 , trim('particlesTest.dat') , particlesMat )
+    sim_param%part_n0 = size(particlesMat,1)
+    allocate(sim_param%part_pos0(sim_param%part_n0, 3))
+    allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
+    allocate(sim_param%part_vort0_mag(sim_param%part_n0))
+   
+    sim_param%part_pos0      = particlesMat(:,1:3)
+    sim_param%part_vort0_dir = particlesMat(:,4:6)
+    sim_param%part_vort0_mag = particlesMat(:,7)
 
     !> Names
-    sim_param%basename              = 'Output'
+    sim_param%basename              = './Output/part'
   
     !> Method parameters
     sim_param%RankineRad            = 0.1_wp
     sim_param%VortexRad             = 0.1_wp
     sim_param%CutoffRad             = 0.001_wp
-    sim_param%use_vs                = .true.
-    sim_param%use_vd                = .true.
+    sim_param%use_vs                = .false.
+    sim_param%use_vd                = .false.
     sim_param%use_tv                = .false.
-    sim_param%use_divfilt           = .true.
+    sim_param%use_divfilt           = .false.
     sim_param%alpha_divfilt         = 0.3_wp
     !> Octree and FMM parameters
     sim_param%use_fmm               = .false.

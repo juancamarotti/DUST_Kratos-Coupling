@@ -165,24 +165,21 @@ allocate(t_free_wake::wake_movement)
 
 !Particles
 
-wake%n_prt = sim_param%part_n0
-allocate(wake%wake_parts(wake%n_prt))
-allocate(wake%prt_ivort(wake%n_prt))
-!Recreate the pointer vector
-if(allocated(wake%part_p)) then 
-  deallocate(wake%part_p)
-endif
+wake%nmax_prt = sim_param%part_n0
+allocate(wake%wake_parts(wake%nmax_prt))
+allocate(wake%prt_ivort(wake%nmax_prt))
+
+wake%n_prt = wake%nmax_prt
 allocate(wake%part_p(wake%n_prt))
 
 
 do ip = 1,wake%n_prt
    wake%wake_parts(ip)%mag      => wake%prt_ivort(ip)
-   wake%wake_parts(ip)%cen      = sim_param%part_pos0
-   wake%wake_parts(ip)%vel      = sim_param%part_vel0
-   wake%wake_parts(ip)%dir      = sim_param%part_vort0_dir
-   wake%wake_parts(ip)%mag      = sim_param%part_vort0_mag
+   wake%wake_parts(ip)%cen      = sim_param%part_pos0(ip,:)
+   wake%wake_parts(ip)%dir      = sim_param%part_vort0_dir(ip,:)
+   wake%wake_parts(ip)%mag      = sim_param%part_vort0_mag(ip)
    wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
-   wake%wake_parts(ip)%mag      => wake%prt_ivort(ip)
+   wake%wake_parts(ip)%free     = .false.
    wake%part_p(ip)%p            => wake%wake_parts(ip)
 enddo
 
@@ -222,9 +219,16 @@ subroutine prepare_wake(wake, octree)
     allocate(wake%part_p(wake%n_prt))
 
     
-    !TODO: consider inverting these two cycles
+    k = 1
     do ip = 1, wake%n_prt
-        wake%part_p(ip)%p => wake%wake_parts(ip)
+      do ir=k,wake%nmax_prt
+        if(.not. wake%wake_parts(ir)%free) then
+          k = ir+1
+          wake%part_p(ip)%p => wake%wake_parts(ir)
+          wake%vort_p(ip)%p => wake%wake_parts(ir)
+          exit
+        endif
+      enddo
     enddo
   endif
 end subroutine prepare_wake
@@ -272,7 +276,6 @@ subroutine update_wake(wake, octree)
       call wake_movement%get_vel(wake, pos_p, vel_p)
 
       wake%part_p(ip)%p%vel =  vel_p
-
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
         stretch = 0.0_wp
@@ -333,6 +336,7 @@ subroutine update_wake(wake, octree)
     if(sim_param%debug_level.ge.1) call printout(msg)
   endif
 
+
 end subroutine update_wake
 
 !----------------------------------------------------------------------
@@ -362,11 +366,10 @@ n_part = wake%n_prt
     if(.not. wake%part_p(ip)%p%free) then
       pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
               sim_param%dt*real(sim_param%ndt_update_wake,wp)
-
       if(all(pos_p .ge. wake%part_box_min) .and. &
           all(pos_p .le. wake%part_box_max)) then
         wake%part_p(ip)%p%cen = pos_p
-
+        write(*,*) 'part_newcen =', wake%part_p(ip)%p%cen
         if(sim_param%use_vs .or. sim_param%use_vd) then
 
           !add filtering (Pedrizzetti Relaxation)
@@ -386,7 +389,7 @@ n_part = wake%n_prt
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           if(alpha_p_n .ne. 0.0_wp) &
               wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
-        endif
+          endif
       else
         wake%part_p(ip)%p%free = .true.
 !$omp atomic update
@@ -430,7 +433,7 @@ subroutine get_vel_free(this, wake, pos, vel)
   call compute_vel_from_all(wake, pos, vel)
 
   !vel = vel + sim_param%u_inf
-  vel = vel + variable_wind(pos, sim_param%time)
+  vel = vel + variable_wind(pos, sim_param%time) 
 
 end subroutine get_vel_free
 
