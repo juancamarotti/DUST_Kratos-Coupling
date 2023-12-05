@@ -162,7 +162,6 @@ subroutine save_status(wake, it, time, run_id)
     turbvisc(ip) = wake%part_p(ip)%p%turbvisc
     v_rad(ip) = wake%part_p(ip)%p%r_Vortex
   enddo
-  write(*,*) 'points_w = ', points_w
   call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
   call write_hdf5(   vel_w(:,:,1),'WakeVels'  ,gloc1)
   call write_hdf5( turbvisc,'turbvisc'  ,gloc1)

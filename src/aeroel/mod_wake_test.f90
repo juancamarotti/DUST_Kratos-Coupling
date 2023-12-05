@@ -369,7 +369,6 @@ n_part = wake%n_prt
       if(all(pos_p .ge. wake%part_box_min) .and. &
           all(pos_p .le. wake%part_box_max)) then
         wake%part_p(ip)%p%cen = pos_p
-        write(*,*) 'part_newcen =', wake%part_p(ip)%p%cen
         if(sim_param%use_vs .or. sim_param%use_vd) then
 
           !add filtering (Pedrizzetti Relaxation)

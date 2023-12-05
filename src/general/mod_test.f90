@@ -216,73 +216,73 @@ end subroutine save_sim_param
 
 !> Initialize all the parameters reading them from the the input file
 subroutine init_sim_param(sim_param)
-    class(t_sim_param)          :: sim_param 
+  class(t_sim_param)          :: sim_param
 
-    !> Timing
-    sim_param%t0                  = 0.0_wp
-    sim_param%tend                = 1.0_wp
-    sim_param%dt                  = 0.01_wp
-    sim_param%dt_out              = sim_param%dt
-    sim_param%n_timesteps         = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
-    sim_param%debug_level         = 1
+  !> Timing
+  sim_param%t0                  = 0.0_wp
+  sim_param%tend                = 20.0_wp
+  sim_param%dt                  = 0.01_wp
+  sim_param%dt_out              = sim_param%dt*10
+  sim_param%n_timesteps         = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
+  sim_param%debug_level         = 1
 
-    !> Reference environment values
-    sim_param%P_inf               = 101325.0_wp
-    sim_param%rho_inf             = 1.225_wp
-    sim_param%a_inf               = 340.0_wp
-    sim_param%mu_inf              = 0.000018_wp
-    sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
-    sim_param%u_inf               = 0.0_wp
-    sim_param%u_ref               = 10.0_wp  
-    
-    !> Wake parameters
-    sim_param%n_wake_particles      = 100000
-    sim_param%particles_box_min     = (/ -10.0_wp, -10.0_wp, -10.0_wp /)
-    sim_param%particles_box_max     = (/ +10.0_wp, +10.0_wp, +10.0_wp /)
+  !> Reference environment values
+  sim_param%P_inf               = 101325.0_wp
+  sim_param%rho_inf             = 1.225_wp
+  sim_param%a_inf               = 340.0_wp
+  sim_param%mu_inf              = 0.000018_wp
+  sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
+  sim_param%u_inf               = 0.0_wp
+  sim_param%u_ref               = 10.0_wp
+ 
+  !> Wake parameters
+  sim_param%n_wake_particles      = 100000
+  sim_param%particles_box_min     = (/ -5.0_wp, -5.0_wp, -5.0_wp /)
+  sim_param%particles_box_max     = (/ +5.0_wp, +5.0_wp, +5.0_wp /)
 
-    !> Wake initial condition
+  !> Wake initial condition
 !    sim_param%part_n0               = 1
 !    sim_param%part_vel0             = (/ 10.0_wp, 0.0_wp, 0.0_wp /)     ! Non sense, because vel is overwritten already in the first iteration
 !    sim_param%part_pos0             = (/ 0.0_wp, 0.0_wp, 0.0_wp /)
 !    sim_param%part_vort0_dir        = (/ 0.0_wp, 0.0_wp, 1.0_wp /)
 !    sim_param%part_vort0_mag        = 1.0_wp
 
-    call read_real_array_from_file ( 7 , trim('particlesTest.dat') , particlesMat )
-    sim_param%part_n0 = size(particlesMat,1)
-    allocate(sim_param%part_pos0(sim_param%part_n0, 3))
-    allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
-    allocate(sim_param%part_vort0_mag(sim_param%part_n0))
-   
-    sim_param%part_pos0      = particlesMat(:,1:3)
-    sim_param%part_vort0_dir = particlesMat(:,4:6)
-    sim_param%part_vort0_mag = particlesMat(:,7)
+  call read_real_array_from_file ( 7 , trim('ciambellone.dat') , particlesMat )
+  sim_param%part_n0 = size(particlesMat,1)
+  allocate(sim_param%part_pos0(sim_param%part_n0, 3))
+  allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
+  allocate(sim_param%part_vort0_mag(sim_param%part_n0))
+ 
+  sim_param%part_pos0      = particlesMat(:,1:3)
+  sim_param%part_vort0_dir = particlesMat(:,4:6)
+  sim_param%part_vort0_mag = particlesMat(:,7)
 
-    !> Names
-    sim_param%basename              = './Output/part'
-  
-    !> Method parameters
-    sim_param%RankineRad            = 0.1_wp
-    sim_param%VortexRad             = 0.1_wp
-    sim_param%CutoffRad             = 0.001_wp
-    sim_param%use_vs                = .false.
-    sim_param%use_vd                = .false.
-    sim_param%use_tv                = .false.
-    sim_param%use_divfilt           = .false.
-    sim_param%alpha_divfilt         = 0.3_wp
-    !> Octree and FMM parameters
-    sim_param%use_fmm               = .false.
-  
-    if(sim_param%use_fmm) then
-      sim_param%BoxLength           = 20
-      sim_param%NBox                = (/ 1, 1, 1 /)
-      sim_param%OctreeOrigin        = (/ -10.0_wp, -10.0_wp, -10.0_wp /)
-      sim_param%NOctreeLevels       = 6
-      sim_param%MinOctreePart       = 5
-      sim_param%MultipoleDegree     = 2
-      sim_param%NMaxOctreeLevels    = sim_param%NOctreeLevels 
-    endif
+  !> Names
+  sim_param%basename              = './Output/part'
 
-    sim_param%ndt_update_wake       = 1
+  !> Method parameters
+  sim_param%RankineRad            = 0.040800000000000_wp
+  sim_param%VortexRad             = 0.040800000000000_wp
+  sim_param%CutoffRad             = 0.001_wp
+  sim_param%use_vs                = .true.
+  sim_param%use_vd                = .false.
+  sim_param%use_tv                = .false.
+  sim_param%use_divfilt           = .true.
+  sim_param%alpha_divfilt         = 0.3_wp
+  !> Octree and FMM parameters
+  sim_param%use_fmm               = .true.
+
+  if(sim_param%use_fmm) then
+    sim_param%BoxLength           = 10
+    sim_param%NBox                = (/ 1, 1, 1 /)
+    sim_param%OctreeOrigin        = (/ -5.0_wp, -5.0_wp, -5.0_wp /)
+    sim_param%NOctreeLevels       = 8
+    sim_param%MinOctreePart       = 5
+    sim_param%MultipoleDegree     = 2
+    sim_param%NMaxOctreeLevels    = sim_param%NOctreeLevels
+  endif
+
+  sim_param%ndt_update_wake       = 1
 
 end subroutine init_sim_param
 
