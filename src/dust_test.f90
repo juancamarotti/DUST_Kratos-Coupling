@@ -53,7 +53,7 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_test, only: &
-  t_sim_param, sim_param, init_sim_param
+  t_sim_param, sim_param, init_sim_param, create_param_test_particle
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_basename, &
@@ -92,22 +92,34 @@ use mod_math, only: &
 use mod_wind, only: &
   variable_wind
 
+use mod_parse, only: &
+  t_parse, &
+  countoption , &
+  getstr, getlogical, getreal, getint, getrealarray, getintarray, &
+  ignoredParameters, finalizeParameters
+
+use mod_basic_io, only: &
+  read_real_array_from_file 
+  
 implicit none
 
 !> Run-id
 integer                           :: run_id(10)
 !> Input
+!> Main parameters parser
+type(t_parse)                     :: prms
+character(len=*), parameter       :: input_file_name_def = 'dust.in'
+character(len=max_char_len)       :: input_file_name
+character(len=max_char_len)       :: target_file
 character(len=extended_char_len)  :: message
 !> Time parameters
 real(wp)                          :: time
 integer                           :: it, nstep, nout
 real(wp)                          :: t_last_out, t_last_debug_out
 real(wp)                          :: time_no_out, time_no_out_debug
-logical                           :: time_2_out, time_2_debug_out
+logical                           :: time_2_out, time_2_debug_out, output_start 
 real(wp)                          :: dt_debug_out
-logical                           :: already_solv_restart
-
-!> Main variables
+logical                           :: already_solv_restart 
 
 !> Wake
 type(t_wake)                      :: wake
@@ -117,7 +129,7 @@ real(t_realtime)                  :: t1 , t0, t00, t11, t22
 character(len=max_char_len)       :: frmt, frmt_vl
 character(len=max_char_len)       :: basename_debug
 
-real(wp), allocatable             :: al_kernel(:,:), al_v(:)
+real(wp), allocatable             :: al_kernel(:,:), al_v(:), particlesMat(:,:)
 real(wp)                          :: theta_cen(3), R_cen(3, 3) 
 integer                           :: i
 
@@ -134,9 +146,37 @@ call get_run_id(run_id)
 !> Modules initialization 
 call initialize_hdf5()
 
-!> Insert simulation data below
+!> Input reading 
+if(command_argument_count().gt.0) then
+  call get_command_argument(1, value = input_file_name)
+else
+  input_file_name = input_file_name_def
+endif
+
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+
+call create_param_test_particle(prms)
+
+!> Get the parameters and print them out
+call printout(nl//'====== Input parameters: ======')
+call check_file_exists(input_file_name,'dust_test')
+call prms%read_options(input_file_name, printout_val=.true.)
+
+!> Initialize all the parameters
 nout = 0  !> Reset the numbering for output files
-call init_sim_param(sim_param)
+output_start = getlogical(prms, 'output_start')
+call init_sim_param(sim_param, prms, nout, output_start) 
+
+call read_real_array_from_file ( 7 , trim('ciambellone.dat') , particlesMat )
+sim_param%part_n0 = size(particlesMat,1)
+allocate(sim_param%part_pos0(sim_param%part_n0, 3))
+allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
+allocate(sim_param%part_vort0_mag(sim_param%part_n0))
+
+sim_param%part_pos0      = particlesMat(:,1:3)
+sim_param%part_vort0_dir = particlesMat(:,4:6)
+sim_param%part_vort0_mag = particlesMat(:,7)
 
 !> Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then

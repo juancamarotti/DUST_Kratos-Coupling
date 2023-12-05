@@ -289,7 +289,7 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
   nbytes = vtk_fsize *  &
                 size(rr,1)*size(rr,2)
   write(fu) nbytes
-  
+
   do i=1,size(rr,2)
     write(fu) real(rr(:,i),vtk_fsize)
   enddo
