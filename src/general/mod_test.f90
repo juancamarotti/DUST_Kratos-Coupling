@@ -92,6 +92,8 @@ type t_sim_param
   integer :: ndt_update_wake
   !> debug level
   integer :: debug_level
+  !> file particles
+  character(len=max_char_len) :: particles_file
 
   !Physical parameters:
   !> Free stream pressure
@@ -216,7 +218,8 @@ subroutine create_param_test_particle(prms)
   call prms%CreateLogicalOption('output_start', "output values at starting &
                                                             & iteration", 'F')
   call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', '1') 
-
+  call prms%CreateStringOption('particles_file', 'file with particles initial condition', 'particles.dat') 
+  
   !> Restart
   call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
   call prms%CreateStringOption('restart_file','restart file name')
@@ -360,6 +363,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%debug_level         = 1
   sim_param%debug_level         = getint(prms, 'debug_level')  
   
+  !> file dat 
+  sim_param%particles_file      = getstr(prms, 'particles_file') 
   !> Reference environment values
   sim_param%P_inf               = getreal(prms,'P_inf')
   sim_param%rho_inf             = getreal(prms,'rho_inf')
@@ -385,7 +390,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
   sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
 
-
   !> Wake initial condition
 !    sim_param%part_n0               = 1
 !    sim_param%part_vel0             = (/ 10.0_wp, 0.0_wp, 0.0_wp /)     ! Non sense, because vel is overwritten already in the first iteration
@@ -402,7 +406,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !sim_param%part_pos0      = particlesMat(:,1:3)
   !sim_param%part_vort0_dir = particlesMat(:,4:6)
   !sim_param%part_vort0_mag = particlesMat(:,7)
-
+  sim_param%basename              = getstr(prms, 'basename')
   !> Manage restart
   sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then

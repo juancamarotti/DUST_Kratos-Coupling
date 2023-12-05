@@ -100,7 +100,7 @@ use mod_parse, only: &
 
 use mod_basic_io, only: &
   read_real_array_from_file 
-  
+
 implicit none
 
 !> Run-id
@@ -168,8 +168,9 @@ nout = 0  !> Reset the numbering for output files
 output_start = getlogical(prms, 'output_start')
 call init_sim_param(sim_param, prms, nout, output_start) 
 
-call read_real_array_from_file ( 7 , trim('ciambellone.dat') , particlesMat )
+call read_real_array_from_file (7 , sim_param%particles_file, particlesMat)
 sim_param%part_n0 = size(particlesMat,1)
+
 allocate(sim_param%part_pos0(sim_param%part_n0, 3))
 allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
 allocate(sim_param%part_vort0_mag(sim_param%part_n0))
