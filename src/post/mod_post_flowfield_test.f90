@@ -294,7 +294,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
     ! Load the wake -----------------------------
     call load_wake_post(floc, wake)
-    
+    call read_hdf5(t,'time',floc)
     call close_hdf5_file(floc)
     
   !> Compute fields to be plotted +++++++++++++++++++++++++++++

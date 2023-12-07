@@ -57,6 +57,7 @@ use mod_test, only: &
 use mod_sim_param, only: &
   create_param_post
 
+
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, new_file_unit, &
   check_basename, check_file_exists
@@ -93,7 +94,6 @@ use mod_hdf5_io, only: &
 use mod_stringtools, only: &
   LowCase, isInList, stricmp
 
-
 use mod_tecplot_out, only: &
   tec_out_viz, tec_out_probes, tec_out_box, tec_out_loads
 
@@ -110,7 +110,7 @@ use mod_math, only: &
 use mod_post_viz_test, only: &
   post_viz
 
-use mod_post_probes, only: &
+use mod_post_probes_test, only: &
   post_probes
 
 use mod_post_flowfield_test, only: &
@@ -197,7 +197,9 @@ do ia = 1, n_analyses
     case('viz')
       call post_viz( sbprms , basename , data_basename , an_name , ia , &
                     out_frmt , an_start , an_end , an_step, average, an_avg )
-
+    case('probes')
+      call post_probes( sbprms , basename , data_basename , an_name , ia , &
+                            out_frmt, an_start , an_end , an_step )
     !> Flow Field
     case('flow_field')
       call post_flowfield( sbprms , basename , data_basename , an_name , ia , &
