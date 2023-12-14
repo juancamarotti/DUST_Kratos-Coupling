@@ -1352,19 +1352,73 @@ All the detailed parameters of the Hinged surfaces input file are:
     \item \param{hinge\_rotation\_function}: \textit{required:} no. \textit{type:} string. 
     
     Parser for hinge input with simple functions; the supported functions are: 
-    \opt{function:const}, \opt{function:sin}, \opt{function:cos}. 
+    \opt{function:const}, \opt{function:sin}, \opt{function:cos}, \opt{function:cosine_driver}. 
     \begin{itemize}
         \item \param{amplitude} \textit{required:} yes. \textit{type:} real. 
         
-        amplitude of the rotation in degrees for constant, cosine and sine functions. 
+        amplitude of the rotation in degrees for constant, cosine, sine and cosine_driver functions. 
+
+        \item \param{amplitude_initial} \textit{required:} no. \textit{type:} real. 
         
+        initial amplitude of the rotation in degrees for constant, cosine, sine and cosine_driver functions.
+
+        \item \param{initial_time} \textit{required:} no. \textit{type:} real. 
+        
+        initial time of the rotation for cosine, sine and cosine_driver functions.
+
         \item \param{omega} \textit{required:} yes. \textit{type:} real. \textit{default:} 0.0 
         
-        Angular velocity of the rotation function in \si{\deg\per\second}, for constant?, cosine and sine functions.
+        Angular velocity of the rotation function in \si{\deg\per\second}, for cosine, sine cosine_driver functions.
         
-        \item \param{phase} \textit{required:} yes. \textit{type:} real. \textit{default:} 0.0
+        \item \param{phase} \textit{required:} no. \textit{type:} real. \textit{default:} 0.0
         
-        phase angle of the rotation function in \si{\deg}, for constant?, cosine and sine functions.
+        phase angle of the rotation function in \si{\deg}, for cosine and sine functions.
+        \item \param{number_of_cycles} \textit{required:} no. \textit{type:} real. \textit{default:} 0.5
+        
+        the value of number_of_cycles determines the behavior of the cosine drive. If is equal to \param{0.5} exactly half cycle is performed. 
+        In this case, it may be useful to express the \param{omega} as $\pi$/duration, where duration is the time required to complete the halfwave.
+        
+        Note that this function does not correspond to $\cos{t}$, but is expressed as eq.\ref{eq:cosine}.
+
+        \begin{equation}
+          \label{eq:cosine}
+          \theta = \theta_0 \cdot (1-\cos{\omega(t-\param{initial_time})})
+        \end{equation}
+        where $\theta$, $\theta_0$, and $\omega$ are respectively \param{amplitude}, \param{amplitude_initial}, and \param{omega}
+
+        This expression is valid for a time between:
+        \begin{equation}
+          \label{eq:cosine_if}
+          (t > \param{initial_time}) \mathrm{  and  } (t< \param{initial_time} + 2\pi\cdot\omega\cdot\param{number_of_cycles})
+        \end{equation}
+
+      Example:
+\begin{inputfile}[frame=single, caption={Cosine_driver example}, 
+  label={file:cosine_driver}]
+  ...
+  hinge_rotation_input = function:cosine_driver
+  hinge_rotation_function = {
+    amplitude         = 10.0      ! deg
+    amplitude_initial = 5.0       ! deg
+    omega             = 15.708   ! rad/sec
+    initial_time      = 0.2       ! sec
+    number_of_cycles  = 1.5
+  }
+  ...
+\end{inputfile} 
+
+\begin{figure}[htbp]
+  \centering
+  \makebox[\textwidth][c]{
+  \subfigure[\label{fig:cosine_05}\param{number_of_cycles}=\num{0.5}]{\includegraphics[width=.33\textwidth]{hinges/05.png}}
+  \subfigure[\label{fig:cosine_1} \param{number_of_cycles}=\num{1.0}]{\includegraphics[width=.33\textwidth]{hinges/1.png}}
+  \subfigure[\label{fig:cosine_15} \param{number_of_cycles}=\num{1.5}]{\includegraphics[width=.33\textwidth]{hinges/15.png}}
+  }
+  \caption{Hinge deflection $\theta$ function of \param{number_of_cycles} for the example reported in file \ref{file:cosine_driver}.}
+  \label{fig:chordwisedistributions}
+\end{figure}
+
+
     \end{itemize}
     \item \param{hinge\_Rotation\_File} \textit{required:} no. \textit{type:} string. 
     

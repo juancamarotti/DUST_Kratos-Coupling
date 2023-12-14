@@ -1198,7 +1198,9 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
-        
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl_init , 'Hinge_Rotation_Amplitude_initial', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_cosine_cycl, 'Hinge_Rotation_cosine_cycles', hiloc)   
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_initial_time, 'Hinge_Rotation_Initial_Time', hiloc)   
 
         if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
@@ -1521,6 +1523,12 @@ subroutine load_components(geo, in_file, out_file, te)
                                                 'Hinge_Rotation_Omega', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, &
                                                 'Hinge_Rotation_Phase', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl_init, &
+                                                'Hinge_Rotation_Amplitude_initial', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_cosine_cycl, &
+                                                'Hinge_Rotation_cosine_cycles', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_initial_time, &
+                                                'Hinge_Rotation_Initial_Time', hiloc)
           call close_hdf5_group(hiloc)
 
         end do
