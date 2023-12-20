@@ -986,7 +986,6 @@ subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
                       matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
 
         end do
-
         
         !> Blending region
         do ib = 1, size(this%blen%n2h(ih)%p2h)
@@ -1036,8 +1035,8 @@ subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
               Rot_I = eye + sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
               
               if (te_i(1 , it) .eq. ii) then ! hinge node is also trailing edge node
-!
-                te_t(:,it) = te_t(:,it) + this%rot%n2h(ih)%s2h(ib) * matmul( Rot_I, te_t(:,it))
+
+                te_t(:,it) = this%rot%n2h(ih)%s2h(ib) * matmul( Rot_I, te_t(:,it))
               
               end if
             
