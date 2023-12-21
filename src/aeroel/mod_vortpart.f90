@@ -266,9 +266,9 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   r = rr
 
   !Rosenhead
-  distn = sqrt(r**2+r_vort**2)
-  c = -1.0_wp/distn**3
-  d = 3.0_wp/distn**5
+!  distn = sqrt(r**2+r_vort**2)
+!  c = -1.0_wp/distn**3
+!  d = 3.0_wp/distn**5
 
   !Rankine
   !if (r .ge. r_vort) then
@@ -280,19 +280,19 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   !endif
 
   !Gaussian from Alvarez
-  !if(r.gt.1e-13_wp) then
-  !c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3 + &
-  !     2.0_wp/(r**2 * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2/(2.0_wp * r_vort**2))
-  !d = 3.0_wp/r**5 * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2/(2.0_wp * r_vort**2)) * &
-  !    (-6.0_wp/(r**4*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2*r_vort**3*sqrt(2.0_wp*pi)))
-  !else
-  !  c=0.0
-  !  d=0.0
-  !endif
+! if(r.gt.1e-13_wp) then
+! c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3 + &
+!      2.0_wp/(r**2 * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2/(2.0_wp * r_vort**2))
+! d = 3.0_wp/r**5 * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2/(2.0_wp * r_vort**2)) * &
+!     (-6.0_wp/(r**4*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2*r_vort**3*sqrt(2.0_wp*pi)))
+! else
+!   c=0.0
+!   d=0.0
+! endif
   !!High Order Algebraic
-  !distn = sqrt(r**2+r_vort**2)
-  !c = -(r**2+2.5_wp*r_vort**2)/distn**5
-  !d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_vort**2)/distn**7
+distn = sqrt(r**2+r_vort**2)
+c = -(r**2+2.5_wp*r_vort**2)/distn**5
+d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_vort**2)/distn**7
 !
 
 end subroutine
@@ -313,8 +313,8 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, diff)
   dist = pos-this%cen
   distn = norm2(dist)
 
-  volp = 4.0_wp/3.0_wp*pi*this%r_Vortex**3
-  volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3
+  volp = 4.0_wp/3.0_wp*pi*r_Vortex_p**3
+  volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3  
   diff = 1.0_wp/(this%r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
                                             *etaeps(distn,this%r_Vortex)
   !diff = 1/(r_Vortex**2)*( - volq*alpha) &

@@ -104,7 +104,7 @@ public :: post_probes
 
 private
 
-character(len=max_char_len), parameter :: this_mod_name = 'mod_post_probes'
+character(len=max_char_len), parameter :: this_mod_name = 'mod_post_probes_test'
 character(len=max_char_len) :: msg
 
 contains

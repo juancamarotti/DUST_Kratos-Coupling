@@ -297,7 +297,6 @@ subroutine update_wake(wake, octree)
         enddo
       
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + stretch
-        
         if(sim_param%use_divfilt) then 
           wake%part_p(ip)%p%rotu = wake%part_p(ip)%p%rotu + rotu
         endif
@@ -314,7 +313,7 @@ subroutine update_wake(wake, octree)
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
                   wake%part_p(ip)%p%r_Vortex, df)
-            diff = diff + df*sim_param%nu_inf
+            diff = diff + 2.0_wp*df*sim_param%nu_inf    ! 21/12/2023 Added factor 2 (see Winckelmans)
           endif
 
         enddo !iq

@@ -1160,7 +1160,7 @@ subroutine update_wake(wake, geo, elems, octree)
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
                   wake%part_p(ip)%p%r_Vortex, df)
-            diff = diff + df*sim_param%nu_inf
+            diff = diff + 2*df*sim_param%nu_inf ! 21/12/2023 Added factor 2 (see Winckelmans)
           endif
 
         enddo !iq
