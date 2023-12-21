@@ -1458,12 +1458,12 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     m = maxval(rr_mean(2,:))
     idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
     p = rr_mean(1, idx_m)           ! x_mean line max thickness 
-
+    write(*,*) 'm = ', m, ' p = ', p
     !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
     !  The expression is related NACA profile, but should be valid for all profile
     !  close to the leading edge. 
     !> Get analytical derivative of the mean line in x = 0  
-    tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+    tang_mean_le = 2.0_wp*m/(p + 1e-16_wp) ! need to get the center of the circle -> linearized approach
     tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
                   (rr_mean(1, size(rr_mean,2) - 1) - rr_mean(1, size(rr_mean,2)))
     
@@ -1477,7 +1477,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       m = maxval(yq_mean)
       idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
       p = xq_mean(idx_m)           ! x_mean line max thickness
-      tang_mean_le_new = 2.0_wp*m/p
+      tang_mean_le_new = 2.0_wp*m/(p + 1e-16_wp)
       if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
       tang_mean_le = tang_mean_le_new 
     enddo 
@@ -1639,7 +1639,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
 
     allocate(rr2mesh_up(2,(size(circ_x_up)   + size(chain_points_up,2) - 1))); rr2mesh_up = 0.0_wp
-    allocate(rr2mesh_low(2,(size(circ_x_low) + size(chain_points_up,2) - 1))); rr2mesh_low = 0.0_wp 
+    allocate(rr2mesh_low(2,(size(circ_x_low) + size(chain_points_low,2) - 1))); rr2mesh_low = 0.0_wp 
     allocate(rr2mesh_mean(2,size(xq_mean)));                                   rr2mesh_mean = 0.0_wp
 
     !> upper part
@@ -1743,7 +1743,10 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       rr(2,:) = rr_geo_mean(2,:) 
     endif 
   end if !> old format 
-
+  write(*,*) rr(1,:)
+  write(*,*) rr(2,:)
+  write(*,*) rr2mesh_low(1,:) 
+  
   !> cleanup
   if (allocated(rr_dat))            deallocate(rr_dat) 
   if (allocated(rr_up))             deallocate(rr_up)
