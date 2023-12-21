@@ -67,6 +67,8 @@ use mod_math, only: &
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input 
+
+use, intrinsic :: ieee_arithmetic
 !----------------------------------------------------------------------
 
 implicit none
@@ -1481,10 +1483,10 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     enddo 
 
     !> conditions on symmetric profile 
-    if (abs(tang_mean_te) .lt. 0.03_wp) then ! tol harcoded so far 
+    if (abs(tang_mean_te) .lt. 0.03_wp .or. ieee_is_nan(tang_mean_te)) then ! tol harcoded so far 
       tang_mean_te = 0.0_wp
     endif 
-    if (abs(tang_mean_le) .lt. 0.03_wp) then ! tol harcoded so far 
+    if (abs(tang_mean_le) .lt. 0.03_wp .or. ieee_is_nan(tang_mean_te)) then ! tol harcoded so far 
       tang_mean_le = 0.0_wp
     endif 
 
@@ -1493,7 +1495,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     ! belonging to the airfoil  
     ! Initials guess: (naca profile) 
     ! radius of the circle at the leading edge 
-    thickness = 0.12  !> initial guess (NACA0012)
+    thickness = 0.12_wp  !> initial guess (NACA0012)
     radius = 1.10_wp*thickness**2.0_wp 
 
     !> get finer approximation of the upper part (maybe not strictly needed)
