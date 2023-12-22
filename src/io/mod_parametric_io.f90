@@ -67,6 +67,8 @@ use mod_math, only: &
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input 
+
+use, intrinsic :: ieee_arithmetic
 !----------------------------------------------------------------------
 
 implicit none
@@ -325,7 +327,9 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
       !> check geometry series type 
       if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
         y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
+        write(*,*) 'ciao'
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+        write(*,*) ' r_in_list(iRegion) : ' , r_in_list(iRegion) 
         r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
       elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ib') then 
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
@@ -1425,12 +1429,12 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     m = maxval(rr_mean(2,:))
     idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
     p = rr_mean(1, idx_m)           ! x_mean line max thickness 
-
+    write(*,*) 'm = ', m, ' p = ', p
     !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
     !  The expression is related NACA profile, but should be valid for all profile
     !  close to the leading edge. 
     !> Get analytical derivative of the mean line in x = 0  
-    tang_mean_le = 2.0_wp*m/p ! need to get the center of the circle -> linearized approach
+    tang_mean_le = 2.0_wp*m/(p + 1e-16_wp) ! need to get the center of the circle -> linearized approach
     tang_mean_te = (rr_mean(2, size(rr_mean,2) - 1) - rr_mean(2, size(rr_mean,2)))/ &
                   (rr_mean(1, size(rr_mean,2) - 1) - rr_mean(1, size(rr_mean,2)))
     
@@ -1444,16 +1448,16 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       m = maxval(yq_mean)
       idx_m = maxloc(yq_mean,1)  ! y_mean line max thickness
       p = xq_mean(idx_m)           ! x_mean line max thickness
-      tang_mean_le_new = 2.0_wp*m/p
+      tang_mean_le_new = 2.0_wp*m/(p + 1e-16_wp)
       if (abs(tang_mean_le_new - tang_mean_le) .lt. 1e-6_wp) exit
       tang_mean_le = tang_mean_le_new 
     enddo 
 
     !> conditions on symmetric profile 
-    if (abs(tang_mean_te) .lt. 0.03_wp) then ! tol harcoded so far 
+    if (abs(tang_mean_te) .lt. 0.03_wp .or. ieee_is_nan(tang_mean_te)) then ! tol harcoded so far 
       tang_mean_te = 0.0_wp
     endif 
-    if (abs(tang_mean_le) .lt. 0.03_wp) then ! tol harcoded so far 
+    if (abs(tang_mean_le) .lt. 0.03_wp .or. ieee_is_nan(tang_mean_te)) then ! tol harcoded so far 
       tang_mean_le = 0.0_wp
     endif 
 
@@ -1462,7 +1466,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     ! belonging to the airfoil  
     ! Initials guess: (naca profile) 
     ! radius of the circle at the leading edge 
-    thickness = 0.12  !> initial guess (NACA0012)
+    thickness = 0.12_wp  !> initial guess (NACA0012)
     radius = 1.10_wp*thickness**2.0_wp 
 
     !> get finer approximation of the upper part (maybe not strictly needed)
@@ -1606,7 +1610,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     circ_y_up = circ_y_up(size(circ_y_up):1:-1) 
 
     allocate(rr2mesh_up(2,(size(circ_x_up)   + size(chain_points_up,2) - 1))); rr2mesh_up = 0.0_wp
-    allocate(rr2mesh_low(2,(size(circ_x_low) + size(chain_points_up,2) - 1))); rr2mesh_low = 0.0_wp 
+    allocate(rr2mesh_low(2,(size(circ_x_low) + size(chain_points_low,2) - 1))); rr2mesh_low = 0.0_wp 
     allocate(rr2mesh_mean(2,size(xq_mean)));                                   rr2mesh_mean = 0.0_wp
 
     !> upper part
@@ -1711,7 +1715,10 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     endif 
 
   end if !> old format 
-
+  write(*,*) rr(1,:)
+  write(*,*) rr(2,:)
+  write(*,*) rr2mesh_low(1,:) 
+  
   !> cleanup
   if (allocated(rr_dat))            deallocate(rr_dat) 
   if (allocated(rr_up))             deallocate(rr_up)
@@ -1814,19 +1821,20 @@ subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te)
   allocate(dl(n_elem)); dl = 0.0_wp
   if (.not. allocated(dcsi_te)) allocate(dcsi_te(n_elem + 1)); dcsi_te = 0.0_wp 
   if (.not. allocated(dcsi_le)) allocate(dcsi_le(n_elem + 1)); dcsi_le = 0.0_wp
+  
   !> check series convergence 
   if ((r .ge. 1.0_wp) .or. (r .le. 0.0_wp)) then 
     call error(this_mod_name, this_sub_name, 'insert a growth value between 0 and 1') 
   end if
   
-  r_d = 1-r; ! growth ratio (intended as decreasing ratio) 
+  r_d = 1-r ! growth ratio (intended as decreasing ratio) 
   ! get size of the first element knowing the sum of the geometric series
-  dl(1) = (1-r_d)/(1-r_d**real(n_elem,wp));
+  dl(1) = (1.0_wp-r_d)/(1.0_wp - r_d**real(n_elem,wp));
   do i = 2, n_elem
-      dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
+    dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
   end do 
   do i = 1, n_elem
-      dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
+    dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
   end do
 
   dcsi_le = (1-dcsi_te)
@@ -1835,10 +1843,8 @@ subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te)
   !> rescale in the interval 
   dcsi_te = dcsi_te*(end_x - start_x) + start_x 
   dcsi_le = dcsi_le*(end_x - start_x) + start_x
-
-  !> cleanup
+  !> cleanup 
   if (allocated(dl)) deallocate(dl)
-
 
 end subroutine geoseries 
 
