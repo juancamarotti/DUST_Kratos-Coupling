@@ -338,7 +338,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       !> check geometry series type 
       if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
         y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
+        write(*,*) 'ciao'
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+        write(*,*) ' r_in_list(iRegion) : ' , r_in_list(iRegion) 
         r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
       elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ib') then 
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
@@ -1849,19 +1851,20 @@ subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te)
   allocate(dl(n_elem)); dl = 0.0_wp
   if (.not. allocated(dcsi_te)) allocate(dcsi_te(n_elem + 1)); dcsi_te = 0.0_wp 
   if (.not. allocated(dcsi_le)) allocate(dcsi_le(n_elem + 1)); dcsi_le = 0.0_wp
+  
   !> check series convergence 
   if ((r .ge. 1.0_wp) .or. (r .le. 0.0_wp)) then 
     call error(this_mod_name, this_sub_name, 'insert a growth value between 0 and 1') 
   end if
   
-  r_d = 1-r; ! growth ratio (intended as decreasing ratio) 
+  r_d = 1-r ! growth ratio (intended as decreasing ratio) 
   ! get size of the first element knowing the sum of the geometric series
-  dl(1) = (1-r_d)/(1-r_d**real(n_elem,wp));
+  dl(1) = (1.0_wp-r_d)/(1.0_wp - r_d**real(n_elem,wp));
   do i = 2, n_elem
-      dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
+    dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
   end do 
   do i = 1, n_elem
-      dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
+    dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
   end do
 
   dcsi_le = (1-dcsi_te)
@@ -1870,10 +1873,8 @@ subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te)
   !> rescale in the interval 
   dcsi_te = dcsi_te*(end_x - start_x) + start_x 
   dcsi_le = dcsi_le*(end_x - start_x) + start_x
-
-  !> cleanup
+  !> cleanup 
   if (allocated(dl)) deallocate(dl)
-
 
 end subroutine geoseries 
 
