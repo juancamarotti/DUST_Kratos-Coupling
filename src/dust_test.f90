@@ -168,16 +168,18 @@ nout = 0  !> Reset the numbering for output files
 output_start = getlogical(prms, 'output_start')
 call init_sim_param(sim_param, prms, nout, output_start) 
 
-call read_real_array_from_file (7 , sim_param%particles_file, particlesMat)
+call read_real_array_from_file (8 , sim_param%particles_file, particlesMat)
 sim_param%part_n0 = size(particlesMat,1)
 
 allocate(sim_param%part_pos0(sim_param%part_n0, 3))
 allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
 allocate(sim_param%part_vort0_mag(sim_param%part_n0))
+allocate(sim_param%part_vol(sim_param%part_n0))
 
 sim_param%part_pos0      = particlesMat(:,1:3)
 sim_param%part_vort0_dir = particlesMat(:,4:6)
 sim_param%part_vort0_mag = particlesMat(:,7)
+sim_param%part_vol       = particlesMat(:,8)
 
 !> Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then

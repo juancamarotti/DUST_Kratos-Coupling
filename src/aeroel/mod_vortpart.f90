@@ -94,6 +94,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: rotu(3)
   real(wp) :: r_Vortex
   real(wp) :: r_cutoff
+  real(wp) :: vol
   
 contains
 
@@ -301,20 +302,23 @@ end subroutine
 !> Compute the vorticity diffusion induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!
-subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, diff)
+subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, volp, diff)
   class(t_vortpart), intent(in) :: this ! particle q (inducing)
   real(wp), intent(in)          :: pos(:)
   real(wp), intent(in)          :: alpha(3)
   real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
   real(wp), intent(out)         :: diff(3)
   real(wp)                      :: dist(3), distn
-  real(wp)                      :: volp, volq
+  real(wp), intent(in)          :: volp
+  real(wp)                      :: volq
   
   dist = pos-this%cen
   distn = norm2(dist)
 
-  volp = 4.0_wp/3.0_wp*pi*r_Vortex_p**3
-  volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3  
+!  volp = 4.0_wp/3.0_wp*pi*r_Vortex_p**3
+!  volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3 
+  volq = this%vol
+  
   diff = 1.0_wp/(this%r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
                                             *etaeps(distn,this%r_Vortex)
   !diff = 1/(r_Vortex**2)*( - volq*alpha) &

@@ -1279,7 +1279,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                  %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex ,str)
+                  %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
+                  octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
               stretch = stretch +str*(2.0_wp*sim_param%nu_inf + octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
                ! 21/12/2023 Added factor 2 (see Winckelmans)
             endif
@@ -1311,7 +1312,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
-              %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
+              %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
+               octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
            stretch = stretch +str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
             ! 21/12/2023 Added factor 2 (see Winckelmans)
          endif
@@ -1342,7 +1344,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           if(sim_param%use_vd) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
                      !                             alpha, str)
-                     alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
+                     alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,&
+                     octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
             stretch = stretch + str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
              ! 21/12/2023 Added factor 2 (see Winckelmans)
           endif

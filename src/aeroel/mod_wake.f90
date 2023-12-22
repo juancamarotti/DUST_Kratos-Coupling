@@ -1159,7 +1159,7 @@ subroutine update_wake(wake, geo, elems, octree)
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
-                  wake%part_p(ip)%p%r_Vortex, df)
+                  wake%part_p(ip)%p%r_Vortex, wake%part_p(ip)%p%vol, df)
             diff = diff + 2*df*sim_param%nu_inf ! 21/12/2023 Added factor 2 (see Winckelmans)
           endif
 
@@ -1292,7 +1292,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
   real(wp)                              :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
   integer                               :: k, n_part
   real(wp)                              :: vel_in(3), vel_out(3), wind(3)
-  real(wp)                              :: area
+  real(wp)                              :: area, rVol
   integer                               :: ic
   
   integer                               :: iwc, isp, n_sbprt, n_max_pan_comp, n_max_sbprt_comp, pan_count, sbprt_count
@@ -1757,6 +1757,8 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
               wake%wake_parts(ip)%cen = pos_p
             if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
               wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
+              rVol = sim_param%KVol * 0.5_wp*sqrt(area)
+              wake%wake_parts(ip)%vol = 4.0_wp/3.0_wp * pi * rVol**3.0_wp  
               else ! revert to sim_param vortex rad
                 wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
               end if

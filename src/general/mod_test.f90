@@ -40,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte
-!!          Davide Montagnani
-!!          Matteo Tugnoli
+!!          Federico Gentile
+!!          Matteo Dall'Ora
+!!          Alessandro Cocco
 !!=========================================================================
 
 module mod_test
@@ -123,6 +123,7 @@ type t_sim_param
   real(wp), allocatable :: part_pos0(:,:)
   real(wp), allocatable :: part_vort0_dir(:,:)
   real(wp), allocatable :: part_vort0_mag(:)
+  real(wp), allocatable :: part_vol(:)
 
   !Method parameters
   !> Rankine Radius for vortices

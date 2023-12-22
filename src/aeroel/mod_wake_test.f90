@@ -178,6 +178,7 @@ do ip = 1,wake%n_prt
    wake%wake_parts(ip)%cen      = sim_param%part_pos0(ip,:)
    wake%wake_parts(ip)%dir      = sim_param%part_vort0_dir(ip,:)
    wake%wake_parts(ip)%mag      = sim_param%part_vort0_mag(ip)
+   wake%wake_parts(ip)%vol      = sim_param%part_vol(ip)
    wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
    wake%wake_parts(ip)%free     = .false.
    wake%part_p(ip)%p            => wake%wake_parts(ip)
@@ -295,7 +296,11 @@ subroutine update_wake(wake, octree)
             endif
           endif
         enddo
-      
+!        if (ip .eq. 1) then
+!          write(*,*) 'mag = ', wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag
+!          write(*,*) 'stretch = ', stretch
+!        endif
+
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + stretch
         if(sim_param%use_divfilt) then 
           wake%part_p(ip)%p%rotu = wake%part_p(ip)%p%rotu + rotu
@@ -312,12 +317,15 @@ subroutine update_wake(wake, octree)
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
-                  wake%part_p(ip)%p%r_Vortex, df)
+                  wake%part_p(ip)%p%r_Vortex, wake%part_p(ip)%p%vol, df)
             diff = diff + 2.0_wp*df*sim_param%nu_inf    ! 21/12/2023 Added factor 2 (see Winckelmans)
           endif
 
         enddo !iq
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + diff
+!        if (ip .eq. 1) then
+!          write(*,*) 'diff = ', diff
+!        endif
       endif !use_vd
 
     end if ! not use_fmm
@@ -383,10 +391,16 @@ n_part = wake%n_prt
                           wake%part_p(ip)%p%stretch* &
                           sim_param%dt*real(sim_param%ndt_update_wake,wp)
           alpha_p_n = norm2(alpha_p)
+!          if (ip .eq. 1) then
+!            write(*,*) 'stretch (complete_wake) = ', wake%part_p(ip)%p%stretch
+!            write(*,*) 'stretch*dt (complete_wake) = ', wake%part_p(ip)%p%stretch*sim_param%dt
+!            write(*,*) 'alpha_old (complete_wake) = ', wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag
+!          endif
 
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           if(alpha_p_n .ne. 0.0_wp) &
               wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
+              wake%part_p(ip)%p%mag = alpha_p_n
           endif
       else
         wake%part_p(ip)%p%free = .true.

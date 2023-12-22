@@ -162,6 +162,8 @@ type t_sim_param
   !> Vortex Radius coefficient for vortex particles
   !> if too low or negative reverts to original behaviour (VortexRad)
   real(wp) :: KVortexRad  
+  !> Particle volume computation coefficient (applies to rVol)
+  real(wp) :: KVol 
   !> Complete cutoff radius
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
@@ -411,6 +413,8 @@ subroutine create_param_main(prms)
         "Radius of vortex core, for particles", '0.1')
   call prms%CreateRealOption('k_vortex_rad', &
         "Radius coefficient of vortex core, for particles", '1.0') ! default is ON
+  call prms%CreateRealOption('k_vol', &
+        "Radius coefficient of volume, for particles", '1.0') 
   call prms%CreateRealOption('cutoff_rad', &
         "Radius of complete cutoff  for vortex induction near core", '0.001')
   
@@ -734,6 +738,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%RankineRad            = getreal(prms,    'rankine_rad')
   sim_param%VortexRad             = getreal(prms,    'vortex_rad')
   sim_param%KVortexRad            = getreal(prms,    'k_vortex_rad')
+  sim_param%KVol                  = getreal(prms,    'k_vol')
   sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
   sim_param%first_panel_scaling   = getreal(prms,    'implicit_panel_scale')
   sim_param%min_vel_at_te         = getreal(prms,    'implicit_panel_min_vel')
