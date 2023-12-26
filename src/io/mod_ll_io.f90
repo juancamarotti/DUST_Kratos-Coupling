@@ -596,9 +596,11 @@ function spacing_weights ( itype, i, n, r_ib, r_ob, y_refinement ) result(w)
   case(6) 
     call geoseries(0.0_wp, 1.0_wp, n, r_ob, divisionIB, divisionOB) 
     w = divisionOB(i + 1)
+
   case(7) 
     call geoseries(0.0_wp, 1.0_wp, n, r_ib, divisionIB, divisionOB) 
     w = divisionIB(i)
+
   case default ! uniform
     w = real(i,wp) / real(n,wp)
   end select

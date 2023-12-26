@@ -173,52 +173,52 @@ end type
 !> Type containing the whole octree structure
 type :: t_octree
 
- !> maximum and minimum of the coordinates of the whole octree
- real(wp) :: xmin(3), xmax(3)
+  !> maximum and minimum of the coordinates of the whole octree
+  real(wp) :: xmin(3), xmax(3)
 
- !> number of level 1 cubic boxes in each direction
- integer :: nbox(3)
+  !> number of level 1 cubic boxes in each direction
+  integer :: nbox(3)
 
- !> number of levels of octree division
- integer :: nlevels
+  !> number of levels of octree division
+  integer :: nlevels
 
- !> Level at which the solid walls are considered (for particles redistribution)
- integer :: lvl_solid
+  !> Level at which the solid walls are considered (for particles redistribution)
+  integer :: lvl_solid
 
- !> total number of cells (sum of cells at each level)
- integer :: ncells_tot
+  !> total number of cells (sum of cells at each level)
+  integer :: ncells_tot
 
- !> number of cells in each direction, at each level
- integer, allocatable :: ncl(:,:)
+  !> number of cells in each direction, at each level
+  integer, allocatable :: ncl(:,:)
 
- !> all the actual cells, in a 1d array
- !type(t_cell), allocatable :: cells(:)
+  !> all the actual cells, in a 1d array
+  !type(t_cell), allocatable :: cells(:)
 
- !> cell pointers organized in layers, each layer corresponding to
- !! a level of the octree
- type(t_cell_layer), allocatable :: layers(:)
+  !> cell pointers organized in layers, each layer corresponding to
+  !! a level of the octree
+  type(t_cell_layer), allocatable :: layers(:)
 
- !> pointer array to all the leaves
- type(t_cell_p), allocatable :: leaves(:)
+  !> pointer array to all the leaves
+  type(t_cell_p), allocatable :: leaves(:)
 
- !> number of leaves
- integer :: nleaves
+  !> number of leaves
+  integer :: nleaves
 
- !> Degree of multipole expansion
- integer :: degree
+  !> Degree of multipole expansion
+  integer :: degree
 
- !> Polynomial expansion tools
- type(t_polyexp) :: pexp
- type(t_polyexp) :: pexp_der
+  !> Polynomial expansion tools
+  type(t_polyexp) :: pexp
+  type(t_polyexp) :: pexp_der
 
- !> Regularized kernel radius
- real(wp) :: delta
+  !> Regularized kernel radius
+  real(wp) :: delta
 
- !> Time spent in multipole calculations
- real(t_realtime) :: t_mp
+  !> Time spent in multipole calculations
+  real(t_realtime) :: t_mp
 
- !> Time spent in leaves calculations
- real(t_realtime) :: t_lv
+  !> Time spent in leaves calculations
+  real(t_realtime) :: t_lv
 
 end type
 
@@ -249,22 +249,22 @@ contains
 
 !> Initialize the octree
 subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
-                             degree, delta, octree)
- real(wp), intent(in) :: box_length
- integer,  intent(in) :: nbox(3)
- real(wp), intent(in) :: origin(3)
- integer,  intent(in) :: nlevels
- integer,  intent(in) :: min_part
- integer,  intent(in) :: degree
- real(wp), intent(in) :: delta
- type(t_octree), intent(out), target :: octree
+                              degree, delta, octree)
+  real(wp), intent(in) :: box_length
+  integer,  intent(in) :: nbox(3)
+  real(wp), intent(in) :: origin(3)
+  integer,  intent(in) :: nlevels
+  integer,  intent(in) :: min_part
+  integer,  intent(in) :: degree
+  real(wp), intent(in) :: delta
+  type(t_octree), intent(out), target :: octree
 
- type(t_cell_p) :: inter_list(208) !all the possible interactions
- integer :: l, i,j,k, ic,jc,kc, ip_list
- integer :: imax, jmax, kmax
- integer :: p, child
- integer :: indx(3)
- character(len=*), parameter :: this_sub_name = 'initialize_octree'
+  type(t_cell_p) :: inter_list(208) !all the possible interactions
+  integer :: l, i,j,k, ic,jc,kc, ip_list
+  integer :: imax, jmax, kmax
+  integer :: p, child
+  integer :: indx(3)
+  character(len=*), parameter :: this_sub_name = 'initialize_octree'
 
   octree%xmin = origin
   octree%xmax = origin + real(nbox,wp)*box_length
@@ -339,7 +339,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     !Set the quantities for the layer
     octree%layers(l)%cell_size = box_length/real((2**(l-1)),wp)
     allocate(octree%layers(l)%&
-                       lcells(octree%ncl(1,l),octree%ncl(2,l),octree%ncl(3,l)))
+                        lcells(octree%ncl(1,l),octree%ncl(2,l),octree%ncl(3,l)))
     !cycle on the parents (i.e. all the cells at the upper level)
     do k = 1,octree%ncl(3,l-1)
     do j = 1,octree%ncl(2,l-1)
@@ -349,21 +349,21 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       do kc = 1,2; do jc = 1,2; do ic = 1,2
         !point the cell in the ordered layer
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cart_index &
-                             = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
+                              = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
     !    octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%level = l
 
         !set the parent
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%parent%p &
-                                     => octree%layers(l-1)%lcells(i,j,k)
+                                      => octree%layers(l-1)%lcells(i,j,k)
     !    octree%layers(l)%lcells(i,j,k)%level = l
         !set the present cell as children of the parent
         octree%layers(l-1)%lcells(i,j,k)%children(p)%p => &
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)
 
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cen = &
-               octree%xmin + &
-               (real((/2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc/),wp)-0.5_wp)* &
-               (octree%xmax-octree%xmin)/real(nbox*2**(l-1),wp)
+                octree%xmin + &
+                (real((/2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc/),wp)-0.5_wp)* &
+                (octree%xmax-octree%xmin)/real(nbox*2**(l-1),wp)
 
         !update the counters
         p = p+1
@@ -389,7 +389,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
             .not.(ic.eq.0 .and. jc.eq.0 .and. kc.eq.0) ) then
           !if it is inside the domain, set the pointer to the neighbour
           octree%layers(l)%lcells(i,j,k)%neighbours(ic,jc,kc)%p =>  &
-             octree%layers(l)%lcells(i+ic,j+jc,k+kc)
+              octree%layers(l)%lcells(i+ic,j+jc,k+kc)
         endif
 
       enddo; enddo; enddo !neighbours ic,jc,kc
@@ -426,7 +426,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     do kc = 1,kmax; do jc = 1,jmax; do ic = 1,imax
           indx = (/ic,jc,kc/)
           if(any(abs(indx - octree%layers(1)%lcells(i,j,k)%cart_index)&
-                                                                   .gt.1)) then
+                                                                    .gt.1)) then
             !If it is not a neighbour, push it in the interaction list
             call push_ptr(octree%layers(1)%lcells(i,j,k)%interaction_list, &
             octree%layers(1)%lcells(ic,jc,kc))
@@ -453,7 +453,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
             indx = octree%layers(l)%lcells(i,j,k)%parent%p%&
                             neighbours(ic,jc,kc)%p%children(child)%p%cart_index
             if(any(abs(indx - octree%layers(l)%lcells(i,j,k)%cart_index)&
-                                                                   .gt.1)) then
+                                                                    .gt.1)) then
               !If the parent neighbour child is not a neighbour =)
               !push it in the interaction list
               !call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
@@ -461,7 +461,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
               !       neighbours(ic,jc,kc)%p%children(child)%p)
               ip_list = ip_list + 1
               inter_list(ip_list)%p => octree%layers(l)%lcells(i,j,k)%parent%p%&
-                     neighbours(ic,jc,kc)%p%children(child)%p
+                      neighbours(ic,jc,kc)%p%children(child)%p
 
             endif
           enddo !child
@@ -470,7 +470,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
 
 
         call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
-               inter_list(1:ip_list))
+                inter_list(1:ip_list))
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
@@ -537,7 +537,6 @@ subroutine add_layer(octree)
   if(sim_param%debug_level.ge.5) call printout(msg)
 
 
-
   !add the last level to the number of cells
   octree%ncells_tot = octree%ncells_tot + product(octree%nbox)*8**(ll-1)
 
@@ -583,21 +582,21 @@ subroutine add_layer(octree)
     do kc = 1,2; do jc = 1,2; do ic = 1,2
       !point the cell in the ordered layer
       octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cart_index &
-                           = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
+                            = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
     !  octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%level = ll
 
       !set the parent
       octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%parent%p &
-                                   => octree%layers(ll-1)%lcells(i,j,k)
-     ! octree%layers(ll)%lcells(i,j,k)%level = ll
+                                    => octree%layers(ll-1)%lcells(i,j,k)
+      ! octree%layers(ll)%lcells(i,j,k)%level = ll
       !set the present cell as children of the parent
       octree%layers(ll-1)%lcells(i,j,k)%children(p)%p => &
       octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)
 
       octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cen = &
-             octree%xmin + &
-             (real((/2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc/),wp)-0.5_wp)* &
-             (octree%xmax-octree%xmin)/real(octree%nbox*2**(ll-1),wp)
+              octree%xmin + &
+              (real((/2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc/),wp)-0.5_wp)* &
+              (octree%xmax-octree%xmin)/real(octree%nbox*2**(ll-1),wp)
 
       !update the counters
       p = p+1
@@ -618,7 +617,7 @@ subroutine add_layer(octree)
           .not.(ic.eq.0 .and. jc.eq.0 .and. kc.eq.0) ) then
         !if it is inside the domain, set the pointer to the neighbour
         octree%layers(ll)%lcells(i,j,k)%neighbours(ic,jc,kc)%p =>  &
-           octree%layers(ll)%lcells(i+ic,j+jc,k+kc)
+            octree%layers(ll)%lcells(i+ic,j+jc,k+kc)
       endif
 
     enddo; enddo; enddo !neighbours ic,jc,kc
@@ -656,12 +655,12 @@ subroutine add_layer(octree)
           indx = octree%layers(ll)%lcells(i,j,k)%parent%p%&
                           neighbours(ic,jc,kc)%p%children(child)%p%cart_index
           if(any(abs(indx - octree%layers(ll)%lcells(i,j,k)%cart_index)&
-                                                                 .gt.1)) then
+                                                                  .gt.1)) then
             !If the parent neighbour child is not a neighbour =)
             !push it in the interaction list
             ip_list = ip_list + 1
             inter_list(ip_list)%p => octree%layers(ll)%lcells(i,j,k)%parent%p%&
-                   neighbours(ic,jc,kc)%p%children(child)%p
+                    neighbours(ic,jc,kc)%p%children(child)%p
 
           endif
         enddo !child
@@ -669,7 +668,7 @@ subroutine add_layer(octree)
     enddo; enddo; enddo !parents neighbours ic,jc,kc
 
       call push_ptr(octree%layers(ll)%lcells(i,j,k)%interaction_list, &
-             inter_list(1:ip_list))
+              inter_list(1:ip_list))
 
   enddo; enddo; enddo !layer cells i,j,k
 
@@ -692,7 +691,7 @@ end subroutine add_layer
 
 !> Destroy a wake panels type by simply passing it as intent(out)
 subroutine destroy_octree(octree)
- type(t_octree), intent(out) :: octree
+  type(t_octree), intent(out) :: octree
 
 
 end subroutine
@@ -701,20 +700,20 @@ end subroutine
 
 !> Sort particles inside the octree grid
 subroutine sort_particles(wparts, n_prt, elem, octree)
- type(t_vortpart), intent(inout), target :: wparts(:)
- integer, intent(inout) :: n_prt
- type(t_pot_elem_p), intent(in) :: elem(:)
- type(t_octree), intent(inout), target :: octree
+  type(t_vortpart), intent(inout), target :: wparts(:)
+  integer, intent(inout) :: n_prt
+  type(t_pot_elem_p), intent(in) :: elem(:)
+  type(t_octree), intent(inout), target :: octree
 
- integer :: ip, ipp
- integer :: idx(3)
- real(wp) :: csize
- integer :: l, i,j,k, child, ic,jc,kc
- integer :: ll, nl
- logical :: got_leaves, got_branches
- integer :: nprt, iq
- real(wp) :: redistr(3), vort(3)
- character(len=*), parameter :: this_sub_name = 'sort_particles'
+  integer :: ip, ipp
+  integer :: idx(3)
+  real(wp) :: csize
+  integer :: l, i,j,k, child, ic,jc,kc
+  integer :: ll, nl
+  logical :: got_leaves, got_branches
+  integer :: nprt, iq
+  real(wp) :: redistr(3), vort(3)
+  character(len=*), parameter :: this_sub_name = 'sort_particles'
 
   !PROFILE
   t0 = dust_time()
@@ -848,7 +847,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
         nprt = octree%layers(ll)%lcells(i,j,k)%npart
         if (nprt .gt. 0) then
           octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
-             octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
+              octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
         endif
 
         ip = 1
@@ -856,12 +855,12 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
         do while (ip.lt.nprt+1)
           if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
              1.0_wp/sim_param%part_redist_ratio *&
-             octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
+              octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
             !the particle is significantly smaller than the average in the cell
             !redistribute it
             redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag*&
-                       octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
-                       / real(nprt,wp)
+                        octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
+                        / real(nprt,wp)
             !free
             octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
             call pull_ptr(octree%layers(ll)%lcells(i,j,k)%cell_parts, ip)
@@ -1135,28 +1134,29 @@ end subroutine calculate_multipole
 !----------------------------------------------------------------------
 
 !> Apply the local expansion and calculate interaction, and also calculate
-!! the interaction from other elements (not particles)
-subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
- type(t_vortpart_p), intent(in), target :: part(:)
- type(t_octree), intent(inout) :: octree
- type(t_pot_elem_p), intent(in) :: elem(:)
- type(t_pot_elem_p), intent(in) :: wpan(:)
- type(t_pot_elem_p), intent(in) :: wrin(:)
- class(c_elem), intent(in) :: wvort(:)
+! the interaction from other elements (not particles)
+subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
+  type(t_vortpart_p), intent(in), target :: part(:)
+  type(t_octree), intent(inout)          :: octree
+  type(t_pot_elem_p), intent(in)         :: elem(:)
+  type(t_pot_elem_p), intent(in)         :: wpan(:)
+  type(t_pot_elem_p), intent(in)         :: wrin(:)
+  class(c_elem), intent(in)              :: wvort(:)
 
- integer :: i, j, k, lv, ip, ipp, m, ie, iln
- real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
- real(wp), allocatable :: velv(:,:), stretchv(:,:), rotuv(:,:)
- real(wp) :: grad(3,3)
- real(t_realtime) :: tsta , tend
- real(wp) :: turbvisc, ave_ros
- real(wp) :: rotu(3), ru(3)
+  integer                     :: i, j, k, lv, ip, ipp, m, ie, iln
+  real(wp)                    :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
+  real(wp), allocatable       :: velv(:,:), stretchv(:,:), rotuv(:,:)
+  real(wp)                    :: grad(3,3)
+  real(t_realtime)            :: tsta , tend
+  real(wp)                    :: turbvisc, ave_ros
+  real(wp)                    :: rotu(3), ru(3)
 
- real(wp) :: grad_elem(3,3) , stretch_elem(3)
+  real(wp) :: grad_elem(3,3) , stretch_elem(3)
 
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions
   t0 = dust_time()
+
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
 !$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, &
 !$omp& grad_elem, stretch_elem, iln, rotuv, rotu, ru) schedule(dynamic)
@@ -1185,12 +1185,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       do m = 1,size(octree%leaves(lv)%p%mp%b,2)
         !velocity
         vel = vel + &
-          octree%leaves(lv)%p%mp%b(:,m)* &
-          product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+              octree%leaves(lv)%p%mp%b(:,m)* &
+              product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
         if(sim_param%use_vs) then
           !stretching
           grad = grad + octree%leaves(lv)%p%mp%c(:,:,m)* &
-             product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+                product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
           !NOTE: grad_ij = d u_j / d x_i
         endif
       enddo
@@ -1282,7 +1282,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
                   %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
                   octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
               stretch = stretch +str*(2.0_wp*sim_param%nu_inf + octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
-               ! 21/12/2023 Added factor 2 (see Winckelmans)
+                ! 21/12/2023 Added factor 2 (see Winckelmans)
             endif
           enddo
         endif
@@ -1313,7 +1313,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
-               octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
+                octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
            stretch = stretch +str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
             ! 21/12/2023 Added factor 2 (see Winckelmans)
          endif
@@ -1427,7 +1427,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   octree%t_lv = tend-tsta
   if(sim_param%use_dyn_layers) then
     if(real(octree%t_lv/octree%t_mp, wp) .gt. sim_param%LeavesTimeRatio .and. &
-       octree%nlevels .lt. sim_param%NMaxOctreeLevels) then
+        octree%nlevels .lt. sim_param%NMaxOctreeLevels) then
       call add_layer(octree)
     endif
   endif

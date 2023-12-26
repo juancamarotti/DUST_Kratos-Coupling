@@ -91,6 +91,7 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  character(len=max_char_len) :: integrator 
   !> Actual time
   real(wp) :: time
   !> Previous time
@@ -196,7 +197,7 @@ type t_sim_param
   !> Maximum number of iteration in LL algorithm
   integer  :: llMaxIter
   !> Tolerance for the relative error in fixed point iteration for LL
-  real(wp) :: llTol
+  real(wp) :: llTol 
   !> Damping param in fixed point iteration for LL used to avoid oscillations
   real(wp) :: llDamp
   !> Avoid "unphysical" separations in inner sections of LL? :: llTol
@@ -353,6 +354,8 @@ subroutine create_param_main(prms)
   call prms%CreateRealOption('dt_debug_out', "debug output time interval")
   call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
   
+  !> Integration 
+  call prms%CreateStringOption('integrator','time integrator','Euler')  
   !> Input
   call prms%CreateStringOption('geometry_file','Main geometry definition file')
   call prms%CreateStringOption('reference_file','Reference frames file','no_set')
@@ -666,6 +669,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
   sim_param%ndt_update_wake     = getint(prms, 'ndt_update_wake')
   
+  !> Integration
+  sim_param%integrator          = getstr(prms, 'integrator') 
   !> Reference environment values
   sim_param%P_inf               = getreal(prms,'P_inf')
   sim_param%rho_inf             = getreal(prms,'rho_inf')

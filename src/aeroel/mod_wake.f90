@@ -925,6 +925,7 @@ subroutine update_wake(wake, geo, elems, octree)
   integer                             :: iw, ipan, ie, ip, np, iq
   integer                             :: id, ir
   real(wp)                            :: pos_p(3), vel_p(3)
+  real(wp)                            :: x_1(3), x_2(3), q_1(3), q_2(3), q_3(3) 
   real(wp)                            :: str(3), stretch(3)
   real(wp)                            :: ru(3), rotu(3)
   real(wp)                            :: df(3), diff(3)
@@ -974,6 +975,8 @@ subroutine update_wake(wake, geo, elems, octree)
     np = np + 1
   endif
 
+select case (sim_param%integrator)
+  case('Euler') ! Explicit Euler
 !$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
   do ipan = 3,np
     do iw = 1,wake%n_pan_points
@@ -995,26 +998,78 @@ subroutine update_wake(wake, geo, elems, octree)
     enddo
   enddo
 !$omp end parallel do
+  case('low_storage') ! Low storage Runge-Kutta 
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
+  do ipan = 3,np
+    do iw = 1,wake%n_pan_points
+      pos_p = point_old(:,iw,ipan-1)
+      vel_p = 0.0_wp
+
+      !update the position in time 
+      !> first stage 
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+      q_1 = vel_p*sim_param%dt 
+      x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
+      !> second stage 
+      call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
+      q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+      x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+      !> third stage 
+      call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
+      q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2 
+      wake%pan_w_points(:,iw,ipan) = x_2 + 8.0_wp/15.0_wp*q_3  
+      wake%pan_w_vel(   :,iw,ipan) = vel_p
+
+    enddo
+  enddo
+!$omp end parallel do
+end select
 
   !if the wake is full, calculate another row of points to generate the
   !particles
   if(wake%full_panels) then
     if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points))
 
-  ! create another row of points
-!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
-    do iw = 1,wake%n_pan_points
-      pos_p = point_old(:,iw,wake%pan_wake_len+1)
-      vel_p = 0.0_wp
+    ! create another row of points
+    select case (sim_param%integrator)
+    case('Euler') ! Explicit Euler 
+      !$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
+      do iw = 1,wake%n_pan_points
+        pos_p = point_old(:,iw,wake%pan_wake_len+1)
+        vel_p = 0.0_wp
 
-      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
-      !update the position in time
-      points_end(:,iw) = pos_p + vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
-    enddo
-!$omp end parallel do
+        !update the position in time
+        points_end(:,iw) = pos_p + vel_p*sim_param%dt
+
+      enddo
+      !$omp end parallel do
+    case('low_storage') ! Low storage Runge-Kutta
+      !$omp parallel do private(iw, pos_p, vel_p, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
+      do iw = 1,wake%n_pan_points
+        pos_p = point_old(:,iw,wake%pan_wake_len+1)
+        vel_p = 0.0_wp
+
+        !update the position in time 
+        !> first stage 
+        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+        q_1 = vel_p*sim_param%dt 
+        x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
+        !> second stage 
+        call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
+        q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+        x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+        !> third stage 
+        call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
+        q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2  
+        !update the position in time
+        points_end(:,iw) = x_2 + 8.0_wp/15.0_wp*q_3 
+      enddo
+      !$omp end parallel do 
+    end select
+
   endif
-
 
   deallocate(point_old)
 
@@ -1051,22 +1106,46 @@ subroutine update_wake(wake, geo, elems, octree)
 
   !calculate the velocities at the old positions of the points and then
   !update the positions
+select case (sim_param%integrator)
+  case('Euler') ! Explicit Euler
+  !$omp parallel do private(pos_p, vel_p, ip, ir)
+    do ip = 1,size(points,2)
+      do ir = 1,size(points,3)
+        pos_p = points(:,ip,ir)
+        vel_p = 0.0_wp
 
-!$omp parallel do private(pos_p, vel_p, ip, ir)
-  do ip = 1,size(points,2)
-    do ir = 1,size(points,3)
-      pos_p = points(:,ip,ir)
-      vel_p = 0.0_wp
+        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
-      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
-
-      !update the position in time
-      points(:,ip,ir) = points(:,ip,ir) + &
+        !update the position in time
+        points(:,ip,ir) = points(:,ip,ir) + &
                         vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
-    enddo !ir
-  enddo !ip
-!$omp end parallel do
+      enddo !ir
+    enddo !ip
+  !$omp end parallel do
+  case('low_storage') ! Low storage Runge-Kutta
+  !$omp parallel do private(pos_p, vel_p, ip, ir, q_1, x_1, q_2, x_2, q_3)
+    do ip = 1,size(points,2)
+      do ir = 1,size(points,3)
+        pos_p = points(:,ip,ir)
+        vel_p = 0.0_wp
 
+        !update the position in time 
+        !> first stage 
+        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+        q_1 = vel_p*sim_param%dt 
+        x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
+        !> second stage 
+        call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
+        q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+        x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+        !> third stage 
+        call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
+        q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2  
+        points(:,ip,ir) = x_2 + 8.0_wp/15.0_wp*q_3 
+      enddo !ir
+    enddo !ip
+  !$omp end parallel do
+end select
   !if the wake is full, calculate another row of points to generate the
   !particles
   if(wake%full_rings) then
@@ -1115,12 +1194,12 @@ subroutine update_wake(wake, geo, elems, octree)
     wake%part_p(ip)%p%rotu = 0.0_wp
 
     !If not using the fast multipole, update particles position now
-    if (.not.sim_param%use_fmm) then
+    if (.not. sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
 
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
-      wake%part_p(ip)%p%vel =  vel_p
+      wake%part_p(ip)%p%vel =  vel_p  
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1156,7 +1235,7 @@ subroutine update_wake(wake, geo, elems, octree)
 
         do iq = 1, wake%n_prt
 
-          if (ip.ne.iq) then
+          if (ip .ne. iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
                   wake%part_p(ip)%p%r_Vortex, wake%part_p(ip)%p%vol, df)
@@ -1174,8 +1253,10 @@ subroutine update_wake(wake, geo, elems, octree)
 
   if (sim_param%use_fmm) then
     t0 = dust_time()
+
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                          wake%end_vorts)
+                          wake%end_vorts) 
+    
     if (sim_param%HCAS) then
       do ip = 1, wake%n_prt
         wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
@@ -1279,12 +1360,13 @@ end subroutine update_wake
 !! Completes the updating to the next time step begun in update_wake
 !! first and second row are updated to the next step and new particles are
 !! created if necessary; they will appear at the save_date in the next time step
-subroutine complete_wake(wake, geo, elems, elems_virtual, te)
+subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree)
   type(t_wake), target, intent(inout)   :: wake
   type(t_geo), intent(in)               :: geo
   type(t_pot_elem_p), intent(in)        :: elems(:)
   type(t_elem_virtual_p), intent(in)    :: elems_virtual(:)
   type(t_tedge), intent(inout)          :: te
+  type(t_octree), intent(inout)         :: octree 
 
   integer                               :: p1, p2
   integer                               :: ip, iw, ipan, id, is, nprev
@@ -1395,6 +1477,8 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
+select case (sim_param%integrator)
+  case('Euler') ! Explicit Euler
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
     if(sim_param%use_pa) then
@@ -1404,7 +1488,8 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
       wake%part_p(ip)%p%vel = vel_out
     endif
 
-    if(.not. wake%part_p(ip)%p%free) then
+    if(.not. wake%part_p(ip)%p%free) then 
+
       pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
               sim_param%dt*real(sim_param%ndt_update_wake,wp)
 
@@ -1441,6 +1526,69 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
     endif
   enddo
 !$omp end parallel do
+  case('low_storage') ! Low storage Runge-Kutta (only in position)
+
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out, q_1, q_2, q_3)
+  do ip = 1, n_part
+    if(sim_param%use_pa) then
+      vel_in = wake%part_p(ip)%p%vel
+      call avoid_collision(elems_virtual, wake, &
+                        wake%part_p(ip)%p, vel_in, vel_out)
+      wake%part_p(ip)%p%vel = vel_out
+    endif
+
+    if(.not. wake%part_p(ip)%p%free) then 
+      
+      !wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
+      !                        sim_param%dt
+      q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
+      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1  
+
+      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts) 
+      q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 15.0_wp/16.0_wp*q_2 
+
+      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts)
+      
+      q_3 = wake%part_p(ip)%p%vel*sim_param%dt - 153.0_wp/128.0_wp*q_2 
+      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 8.0_wp/15.0_wp*q_3 
+    
+      if(all(pos_p .ge. wake%part_box_min) .and. &
+          all(pos_p .le. wake%part_box_max)) then
+        wake%part_p(ip)%p%cen = pos_p
+
+        if(sim_param%use_vs .or. sim_param%use_vd) then
+
+          !add filtering (Pedrizzetti Relaxation)
+          if(sim_param%use_divfilt) then
+            filt_eta = sim_param%alpha_divfilt/sim_param%dt
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+              filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+              wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+          endif
+
+          !Explicit Euler
+          alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+                          wake%part_p(ip)%p%stretch* &
+                          sim_param%dt*real(sim_param%ndt_update_wake,wp)
+          alpha_p_n = norm2(alpha_p)
+
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+          if(alpha_p_n .ne. 0.0_wp) &
+              wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
+        endif
+      else
+        wake%part_p(ip)%p%free = .true.
+!$omp atomic update
+        wake%n_prt = wake%n_prt -1
+!$omp end atomic
+      endif
+    endif
+  enddo
+!$omp end parallel do
+end select 
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
@@ -1530,7 +1678,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
         isp = isp + n_sbprt ! added subparticles
         
         iwc = iwc +1 ! added parent panel     
-           
+
         ! parent panel from previous row
         call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 4) ! parent panel
         cen_parent(:,iwc) = pos_p
@@ -1600,7 +1748,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
           dir_parent(:,iwc) = dir_parent(:,iwc-1)
   
           iwc = iwc+1 ! added parent panel
-           
+          
         enddo ! loop over panels for this component
         
         iwc = iwc - 1
@@ -1666,7 +1814,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
       deallocate(cen_sbprt, area_sbprt, mag_sbprt, dir_sbprt)
       deallocate(cen_parent, mag_parent, dir_parent)
     
-     ! old behaviour, possibly with refined wake
+    ! old behaviour, possibly with refined wake
       
     else if (wake%refine_wake) then ! wake refinement
       ! each wake panel is converted in multiple particles
@@ -1678,7 +1826,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te)
         ! compute the quantites of the wake panel
         call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 1, vertices)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
-               
+        
         ! divide the panel in multiple particles by tessellating it with triangles
         call tessellate(vertices, wake%k_refine, wake%tol_refine, cen_sbprt, rad_sbprt, n_sbprt)
     
@@ -2013,8 +2161,8 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
   area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
               points_end(:,p2)-wake%pan_w_points(:,p1,wake%nmax_pan+1)))
   
-  vel = 0.5_wp*( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                 wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+  vel = 0.5_wp*(wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+                wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
   
   if (present(vertices_out)) then
     vertices_out = vertices
@@ -2038,32 +2186,34 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     call elems(ie)%p%compute_vel(pos, v)
-    vel = vel + v/(4*pi)
+    vel = vel + v
   enddo
 
   ! calculate the influence of the wake panels
   do ie=1,size(wake%pan_p)
     call wake%pan_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v/(4*pi)
+    vel = vel + v
   enddo
 
   ! calculate the influence of the wake rings
   do ie=1,size(wake%rin_p)
     call wake%rin_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v/(4*pi)
+    vel = vel + v
   enddo
 
   !calculate the influence of the end vortex
   do ie=1,size(wake%end_vorts)
     call wake%end_vorts(ie)%compute_vel(pos, v)
-    vel = vel + v/(4*pi)
+    vel = vel + v
   enddo
-
+  
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v/(4*pi)
+    vel = vel + v
   enddo
+
+  vel = vel/(4.0_wp*pi)  
 
 end subroutine compute_vel_from_all
 
