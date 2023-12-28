@@ -78,6 +78,8 @@ join_te_factor = 1.0
 refine_wake = T
 k_refine = 1
 autoscale_te = F 
+! --- integrator
+integrator = Euler 
 
 ! --- model parameters ---
 far_field_ratio_doublet = 10.0
@@ -435,6 +437,11 @@ $V_\mathrm{local} = \|V_\infty-V_\mathrm{te}\|$.
 When is false, the wake panel can be scaled by the \param{implicit_panel_scale} 
 parameter at simulation level and by the \param{scale\_te} at component level.
 
+\item \param{integrator}: \textit{required: } no. \textit{multiple:} no. 
+\textit{default:} Euler. \textit{type:} string. 
+
+Integrator for the wake motion: \param{Euler} (explicit Euler) or \param{low\_storage}
+Three-stage low-storage Runge Kutta.  
 
 \item \param{far_field_ratio_doublet}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10.0 \textit{type:} real.

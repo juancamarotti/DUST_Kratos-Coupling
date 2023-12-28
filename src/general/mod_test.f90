@@ -144,7 +144,8 @@ type t_sim_param
   logical :: use_vd
   !> use turbulent viscosity or not
   logical :: use_tv
-
+  !> integrators
+  character(len=max_char_len) :: integrator
   !FMM parameters
   !> Employing the FMM method
   logical :: use_fmm
@@ -283,7 +284,9 @@ subroutine create_param_test_particle(prms)
   call prms%CreateRealOption('particles_redistribution_ratio','How many times &
             &a particle need to be smaller than the average of the cell to be&
             & eliminated','3.0')
-
+  !> Integrators
+  call prms%CreateStringOption('integrators', 'integrator solver: Euler or low storage RK', &
+                              'Euler') 
 end subroutine create_param_test_particle  
 
 !----------------------------------------------------------------------
@@ -391,23 +394,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
   sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
 
-  !> Wake initial condition
-!    sim_param%part_n0               = 1
-!    sim_param%part_vel0             = (/ 10.0_wp, 0.0_wp, 0.0_wp /)     ! Non sense, because vel is overwritten already in the first iteration
-!    sim_param%part_pos0             = (/ 0.0_wp, 0.0_wp, 0.0_wp /)
-!    sim_param%part_vort0_dir        = (/ 0.0_wp, 0.0_wp, 1.0_wp /)
-!    sim_param%part_vort0_mag        = 1.0_wp
-  !> move in dust_test 
-  !call read_real_array_from_file ( 7 , trim('ciambellone.dat') , particlesMat )
-  !sim_param%part_n0 = size(particlesMat,1)
-  !allocate(sim_param%part_pos0(sim_param%part_n0, 3))
-  !allocate(sim_param%part_vort0_dir(sim_param%part_n0, 3))
-  !allocate(sim_param%part_vort0_mag(sim_param%part_n0))
 
-  !sim_param%part_pos0      = particlesMat(:,1:3)
-  !sim_param%part_vort0_dir = particlesMat(:,4:6)
-  !sim_param%part_vort0_mag = particlesMat(:,7)
   sim_param%basename              = getstr(prms, 'basename')
+  !Integrators 
+  sim_param%integrator            = getstr(prms, 'integrator')
   !> Manage restart
   sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then
