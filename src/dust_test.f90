@@ -279,7 +279,7 @@ do while ( ( it .lt. nstep ) )
     if(it .lt. nstep) then
       time = min(sim_param%tend, sim_param%time_vec(it+1))
       if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-        call complete_wake(wake) 
+        call complete_wake(wake, octree) 
       end if
     endif
     t1 = dust_time() 
