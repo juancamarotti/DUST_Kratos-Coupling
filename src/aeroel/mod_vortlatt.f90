@@ -363,7 +363,7 @@ subroutine compute_linear_pot_vortlatt(this, TL, TR, pos,i,j)
   real(wp), intent(in) :: pos(:)
   integer , intent(in) :: i,j
 
-    call linear_potential_calc_doublet(this, TL, TR, pos) 
+  call linear_potential_calc_doublet(this, TL, TR, pos) 
 
 end subroutine compute_linear_pot_vortlatt
 
