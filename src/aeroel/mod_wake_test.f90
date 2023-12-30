@@ -420,13 +420,13 @@ select case (sim_param%integrator)
 !$omp end parallel do
 
   case('low_storage') ! Low storage Runge-Kutta 
-
+  
+  write(*,*) 'low storage'
 !$omp parallel do schedule(dynamic,4) private(ip, q_1, alpha_q_1, alpha_p_1)
     do ip = 1, n_part
       !> 1st stage
       q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
       wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
-      
       !add filtering (Pedrizzetti Relaxation)    
       wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
               filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
@@ -442,8 +442,8 @@ select case (sim_param%integrator)
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-      wake%part_p(ip)%p%vel_prev = wake%part_p(ip)%p%vel 
-      wake%part_p(ip)%p%stretch_prev = wake%part_p(ip)%p%stretch
+      wake%part_p(ip)%p%vel_prev = q_1 
+      wake%part_p(ip)%p%stretch_prev = alpha_q_1
     enddo
 !$omp end parallel do
   
@@ -452,15 +452,14 @@ select case (sim_param%integrator)
     call apply_multipole(wake%part_p, octree) 
 !$omp parallel do schedule(dynamic,4) private(ip, q_2, alpha_q_2, alpha_p_2)                        
     do ip = 1, n_part  
-      q_2 = (wake%part_p(ip)%p%vel - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev)*sim_param%dt  
-      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 15.0_wp/16.0_wp*q_2 
-
+      q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
+      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2 
       !add filtering (Pedrizzetti Relaxation)    
       wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
             filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
             wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
       
-      alpha_q_2 = (wake%part_p(ip)%p%stretch - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev)*sim_param%dt  
+      alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
       alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
       wake%part_p(ip)%p%mag = norm2(alpha_p_2)
       wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag) 
@@ -469,8 +468,8 @@ select case (sim_param%integrator)
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-      wake%part_p(ip)%p%vel_prev = wake%part_p(ip)%p%vel 
-      wake%part_p(ip)%p%stretch_prev = wake%part_p(ip)%p%stretch
+      wake%part_p(ip)%p%vel_prev = q_2 
+      wake%part_p(ip)%p%stretch_prev = alpha_q_2
     enddo
 !$omp end parallel do
 
@@ -483,14 +482,15 @@ select case (sim_param%integrator)
     
       if ( .not. wake%part_p(ip)%p%free) then
       
-        q_3 = (wake%part_p(ip)%p%vel - 153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev)*sim_param%dt 
-        pos_p = wake%part_p(ip)%p%cen + 8.0_wp/15.0_wp*q_3 
-  
+        q_3 = wake%part_p(ip)%p%vel*sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev 
+        pos_p = wake%part_p(ip)%p%cen_prev + 8.0_wp/15.0_wp*q_3 
+        
+        !add filtering (Pedrizzetti Relaxation)
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
               filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
               wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))  
   
-        alpha_q_3 = (wake%part_p(ip)%p%stretch - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev)*sim_param%dt  
+        alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev  
         alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3 
         alpha_p_3_mag = norm2(alpha_p_3)
         alpha_p_3_dir = alpha_p_3/(alpha_p_3_mag)   

@@ -1000,26 +1000,24 @@ select case (sim_param%integrator)
 !$omp end parallel do
   case('low_storage') ! Low storage Runge-Kutta 
 !$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
-  do ipan = 3,np
+  do ipan = 3, np
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,ipan-1)
       vel_p = 0.0_wp
-
       !update the position in time 
       !> first stage 
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
       q_1 = vel_p*sim_param%dt 
-      x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
+      x_1 = pos_p + 1.0_wp/3.0_wp*q_1   
       !> second stage 
       call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
       q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
-      x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+      x_2 = x_1 + 15.0_wp/16.0_wp*q_2
       !> third stage 
       call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
       q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2 
       wake%pan_w_points(:,iw,ipan) = x_2 + 8.0_wp/15.0_wp*q_3  
       wake%pan_w_vel(   :,iw,ipan) = vel_p
-
     enddo
   enddo
 !$omp end parallel do
@@ -1127,8 +1125,7 @@ select case (sim_param%integrator)
     do ip = 1,size(points,2)
       do ir = 1,size(points,3)
         pos_p = points(:,ip,ir)
-        vel_p = 0.0_wp
-
+        vel_p = 0.0_wp        
         !update the position in time 
         !> first stage 
         call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
@@ -1535,13 +1532,12 @@ select case (sim_param%integrator)
 !$omp end parallel do
 
   case('low_storage') ! Low storage Runge-Kutta 
-
 !$omp parallel do schedule(dynamic,4) private(ip, q_1, alpha_q_1, alpha_p_1)
     do ip = 1, n_part
       !> 1st stage
       q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
       wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
-      
+
       !add filtering (Pedrizzetti Relaxation)    
       wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
               filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
@@ -1557,8 +1553,8 @@ select case (sim_param%integrator)
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-      wake%part_p(ip)%p%vel_prev = wake%part_p(ip)%p%vel 
-      wake%part_p(ip)%p%stretch_prev = wake%part_p(ip)%p%stretch
+      wake%part_p(ip)%p%vel_prev =  q_1 !> velocity*dt
+      wake%part_p(ip)%p%stretch_prev = alpha_q_1 !> stretch*dt
     enddo
 !$omp end parallel do
   
@@ -1568,15 +1564,16 @@ select case (sim_param%integrator)
                           wake%end_vorts) 
 !$omp parallel do schedule(dynamic,4) private(ip, q_2, alpha_q_2, alpha_p_2)                        
     do ip = 1, n_part  
-      q_2 = (wake%part_p(ip)%p%vel - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev)*sim_param%dt  
-      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 15.0_wp/16.0_wp*q_2 
 
+      q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
+      wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2  
+    
       !add filtering (Pedrizzetti Relaxation)    
       wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
             filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
             wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
       
-      alpha_q_2 = (wake%part_p(ip)%p%stretch - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev)*sim_param%dt  
+      alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
       alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
       wake%part_p(ip)%p%mag = norm2(alpha_p_2)
       wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag) 
@@ -1585,8 +1582,8 @@ select case (sim_param%integrator)
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-      wake%part_p(ip)%p%vel_prev = wake%part_p(ip)%p%vel 
-      wake%part_p(ip)%p%stretch_prev = wake%part_p(ip)%p%stretch
+      wake%part_p(ip)%p%vel_prev = q_2
+      wake%part_p(ip)%p%stretch_prev = alpha_q_2
     enddo
 !$omp end parallel do
 
@@ -1607,14 +1604,14 @@ select case (sim_param%integrator)
   
       if ( .not. wake%part_p(ip)%p%free) then
       
-        q_3 = (wake%part_p(ip)%p%vel - 153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev)*sim_param%dt 
-        pos_p = wake%part_p(ip)%p%cen + 8.0_wp/15.0_wp*q_3 
-  
+        q_3 = wake%part_p(ip)%p%vel*sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev 
+        pos_p = wake%part_p(ip)%p%cen_prev + 8.0_wp/15.0_wp*q_3 
+        
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
               filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
               wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))  
   
-        alpha_q_3 = (wake%part_p(ip)%p%stretch - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev)*sim_param%dt  
+        alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev  
         alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3 
         alpha_p_3_mag = norm2(alpha_p_3)
         alpha_p_3_dir = alpha_p_3/(alpha_p_3_mag)   
