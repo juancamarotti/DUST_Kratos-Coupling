@@ -438,6 +438,7 @@ select case (sim_param%integrator)
       
       wake%part_p(ip)%p%mag = norm2(alpha_p_1) !> mag
       wake%part_p(ip)%p%dir = alpha_p_1/(wake%part_p(ip)%p%mag) !> direction 
+
       !> assign old values
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
@@ -462,8 +463,7 @@ select case (sim_param%integrator)
       alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
       alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
       wake%part_p(ip)%p%mag = norm2(alpha_p_2)
-      wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag) 
-
+      wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag)  
       !> assign old values
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
@@ -493,14 +493,13 @@ select case (sim_param%integrator)
         alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev  
         alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3 
         alpha_p_3_mag = norm2(alpha_p_3)
-        alpha_p_3_dir = alpha_p_3/(alpha_p_3_mag)   
+        alpha_p_3_dir = alpha_p_3/(alpha_p_3_mag)  
         
         if(all(pos_p .ge. wake%part_box_min) .and. &
             all(pos_p .le. wake%part_box_max)) then
           wake%part_p(ip)%p%cen = pos_p
           wake%part_p(ip)%p%dir = alpha_p_3_dir
-          wake%part_p(ip)%p%mag = alpha_p_3_mag
-          
+          wake%part_p(ip)%p%mag = alpha_p_3_mag   
         else
           wake%part_p(ip)%p%free = .true.
 !$omp atomic update
