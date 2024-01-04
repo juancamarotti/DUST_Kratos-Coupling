@@ -285,7 +285,7 @@ subroutine create_param_test_particle(prms)
             &a particle need to be smaller than the average of the cell to be&
             & eliminated','3.0')
   !> Integrators
-  call prms%CreateStringOption('integrators', 'integrator solver: Euler or low storage RK', &
+  call prms%CreateStringOption('integrator', 'integrator solver: Euler or low storage RK', &
                               'Euler') 
 end subroutine create_param_test_particle  
 
