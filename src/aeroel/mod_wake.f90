@@ -1236,14 +1236,14 @@ end select
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
                   wake%part_p(ip)%p%r_Vortex, wake%part_p(ip)%p%vol, df)
-            diff = diff + 2*df*sim_param%nu_inf ! 21/12/2023 Added factor 2 (see Winckelmans)
+            diff = diff + 2.0_wp*df*sim_param%nu_inf ! 21/12/2023 Added factor 2 (see Winckelmans)
           endif
 
         enddo !iq
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + diff
       endif !use_vd
 
-    end if !use_fmm
+    end if ! not use_fmm
 
   enddo
 !$omp end parallel do
