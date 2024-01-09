@@ -428,9 +428,11 @@ select case (sim_param%integrator)
       q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
       wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
       !add filtering (Pedrizzetti Relaxation)    
+      if (sim_param%use_divfilt) then
       wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
               filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
               wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+      endif
 
       alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt 
       
@@ -456,10 +458,12 @@ select case (sim_param%integrator)
       q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
       wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2 
       !add filtering (Pedrizzetti Relaxation)    
+      if (sim_param%use_divfilt) then
       wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
             filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
             wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
-      
+      endif 
+
       alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
       alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
       wake%part_p(ip)%p%mag = norm2(alpha_p_2)
@@ -486,10 +490,12 @@ select case (sim_param%integrator)
         pos_p = wake%part_p(ip)%p%cen_prev + 8.0_wp/15.0_wp*q_3 
         
         !add filtering (Pedrizzetti Relaxation)
+        if (sim_param%use_divfilt) then
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
               filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
               wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))  
-  
+        endif
+        
         alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev  
         alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3 
         alpha_p_3_mag = norm2(alpha_p_3)
