@@ -375,7 +375,7 @@ subroutine complete_wake(wake, octree)
 n_part = wake%n_prt
 filt_eta = sim_param%alpha_divfilt/sim_param%dt
 select case (sim_param%integrator)
-  case('Euler') ! Explicit Euler
+  case('euler') ! Explicit Euler
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
 
