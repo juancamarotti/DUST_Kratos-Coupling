@@ -94,6 +94,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: stretch(3)
   real(wp) :: stretch_old(3)
   real(wp) :: stretch_prev(3) 
+  real(wp) :: stretch_alone(3) 
   logical  :: free=.true.
   real(wp) :: turbvisc
   real(wp) :: rotu(3)

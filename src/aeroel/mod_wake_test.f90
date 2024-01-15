@@ -292,16 +292,18 @@ subroutine update_wake(wake, octree)
               call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
                     wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, ru)
               rotu = rotu + ru/(4.0_wp*pi)
-
             endif
+            
           endif
         enddo
 !        if (ip .eq. 1) then
 !          write(*,*) 'mag = ', wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag
 !          write(*,*) 'stretch = ', stretch
 !        endif
-
+        
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + stretch
+        wake%part_p(ip)%p%stretch_alone = wake%part_p(ip)%p%stretch ! Used in reformulated
+
         if(sim_param%use_divfilt) then 
           wake%part_p(ip)%p%rotu = wake%part_p(ip)%p%rotu + rotu
         endif
@@ -390,17 +392,17 @@ select case (sim_param%integrator)
         wake%part_p(ip)%p%cen = pos_p
 
         if(sim_param%use_vs .or. sim_param%use_vd) then
-          
+
           ! add reformulated contribution (Alvarez rVPM 2023)
           sigma_dot = 0
           if(sim_param%use_reformulated) then
             wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
                                         - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                        * sum(wake%part_p(ip)%p%stretch*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
+                                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
 
             sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
                         * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                        * sum(wake%part_p(ip)%p%stretch*wake%part_p(ip)%p%dir)
+                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
           endif
 
           !add divergence filtering (Pedrizzetti Relaxation)
