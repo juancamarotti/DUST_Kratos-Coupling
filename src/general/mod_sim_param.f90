@@ -187,6 +187,11 @@ type t_sim_param
   real(wp) :: pa_elrad_mult
   !> simulate viscosity effects or not
   logical :: use_ve
+  !> use reformulated formulation rVPM (Alvarez 2023)
+  logical   :: use_reformulated
+    !> rVPM coefficients
+    real(wp)  :: f                   
+    real(wp)  :: g
 
   !Lifting Lines
   character(len=max_char_len) :: llSolver
@@ -354,6 +359,11 @@ subroutine create_param_main(prms)
   call prms%CreateRealOption('dt_debug_out', "debug output time interval")
   call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
   
+  !> Reformulated formulation                                         
+  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','F')
+  call prms%CreateRealOption('f','rVPM coefficient f','0.0')
+  call prms%CreateRealOption('g','rVPM coefficient g','0.2')
+
   !> Integration 
   call prms%CreateStringOption('integrator','time integrator','Euler')  
   !> Input
@@ -760,6 +770,14 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%pa_rad_mult = getreal(prms, 'penetration_avoidance_check_radius')
     sim_param%pa_elrad_mult = getreal(prms,'penetration_avoidance_element_radius')
   endif
+    
+  !> Reformulated formulation (Alvarez rVPM 2023)
+  sim_param%use_reformulated      = getlogical(prms, 'reformulated')
+
+  if(sim_param%use_reformulated) then
+    sim_param%f                   = getreal(prms, 'f')
+    sim_param%g                   = getreal(prms, 'g')
+  endif
 
   !> Lifting line elements
   sim_param%llSolver                        = getstr(    prms, 'll_solver')
@@ -1095,6 +1113,13 @@ subroutine save_sim_param(this, loc)
                                           'ParticlesRedistributionRatio', loc)
     endif
   endif
+   
+  call write_hdf5_attr(this%use_reformulated, 'use_reformulated', loc)
+  if(this%use_reformulated) then
+    call write_hdf5_attr(this%f, 'f', loc)
+    call write_hdf5_attr(this%g, 'g', loc)
+  endif
+
   call write_hdf5_attr(this%debug_level, 'debug_level', loc)
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)
   call write_hdf5_attr(this%basename, 'basename', loc)

@@ -1386,6 +1386,8 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree)
   real(wp), allocatable                 :: W(:,:), w_i(:)
   real(wp)                              :: vel_part(3), vertices(3,4)
   real(wp)                              :: filt_eta
+  real(wp)                              :: sigma_dot
+
   ! flow separation variables
   integer                               :: i_comp , i_elem , n_elem
 
@@ -1482,7 +1484,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree)
   filt_eta = sim_param%alpha_divfilt/sim_param%dt
 select case (sim_param%integrator)
   case('Euler') ! Explicit Euler
-!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out, sigma_dot)
   do ip = 1, n_part
     if(sim_param%use_pa) then
       vel_in = wake%part_p(ip)%p%vel
@@ -1502,6 +1504,18 @@ select case (sim_param%integrator)
 
         if(sim_param%use_vs .or. sim_param%use_vd) then
 
+          ! add reformulated contribution (Alvarez rVPM 2023)
+          sigma_dot = 0
+          if(sim_param%use_reformulated) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
+                                        - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
+                                        * sum(wake%part_p(ip)%p%stretch*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
+
+            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
+                        * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
+                        * sum(wake%part_p(ip)%p%stretch*wake%part_p(ip)%p%dir)
+          endif
+
           !add filtering (Pedrizzetti Relaxation)
           if(sim_param%use_divfilt) then
             filt_eta = sim_param%alpha_divfilt/sim_param%dt
@@ -1516,6 +1530,12 @@ select case (sim_param%integrator)
                           sim_param%dt*real(sim_param%ndt_update_wake,wp)
           alpha_p_n = norm2(alpha_p)
 
+          if(sim_param%use_reformulated) then
+            !r_Vortex update
+            wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex &
+                                         + sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
+          endif
+          
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           if(alpha_p_n .ne. 0.0_wp) &
             wake%part_p(ip)%p%dir = alpha_p/alpha_p_n

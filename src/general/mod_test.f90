@@ -146,6 +146,12 @@ type t_sim_param
   logical :: use_tv
   !> integrators
   character(len=max_char_len) :: integrator
+  !> use reformulated formulation rVPM (Alvarez 2023)
+  logical   :: use_reformulated
+    !> rVPM coefficients
+    real(wp)  :: f                   
+    real(wp)  :: g
+
   !FMM parameters
   !> Employing the FMM method
   logical :: use_fmm
@@ -284,9 +290,17 @@ subroutine create_param_test_particle(prms)
   call prms%CreateRealOption('particles_redistribution_ratio','How many times &
             &a particle need to be smaller than the average of the cell to be&
             & eliminated','3.0')
+
+  !> Reformulated formulation                                         
+  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','F')
+  call prms%CreateRealOption('f','rVPM coefficient f','0.0')
+  call prms%CreateRealOption('g','rVPM coefficient g','0.2')
+
   !> Integrators
   call prms%CreateStringOption('integrator', 'integrator solver: Euler or low storage RK', &
                               'Euler') 
+
+
 end subroutine create_param_test_particle  
 
 !----------------------------------------------------------------------
@@ -326,6 +340,13 @@ subroutine save_sim_param(this, loc)
     call write_hdf5_attr(this%MinOctreePart, 'MinOctreePart', loc)
     call write_hdf5_attr(this%MultipoleDegree, 'MultipoleDegree', loc)
   endif
+
+  call write_hdf5_attr(this%use_reformulated, 'use_reformulated', loc)
+  if(this%use_reformulated) then
+    call write_hdf5_attr(this%f, 'f', loc)
+    call write_hdf5_attr(this%g, 'g', loc)
+  endif
+
 
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)
   call write_hdf5_attr(this%basename, 'basename', loc)
@@ -434,6 +455,15 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%use_divfilt           = getlogical(prms, 'divergence_filtering')
   sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
   sim_param%alpha_divfilt         = getreal(prms,    'alpha_divfilt')
+
+  !> Reformulated formulation (Alvarez rVPM 2023)
+  sim_param%use_reformulated      = getlogical(prms, 'reformulated')
+
+  if(sim_param%use_reformulated) then
+    sim_param%f                   = getreal(prms, 'f')
+    sim_param%g                   = getreal(prms, 'g')
+  endif
+
   !> Octree and FMM parameters
   sim_param%use_fmm                       = getlogical(prms, 'fmm')
 
