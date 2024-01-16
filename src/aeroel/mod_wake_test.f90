@@ -436,7 +436,8 @@ select case (sim_param%integrator)
 !$omp atomic update
               wake%n_prt = wake%n_prt -1
 !$omp end atomic
-            endif
+            endif !magnitude check
+          endif !use_vs 
         else !part_box
           wake%part_p(ip)%p%free = .true.
 !$omp atomic update
@@ -452,7 +453,6 @@ select case (sim_param%integrator)
     endif ! not free
   enddo
 !$omp end parallel do
-
   case('low_storage') ! Low storage Runge-Kutta 
   
 !$omp parallel do schedule(dynamic,4) private(ip, q_1, alpha_q_1, alpha_p_1, sigma_dot, r_Vortex_q_1, filt_eta)
