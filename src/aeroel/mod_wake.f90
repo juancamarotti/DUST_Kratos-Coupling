@@ -1584,8 +1584,7 @@ select case (sim_param%integrator)
         !r_Vortex update
         r_Vortex_q_1 = sigma_dot * sim_param%dt
         wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex & 
-                                    + 1.0_wp/3.0_wp*r_Vortex_q_1
-        wake%part_p(ip)%p%r_Vortex_prev = wake%part_p(ip)%p%r_Vortex 
+                                    + 1.0_wp/3.0_wp*r_Vortex_q_1       
       endif
       !> assign old values
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
@@ -1593,6 +1592,7 @@ select case (sim_param%integrator)
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
       wake%part_p(ip)%p%vel_prev =  q_1 !> velocity*dt
       wake%part_p(ip)%p%stretch_prev = alpha_q_1 !> stretch*dt
+      wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_1 !> sigma_dot*dt
     enddo
 !$omp end parallel do
   
@@ -1631,16 +1631,16 @@ select case (sim_param%integrator)
       if(sim_param%use_reformulated) then
         !r_Vortex update
         r_Vortex_q_2 = sigma_dot * sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
-        wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex_prev + 15.0_wp/16.0_wp*r_Vortex_q_2
-        wake%part_p(ip)%p%r_Vortex_prev = wake%part_p(ip)%p%r_Vortex 
+        wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex + 15.0_wp/16.0_wp*r_Vortex_q_2
       endif
       
       !> assign old values
       wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-      wake%part_p(ip)%p%vel_prev = q_2
-      wake%part_p(ip)%p%stretch_prev = alpha_q_2
+      wake%part_p(ip)%p%vel_prev = q_2 !> velocity*dt
+      wake%part_p(ip)%p%stretch_prev = alpha_q_2 !> stretch*dt
+      wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_2 !> sigma_dot*dt
     enddo
 !$omp end parallel do
 
@@ -1688,7 +1688,7 @@ select case (sim_param%integrator)
         if (sim_param%use_reformulated) then
           !r_Vortex update
           r_Vortex_q_3 = sigma_dot * sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%r_Vortex_prev
-          r_Vortex_p_3 = wake%part_p(ip)%p%r_Vortex_prev + 8.0_wp/15.0_wp*r_Vortex_q_3
+          r_Vortex_p_3 = wake%part_p(ip)%p%r_Vortex + 8.0_wp/15.0_wp*r_Vortex_q_3
         endif
 
         if(all(pos_p .ge. wake%part_box_min) .and. &
