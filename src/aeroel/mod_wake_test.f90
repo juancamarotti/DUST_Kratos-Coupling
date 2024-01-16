@@ -384,61 +384,72 @@ select case (sim_param%integrator)
   do ip = 1, n_part
 
     if(.not. wake%part_p(ip)%p%free) then 
+      if( wake%part_p(ip)%p%mag .ge. 1.0e-13_wp) then ! to avoid negative magnitudes (and too small)
 
-      pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
-              sim_param%dt*real(sim_param%ndt_update_wake,wp)
+        pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
+                sim_param%dt*real(sim_param%ndt_update_wake,wp)
 
-      if(all(pos_p .ge. wake%part_box_min) .and. &
-          all(pos_p .le. wake%part_box_max)) then
-        wake%part_p(ip)%p%cen = pos_p
+        if(all(pos_p .ge. wake%part_box_min) .and. &
+            all(pos_p .le. wake%part_box_max)) then
+          wake%part_p(ip)%p%cen = pos_p
 
-        if(sim_param%use_vs .or. sim_param%use_vd) then
+          if(sim_param%use_vs .or. sim_param%use_vd) then
 
-          ! add reformulated contribution (Alvarez rVPM 2023)
-          sigma_dot = 0.0_wp
-          if(sim_param%use_reformulated) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                        - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
+            ! add reformulated contribution (Alvarez rVPM 2023)
+            sigma_dot = 0.0_wp
+            if(sim_param%use_reformulated) then
+              wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
+                                          - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
+                                          * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
 
-            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                        * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-          endif
+              sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
+                          * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
+                          * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
+            endif
 
-          !add divergence filtering (Pedrizzetti Relaxation)
-          if(sim_param%use_divfilt) then
-            filt_eta = sim_param%alpha_divfilt/sim_param%dt
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-              filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
-              wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
-          endif
+            !add divergence filtering (Pedrizzetti Relaxation)
+            if(sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-13_wp) then
+              filt_eta = sim_param%alpha_divfilt/sim_param%dt
+              wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+                filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+            endif
 
-          !Explicit Euler
-          alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                          wake%part_p(ip)%p%stretch* &
-                          sim_param%dt*real(sim_param%ndt_update_wake,wp)
-          alpha_p_n = norm2(alpha_p)
+            !Explicit Euler
+            alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+                            wake%part_p(ip)%p%stretch* &
+                            sim_param%dt*real(sim_param%ndt_update_wake,wp)
+            alpha_p_n = norm2(alpha_p)
 
-          if(sim_param%use_reformulated) then
-            !r_Vortex update
-            wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex &
-                                         + sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
-          endif
-          
-
-! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-          if(alpha_p_n .ne. 0.0_wp) &
-            wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
-            wake%part_p(ip)%p%mag = alpha_p_n 
-        endif
-      else
+            if(sim_param%use_reformulated) then
+              !r_Vortex update
+              wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex &
+                                          + sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
+            endif
+            
+            !Magnitude check to avoid division by zero and negative magnitudes
+            if(alpha_p_n .ge. 1.0e-13_wp) then
+              wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
+              wake%part_p(ip)%p%mag = alpha_p_n 
+            else
+              wake%part_p(ip)%p%free = .true.
+!$omp atomic update
+              wake%n_prt = wake%n_prt -1
+!$omp end atomic
+            endif
+        else !part_box
+          wake%part_p(ip)%p%free = .true.
+!$omp atomic update
+          wake%n_prt = wake%n_prt -1
+!$omp end atomic
+        endif !part box  
+      else !magnitude
         wake%part_p(ip)%p%free = .true.
 !$omp atomic update
         wake%n_prt = wake%n_prt -1
-!$omp end atomic
-      endif
-    endif
+!$omp end atomic       
+      endif !magnitude
+    endif ! not free
   enddo
 !$omp end parallel do
 
@@ -531,8 +542,8 @@ select case (sim_param%integrator)
       wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
       wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
       wake%part_p(ip)%p%vel_prev = q_2 !> velocity*dt
-      wake%part_p(ip)%p%stretch_prev = alpha_q_2 !> stretch*dt
-      wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_2 !> sigma_dot*dt
+        wake%part_p(ip)%p%stretch_prev = alpha_q_2 !> stretch*dt
+        wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_2 !> sigma_dot*dt
 
     enddo
 !$omp end parallel do
