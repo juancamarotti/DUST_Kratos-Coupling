@@ -1045,6 +1045,7 @@ subroutine apply_multipole( part, octree )
 
       vel = 0.0_wp
       stretch = 0.0_wp
+      stretch_alone = 0.0_wp
       grad = 0.0_wp
       rotu = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
