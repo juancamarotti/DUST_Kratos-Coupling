@@ -40,8 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Davide Montagnani
-!!          Matteo Tugnoli
+!!          Federico Gentile
+!!          Matteo Dall'Ora
+!!          Alessandro Cocco
 !!=========================================================================
 
 

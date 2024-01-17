@@ -134,6 +134,9 @@ type t_sim_param
   !> Minimum and maximum of the particles box
   real(wp) :: particles_box_min(3)
   real(wp) :: particles_box_max(3)
+  !> Minimun particle magnitude allowed (suppress if lower)
+  real(wp) :: mag_threshold
+
   !> Join close trailing edges
   logical :: join_te
   !> All trailing edges closer than join_te_factor will be joined
@@ -399,6 +402,8 @@ subroutine create_param_main(prms)
                                   &particles bounding box', '(/-10.0, -10.0, -10.0/)')
   call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
                                   &particles bounding box', '(/10.0, 10.0, 10.0/)')
+  call prms%CreateRealOption('mag_threshold', "Minimum particle magnitude allowed", '1.0e-9')
+  
   call prms%CreateRealOption('implicit_panel_scale', "Scaling of the first implicit wake panel", '0.3')
   call prms%CreateRealOption('implicit_panel_min_vel', "Minimum velocity at the trailing edge", '1.0e-8')
   call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
@@ -706,6 +711,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
   sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
   sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
+  sim_param%mag_threshold         = getreal(prms, 'mag_threshold')
   sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
   sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
   sim_param%refine_wake           = getlogical(prms,  'refine_wake')
@@ -1066,6 +1072,8 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%n_wake_particles, 'n_wake_particles', loc)
   call write_hdf5_attr(this%particles_box_min, 'particles_box_min', loc)
   call write_hdf5_attr(this%particles_box_max, 'particles_box_max', loc)
+  call write_hdf5_attr(this%mag_threshold, 'mag_threshold', loc)
+
   call write_hdf5_attr(this%join_te, 'join_te', loc)
   if(this%join_te) &
     call write_hdf5_attr(this%join_te_factor, 'join_te_factor', loc)

@@ -117,6 +117,8 @@ type t_sim_param
   !> Minimum and maximum of the particles box
   real(wp) :: particles_box_min(3)
   real(wp) :: particles_box_max(3)
+  !> Minimun particle magnitude allowed (suppress if lower)
+  real(wp) :: mag_threshold
 
   !> Wake initial condition
   integer  :: part_n0 
@@ -246,6 +248,7 @@ subroutine create_param_test_particle(prms)
                                   &particles bounding box', '(/-10.0, -10.0, -10.0/)')
   call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
                                   &particles bounding box', '(/10.0, 10.0, 10.0/)')
+  call prms%CreateRealOption('mag_threshold', "Minimum particle magnitude allowed", '1.0e-9')
 
   !> Regularisation 
   call prms%CreateRealOption('rankine_rad', &
@@ -320,6 +323,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%n_wake_particles, 'n_wake_particles', loc)
   call write_hdf5_attr(this%particles_box_min, 'particles_box_min', loc)
   call write_hdf5_attr(this%particles_box_max, 'particles_box_max', loc)
+  call write_hdf5_attr(this%mag_threshold, 'mag_threshold', loc)
 
   call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
@@ -414,7 +418,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
   sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
   sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
-
+  sim_param%mag_threshold         = getreal(prms, 'mag_threshold')
 
   sim_param%basename              = getstr(prms, 'basename')
   !Integrators 
