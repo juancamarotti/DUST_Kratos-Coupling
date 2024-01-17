@@ -365,7 +365,7 @@ subroutine create_param_main(prms)
   call prms%CreateRealOption('g','rVPM coefficient g','0.2')
 
   !> Integration 
-  call prms%CreateStringOption('integrator','time integrator','Euler')  
+  call prms%CreateStringOption('integrator','time integrator','euler')  
   !> Input
   call prms%CreateStringOption('geometry_file','Main geometry definition file')
   call prms%CreateStringOption('reference_file','Reference frames file','no_set')

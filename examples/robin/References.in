@@ -49,9 +49,9 @@ multiplicity = {
   dof = {
     hinge_type = Pitch
     hinge_offset = (/ 0.0 , 0.0 , 0.0 /)
-    Collective  = 6.86 
-    cyclic_ampl =  3.81
-    cyclic_phas =  -59.1
+    Collective  = 8.86 
+    cyclic_ampl =  0.0 !3.81
+    cyclic_phas =  0.0 !-59.1
   }
 
 }

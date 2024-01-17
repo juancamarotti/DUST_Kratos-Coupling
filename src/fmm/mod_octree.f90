@@ -1144,7 +1144,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
   class(c_elem), intent(in)              :: wvort(:)
 
   integer                     :: i, j, k, lv, ip, ipp, m, ie, iln
-  real(wp)                    :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
+  real(wp)                    :: Rnorm2, vel(3), pos(3), v(3), stretch(3), stretch_alone(3), str(3), alpha(3), dir(3)
   real(wp), allocatable       :: velv(:,:), stretchv(:,:), rotuv(:,:)
   real(wp)                    :: grad(3,3)
   real(t_realtime)            :: tsta , tend
@@ -1158,7 +1158,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
   t0 = dust_time()
   
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, &
+!$omp& v, stretch, stretch_alone, str, grad, alpha, dir, velv, stretchv, ave_ros, &
 !$omp& grad_elem, stretch_elem, iln, rotuv, rotu, ru) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
@@ -1168,11 +1168,12 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
 
     ave_ros = 0.0_wp
 
-!$omp simd private(vel, stretch, str, grad, pos, alpha, dir, m) reduction(+:ave_ros)
+!$omp simd private(vel, stretch, stretch_alone, str, grad, pos, alpha, dir, m) reduction(+:ave_ros)
     do ip = 1,octree%leaves(lv)%p%npart
     if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
       vel = 0.0_wp
       stretch = 0.0_wp
+      stretch_alone = 0.0_wp
       grad = 0.0_wp
       rotu = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
@@ -1235,6 +1236,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
 
       vel = velv(:,ip)
       stretch = stretchv(:,ip)
+      stretch_alone = stretchv(:,ip)
       grad = 0.0_wp
       rotu  = rotuv(:,ip)
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
@@ -1267,6 +1269,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
                   %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
               stretch = stretch + str/(4.0_wp*pi)
+              stretch_alone = stretch_alone + str/(4.0_wp*pi)
 !             !removed the parallel component
 !             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
@@ -1290,30 +1293,31 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
 
       !interact with the leaf neighbours
       do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
-       do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
+        do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
 
-         call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+          call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_vel(pos, v)
-         vel = vel +v/(4.0_wp*pi)
-         if(sim_param%use_vs) then
-           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+          vel = vel +v/(4.0_wp*pi)
+          if(sim_param%use_vs) then
+            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-           stretch = stretch + str/(4.0_wp*pi)
-!          !removed the parallel component
-!          stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+            stretch = stretch + str/(4.0_wp*pi)
+            stretch_alone = stretch_alone + str/(4.0_wp*pi)
+!           !removed the parallel component
+!           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-           if(sim_param%use_divfilt) then
-             call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+            if(sim_param%use_divfilt) then
+              call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
                 %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, ru)
-             rotu = rotu + ru/(4.0_wp*pi)
+              rotu = rotu + ru/(4.0_wp*pi)
            endif
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
                 octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
-           stretch = stretch +str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
+           stretch = stretch + str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
             ! 21/12/2023 Added factor 2 (see Winckelmans)
          endif
        enddo
@@ -1330,6 +1334,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
                   alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             stretch = stretch + str/(4.0_wp*pi)
+            stretch_alone = stretch_alone + str/(4.0_wp*pi)
 !           !> removed the parallel component ( proj to avoid numerical instability ? )
 !           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
@@ -1409,6 +1414,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
+        octree%leaves(lv)%p%cell_parts(ip)%p%stretch_alone = stretch_alone
         if(sim_param%use_divfilt) octree%leaves(lv)%p%cell_parts(ip)%p%rotu = rotu
       endif
 
