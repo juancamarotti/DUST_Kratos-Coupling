@@ -327,9 +327,7 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
       !> check geometry series type 
       if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
         y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
-        write(*,*) 'ciao'
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
-        write(*,*) ' r_in_list(iRegion) : ' , r_in_list(iRegion) 
         r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
       elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ib') then 
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
@@ -1429,7 +1427,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     m = maxval(rr_mean(2,:))
     idx_m = maxloc(rr_mean(2,:),1)  ! y_mean line max thickness
     p = rr_mean(1, idx_m)           ! x_mean line max thickness 
-    write(*,*) 'm = ', m, ' p = ', p
     !  The mean line is given by the expression: y_m = m/p^2(2px - x^2) 
     !  The expression is related NACA profile, but should be valid for all profile
     !  close to the leading edge. 
@@ -1714,10 +1711,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       rr(2,:) = rr_geo_mean(2,:) 
     endif 
 
-  end if !> old format 
-  write(*,*) rr(1,:)
-  write(*,*) rr(2,:)
-  write(*,*) rr2mesh_low(1,:) 
+  end if !> old format  
   
   !> cleanup
   if (allocated(rr_dat))            deallocate(rr_dat) 

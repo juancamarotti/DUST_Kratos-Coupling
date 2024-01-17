@@ -1374,6 +1374,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree)
   real(wp)                              :: q_1(3), q_2(3), q_3(3)
   real(wp)                              :: alpha_q_1(3), alpha_q_2(3), alpha_q_3(3)
   real(wp)                              :: alpha_p_1(3), alpha_p_2(3), alpha_p_3(3)
+  real(wp)                              :: hcas_vel(3)
   real(wp)                              :: alpha_p_1_mag, alpha_p_2_mag, alpha_p_3_mag
   real(wp)                              :: r_Vortex_q_1, r_Vortex_q_2, r_Vortex_q_3, r_Vortex_p_3
   real(wp)                              :: alpha_p_3_dir(3)
@@ -1478,6 +1479,7 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree)
 #endif      
   enddo
 
+  
 
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
@@ -1626,10 +1628,17 @@ select case (sim_param%integrator)
       endif !not free
     enddo
 !$omp end parallel do
-     
+
     !> 2nd stage 
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                         wake%end_vorts)
+    !> HCAS 
+    if (sim_param%HCAS) then
+      hcas_vel = get_vel_hcas()
+      do ip = 1, n_part
+        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
+      enddo
+    endif
 !$omp parallel do schedule(dynamic,4) private(ip, q_2, alpha_q_2, alpha_p_2, sigma_dot, r_Vortex_q_2)                        
     do ip = 1, n_part
       if ( .not. wake%part_p(ip)%p%free) then 
@@ -1694,7 +1703,12 @@ select case (sim_param%integrator)
     !> 3rd stage 
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                         wake%end_vorts)
-  
+    !> HCAS
+    if (sim_param%HCAS) then
+      do ip = 1, n_part
+        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
+      enddo
+    endif
 !$omp parallel do schedule(dynamic,4) private(ip, pos_p, vel_in,vel_out, q_3, &
 !$omp& alpha_q_3, alpha_p_3_mag, alpha_p_3_dir, alpha_p_3, sigma_dot, r_Vortex_q_3, r_Vortex_p_3)         
     do ip = 1, n_part 
