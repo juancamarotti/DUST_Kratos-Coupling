@@ -203,6 +203,7 @@ subroutine prepare_wake(wake, octree)
   integer                               :: k, ip, ir, iw, ie, n_end_vort
 
   if (sim_param%use_fmm) then
+    write(*,*) 'n_part (sort_particles) = ', wake%n_prt
     call sort_particles(wake%wake_parts, wake%n_prt, octree)
     call calculate_multipole(wake%part_p, octree)
   endif
@@ -365,7 +366,7 @@ subroutine complete_wake(wake, octree)
   real(wp)                              :: alpha_p_1_mag, alpha_p_2_mag, alpha_p_3_mag
   real(wp)                              :: alpha_p_1_dir(3), alpha_p_2_dir(3), alpha_p_3_dir(3)
   real(wp)                              :: r_Vortex_q_1, r_Vortex_q_2, r_Vortex_q_3, r_Vortex_p_3
-  integer                               :: n_part
+  integer                               :: n_part, count_free
   real(wp)                              :: vel_in(3), vel_out(3), wind(3), filt_eta
   real(wp)                              :: sigma_dot
   
@@ -454,113 +455,116 @@ select case (sim_param%integrator)
 
   case('low_storage') ! Low storage Runge-Kutta 
     !> 1st stage
+    count_free = 0
 !$omp parallel do schedule(dynamic,4) private(ip, q_1, alpha_q_1, alpha_p_1, sigma_dot, r_Vortex_q_1, filt_eta)
     do ip = 1, n_part
-      if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
-        q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
-        wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
-        
-        sigma_dot = 0.0_wp
-        if(sim_param%use_reformulated) then
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                      - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                      * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
+      if ( .not. wake%part_p(ip)%p%free) then
+        if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
+          q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
+          wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
+          
+          sigma_dot = 0.0_wp
+          if(sim_param%use_reformulated) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
+                                        - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
+                                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
 
-          sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                      * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                      * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-        endif
+            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
+                        * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
+                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
+          endif
 
-        !add filtering (Pedrizzetti Relaxation)    
-        if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
-                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
-        endif
+          !add filtering (Pedrizzetti Relaxation)    
+          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+                  filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+                  wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+          endif
 
-        alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt 
-        alpha_p_1 = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + 1.0_wp/3.0_wp*alpha_q_1  
-        wake%part_p(ip)%p%mag = norm2(alpha_p_1) !> mag
-        wake%part_p(ip)%p%dir = alpha_p_1/(wake%part_p(ip)%p%mag) !> direction 
+          alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt 
+          alpha_p_1 = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + 1.0_wp/3.0_wp*alpha_q_1  
+          wake%part_p(ip)%p%mag = norm2(alpha_p_1) !> mag
+          wake%part_p(ip)%p%dir = alpha_p_1/(wake%part_p(ip)%p%mag) !> direction 
 
-        if(sim_param%use_reformulated) then
-          !r_Vortex update
-          r_Vortex_q_1 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
-          wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex & 
-                                      + 1.0_wp/3.0_wp*r_Vortex_q_1
-        endif
-        !> assign old values
-        wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
-        wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
-        wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-        wake%part_p(ip)%p%vel_prev = q_1 !> velocity*dt
-        wake%part_p(ip)%p%stretch_prev = alpha_q_1 !> stretch*dt
-        wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_1 !> sigma_dot*dt
-      else !magnitude
-        wake%part_p(ip)%p%free = .true.
+          if(sim_param%use_reformulated) then
+            !r_Vortex update
+            r_Vortex_q_1 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
+            wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex & 
+                                        + 1.0_wp/3.0_wp*r_Vortex_q_1
+          endif
+          !> assign old values
+          wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
+          wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
+          wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
+          wake%part_p(ip)%p%vel_prev = q_1 !> velocity*dt
+          wake%part_p(ip)%p%stretch_prev = alpha_q_1 !> stretch*dt
+          wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_1 !> sigma_dot*dt
+        else !magnitude
+          wake%part_p(ip)%p%free = .true.
 !$omp atomic update
-        wake%n_prt = wake%n_prt -1
-!$omp end atomic    
-      endif !magnitude
+          count_free = count_free + 1
+!$omp end atomic     
+        endif !magnitude
+      endif !not free
     enddo
 !$omp end parallel do
      
     !> 2nd stage 
-    call prepare_wake(wake, octree)
     call apply_multipole(wake%part_p, octree) 
 !$omp parallel do schedule(dynamic,4) private(ip, q_2, alpha_q_2, alpha_p_2, sigma_dot, r_Vortex_q_2, filt_eta)                        
-    do ip = 1, n_part 
-      if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small) 
-        q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
-        wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2 
+    do ip = 1, n_part
+      if ( .not. wake%part_p(ip)%p%free) then 
+        if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small) 
+          q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
+          wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2 
 
-        sigma_dot = 0.0_wp
-        if(sim_param%use_reformulated) then
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                      - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                      * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
+          sigma_dot = 0.0_wp
+          if(sim_param%use_reformulated) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
+                                        - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
+                                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
 
-          sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                      * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                      * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-        endif
+            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
+                        * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
+                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
+          endif
 
-        !add filtering (Pedrizzetti Relaxation)    
-        if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-              filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
-              wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
-        endif 
+          !add filtering (Pedrizzetti Relaxation)    
+          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+                filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
+                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
+          endif 
 
-        alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
-        alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
-        wake%part_p(ip)%p%mag = norm2(alpha_p_2)
-        wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag)  
+          alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
+          alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
+          wake%part_p(ip)%p%mag = norm2(alpha_p_2)
+          wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag)  
 
-        if(sim_param%use_reformulated) then
-          !r_Vortex update
-          r_Vortex_q_2 = sigma_dot * sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
-          wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex + 15.0_wp/16.0_wp*r_Vortex_q_2
+          if(sim_param%use_reformulated) then
+            !r_Vortex update
+            r_Vortex_q_2 = sigma_dot * sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
+            wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex + 15.0_wp/16.0_wp*r_Vortex_q_2
 
-        endif
-        !> assign old values
-        wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
-        wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
-        wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-        wake%part_p(ip)%p%vel_prev = q_2 !> velocity*dt
-        wake%part_p(ip)%p%stretch_prev = alpha_q_2 !> stretch*dt
-        wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_2 !> sigma_dot*dt
-      else !magnitude
-        wake%part_p(ip)%p%free = .true.
+          endif
+          !> assign old values
+          wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
+          wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
+          wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
+          wake%part_p(ip)%p%vel_prev = q_2 !> velocity*dt
+          wake%part_p(ip)%p%stretch_prev = alpha_q_2 !> stretch*dt
+          wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_2 !> sigma_dot*dt
+        else !magnitude
+          wake%part_p(ip)%p%free = .true.
 !$omp atomic update
-        wake%n_prt = wake%n_prt -1
+          count_free = count_free + 1
 !$omp end atomic    
-      endif !magnitude
+        endif !magnitude
+      endif !not free
     enddo
 !$omp end parallel do
 
     !> 3rd stage 
-    call prepare_wake(wake,octree)
     call apply_multipole(wake%part_p, octree)
   
 !$omp parallel do schedule(dynamic,4) private(ip, pos_p, vel_in,vel_out, q_3, &
@@ -612,24 +616,27 @@ select case (sim_param%integrator)
             else !part_box
               wake%part_p(ip)%p%free = .true.
 !$omp atomic update
-              wake%n_prt = wake%n_prt - 1
+              count_free = count_free + 1
 !$omp end atomic
             endif !part_box
           else !mag check
             wake%part_p(ip)%p%free = .true.
 !$omp atomic update
-            wake%n_prt = wake%n_prt - 1
+            count_free = count_free + 1
 !$omp end atomic
           endif !mag check
         else !magnitude
           wake%part_p(ip)%p%free = .true.
 !$omp atomic update
-          wake%n_prt = wake%n_prt - 1
+          count_free = count_free + 1
 !$omp end atomic
         endif !magnitude
       endif !not free
     enddo
 !$omp end parallel do
+
+wake%n_prt = wake%n_prt - count_free
+
 end select 
 
 end subroutine complete_wake
