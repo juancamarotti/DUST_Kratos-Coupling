@@ -509,8 +509,8 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('vortstretch','Employ vortex stretching','T')
   call prms%CreateLogicalOption('vortstretch_from_elems','Employ vortex stretching&
                                 & from geometry elements','F')
-  call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering','T')
-  call prms%CreateRealOption('alpha_divfilt','Pedrizzetti relaxation coefficient','0.3')
+  call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering', 'T')
+  call prms%CreateRealOption('alpha_divfilt','Pedrizzetti relaxation coefficient', '0.3')
   call prms%CreateLogicalOption('diffusion','Employ vorticity diffusion','T')
   call prms%CreateLogicalOption('turbulent_viscosity','Employ turbulent &
                                 &viscosity','F')

@@ -975,8 +975,8 @@ subroutine update_wake(wake, geo, elems, octree)
     np = np + 1
   endif
 
-select case (sim_param%integrator)
-  case('euler') ! Explicit euler
+!select case (sim_param%integrator)
+!  case('euler') ! Explicit euler
 !$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
   do ipan = 3,np
     do iw = 1,wake%n_pan_points
@@ -998,30 +998,31 @@ select case (sim_param%integrator)
     enddo
   enddo
 !$omp end parallel do
-  case('low_storage') ! Low storage Runge-Kutta 
-!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
-  do ipan = 3, np
-    do iw = 1,wake%n_pan_points
-      pos_p = point_old(:,iw,ipan-1)
-      vel_p = 0.0_wp
-      !update the position in time 
-      !> first stage 
-      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
-      q_1 = vel_p*sim_param%dt 
-      x_1 = pos_p + 1.0_wp/3.0_wp*q_1   
-      !> second stage 
-      call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
-      q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
-      x_2 = x_1 + 15.0_wp/16.0_wp*q_2
-      !> third stage 
-      call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
-      q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2 
-      wake%pan_w_points(:,iw,ipan) = x_2 + 8.0_wp/15.0_wp*q_3  
-      wake%pan_w_vel(   :,iw,ipan) = vel_p
-    enddo
-  enddo
-!$omp end parallel do
-end select
+
+!  case('low_storage') ! Low storage Runge-Kutta 
+!!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
+!  do ipan = 3, np
+!    do iw = 1,wake%n_pan_points
+!      pos_p = point_old(:,iw,ipan-1)
+!      vel_p = 0.0_wp
+!      !update the position in time 
+!      !> first stage 
+!      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+!      q_1 = vel_p*sim_param%dt 
+!      x_1 = pos_p + 1.0_wp/3.0_wp*q_1   
+!      !> second stage 
+!      call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
+!      q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+!      x_2 = x_1 + 15.0_wp/16.0_wp*q_2
+!      !> third stage 
+!      call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
+!      q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2 
+!      wake%pan_w_points(:,iw,ipan) = x_2 + 8.0_wp/15.0_wp*q_3  
+!      wake%pan_w_vel(   :,iw,ipan) = vel_p
+!    enddo
+!  enddo
+!!$omp end parallel do
+!end select
 
   !if the wake is full, calculate another row of points to generate the
   !particles
@@ -1031,7 +1032,7 @@ end select
     ! create another row of points
     select case (sim_param%integrator)
     case('euler') ! Explicit euler 
-      !$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
+!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
       do iw = 1,wake%n_pan_points
         pos_p = point_old(:,iw,wake%pan_wake_len+1)
         vel_p = 0.0_wp
@@ -1042,29 +1043,50 @@ end select
         points_end(:,iw) = pos_p + vel_p*sim_param%dt
 
       enddo
-      !$omp end parallel do
+!$omp end parallel do
     case('low_storage') ! Low storage Runge-Kutta
-      !$omp parallel do private(iw, pos_p, vel_p, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
+!$omp parallel do private(iw, pos_p, vel_p, q_1, x_1, q_2, x_2, q_3) schedule(dynamic)
       do iw = 1,wake%n_pan_points
         pos_p = point_old(:,iw,wake%pan_wake_len+1)
         vel_p = 0.0_wp
+        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
+        !update the position in time
+        points_end(:,iw) = pos_p + vel_p*sim_param%dt ! euler (avoid instabilities)
         !update the position in time 
         !> first stage 
-        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
-        q_1 = vel_p*sim_param%dt 
-        x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
+        !call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+        !q_1 = vel_p*sim_param%dt 
+        !x_1 = pos_p + 1.0_wp/3.0_wp*q_1
+        !if (iw .eq. 18) then
+        !  write(*,*) 'vel_p', vel_p
+        !  write(*,*) 'pos_p', pos_p
+        !  write(*,*) 'q_1', q_1
+        !  write(*,*) 'x_1', x_1
+        !endif  
         !> second stage 
-        call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
-        q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
-        x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+        !call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
+        !q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+        !x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+        !if (iw .eq. 18) then
+        !  write(*,*) 'stage 2'
+        !  write(*,*) 'vel_p', vel_p
+        !  write(*,*) 'q_2', q_2
+        !  write(*,*) 'x_2', x_2
+        !endif
         !> third stage 
-        call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
-        q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2  
+        !call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
+        !q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2  
         !update the position in time
-        points_end(:,iw) = x_2 + 8.0_wp/15.0_wp*q_3 
+        !points_end(:,iw) = x_2 + 8.0_wp/15.0_wp*q_3
+        !if (iw .eq. 18) then
+        !  write(*,*) 'stage 3'
+        !  write(*,*) 'vel_p', vel_p
+        !  write(*,*) 'q_3', q_3
+        !  write(*,*) 'points_end', points_end(:,iw)
+        !endif
       enddo
-      !$omp end parallel do 
+!$omp end parallel do 
     end select
 
   endif
@@ -1129,16 +1151,19 @@ select case (sim_param%integrator)
         !update the position in time 
         !> first stage 
         call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
-        q_1 = vel_p*sim_param%dt 
-        x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
+        !update the position in time
+        points(:,ip,ir) = points(:,ip,ir) + &
+                        vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
+        !q_1 = vel_p*sim_param%dt 
+        !x_1 = pos_p + 1.0_wp/3.0_wp*q_1  
         !> second stage 
-        call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
-        q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
-        x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
+        !call wake_movement%get_vel(elems, wake, x_1, hcas_vel, vel_p) 
+        !q_2 = vel_p*sim_param%dt - 5.0_wp/9.0_wp*q_1 
+        !x_2 = x_1 + 15.0_wp/16.0_wp*q_2 
         !> third stage 
-        call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
-        q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2  
-        points(:,ip,ir) = x_2 + 8.0_wp/15.0_wp*q_3 
+        !call wake_movement%get_vel(elems, wake, x_2, hcas_vel, vel_p)
+        !q_3 = vel_p*sim_param%dt - 153.0_wp/128.0_wp*q_2  
+        !points(:,ip,ir) = x_2 + 8.0_wp/15.0_wp*q_3 
       enddo !ir
     enddo !ip
   !$omp end parallel do
@@ -1521,7 +1546,6 @@ select case (sim_param%integrator)
 
             !add divergence filtering (Pedrizzetti Relaxation)
             if(sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-              filt_eta = sim_param%alpha_divfilt/sim_param%dt
               wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
                 filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
                 wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
@@ -1542,6 +1566,9 @@ select case (sim_param%integrator)
             !Magnitude check to avoid division by zero and negative magnitudes
             if(alpha_p_n .ge. sim_param%mag_threshold) then
               wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
+              !if (ip .eq. 18) then 
+              !  write(*,*) 'wake%part_p(ip)%p%dir', wake%part_p(ip)%p%dir
+              !endif
               wake%part_p(ip)%p%mag = alpha_p_n 
             else
               wake%part_p(ip)%p%free = .true.
@@ -1588,18 +1615,22 @@ select case (sim_param%integrator)
           endif
 
           !add filtering (Pedrizzetti Relaxation)    
-          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                  filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
-                  wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
-          endif
+          !if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
+          !  wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+          !        filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+          !        wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+          !endif
 
           alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt 
           alpha_p_1 = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + 1.0_wp/3.0_wp*alpha_q_1  
           if(norm2(alpha_p_1) .ge. sim_param%mag_threshold) then 
             wake%part_p(ip)%p%mag = norm2(alpha_p_1) !> mag
             wake%part_p(ip)%p%dir = alpha_p_1/(wake%part_p(ip)%p%mag) !> direction 
-
+            !if (ip .eq. 18) then 
+            !    write(*,*) 'stage 1'
+            !    write(*,*) 'wake%part_p(ip)%p%dir', wake%part_p(ip)%p%dir
+            !endif
+              
             if(sim_param%use_reformulated) then
               !r_Vortex update
               r_Vortex_q_1 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
@@ -1658,11 +1689,11 @@ select case (sim_param%integrator)
           endif
 
           !add filtering (Pedrizzetti Relaxation)    
-          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
-                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
-          endif 
+          !if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
+          !  wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+          !      filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
+          !      wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
+          !endif 
 
           alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
           alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
@@ -1670,7 +1701,10 @@ select case (sim_param%integrator)
           if(norm2(alpha_p_2) .ge. sim_param%mag_threshold) then 
             wake%part_p(ip)%p%mag = norm2(alpha_p_2)
             wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag)  
-
+            !if (ip .eq. 18) then 
+            !    write(*,*) 'stage 2'
+            !    write(*,*) 'wake%part_p(ip)%p%dir', wake%part_p(ip)%p%dir
+            !endif
             if(sim_param%use_reformulated) then
               !r_Vortex update
               r_Vortex_q_2 = sigma_dot * sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
@@ -1736,7 +1770,7 @@ select case (sim_param%integrator)
 
           !add filtering (Pedrizzetti Relaxation)
           if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
                 filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
                 wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))  
           endif
@@ -2352,7 +2386,12 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
 !    case 1 ! ghost_left
 !      pos_p = pos_p - 
 !  endif
-  
+  !if (iw .eq. 18) then
+  !  write(*,*) 'vertices', vertices(:,1) 
+  !  write(*,*) 'vertices', vertices(:,2)
+  !  write(*,*) 'vertices', vertices(:,3)
+  !  write(*,*) 'vertices', vertices(:,4)
+  !endif 
   ! A = cross product of diagonals       
   area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
               points_end(:,p2)-wake%pan_w_points(:,p1,wake%nmax_pan+1)))
