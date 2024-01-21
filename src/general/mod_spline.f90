@@ -53,7 +53,9 @@ use mod_handling, only: &
 
 use mod_math, only: &
   linspace 
-  
+
+use, intrinsic :: ieee_arithmetic
+
 implicit none
 
 public :: t_spline , hermite_spline , hermite_spline_profile, catmull_rom_chain, & 
@@ -367,6 +369,11 @@ subroutine hermite_spline_profile(x, y, xq, tang_start, tang_end, yq)
                 h10*(x(j + 1) - x(j))*m(j) + &
                 h01*y(j + 1) + &
                 h11*(x(j + 1) - x(j))*m(j + 1)
+        !> check for nan (can happen in symmetric profile with zero thickness)
+        if (ieee_is_nan(yq(i))) then
+          yq(i) = 0.0_wp
+        end if
+        
       end if
     end do 
   end do
