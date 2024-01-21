@@ -1155,7 +1155,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
     endif
 
     ! Thickness
-    thickness = 5.0_wp*s*( 0.2969_wp*sqrt(xa)  &
+    thickness = 5.0_wp*s*( 0.2969_wp*sqrt(max(xa, 1e-16_wp))  &
                           - 0.1260_wp* xa       &
                           - 0.3516_wp*(xa**2)   &
                           + 0.2843_wp*(xa**3)   &
@@ -1260,7 +1260,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
     endif
 
     ! Thickness
-    thickness = 5.0_wp*s*(0.2969_wp*sqrt(xa) - 0.1260_wp*xa - &
+    thickness = 5.0_wp*s*(0.2969_wp*sqrt(max(xa,1e-16_wp)) - 0.1260_wp*xa - &
                 0.3516_wp*(xa**2) + 0.2843_wp*(xa**3) - 0.1015_wp*(xa**4))
 
     points_mean_line(1,iPoint) = xa
@@ -1297,12 +1297,11 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
 
   real(wp) , allocatable      :: rr_dat(:,:) 
   real(wp) , allocatable      :: rr_up(:,:), rr_low(:,:)
-  real(wp) , allocatable      :: y_mean(:,:), rr_mean(:,:)
+  real(wp) , allocatable      :: rr_mean(:,:)
   integer                     :: np_dat, min_X, idx_m
-  real(wp)                    :: x_plus, y_plus, x_minus, y_minus, tan_plus, tan_minus, m, p
-  real(Wp)                    :: mean_id_min, tang_le_low, tang_le_up, tang_me_le, tang_me_te
-  real(wp) , allocatable      :: point_up_updated(:,:), point_low_updated(:,:)
-  real(wp) , allocatable      :: point_up(:,:), point_low(:,:), point_le_updated(:,:)
+  real(wp)                    :: m, p
+  real(Wp)                    :: mean_id_min, tang_le_low, tang_le_up
+  real(wp) , allocatable      :: point_up_updated(:,:), point_low_updated(:,:), point_le_updated(:,:)
   real(wp) , allocatable      :: xq_mean(:), yq_mean(:) 
   real(wp) , allocatable      :: rr2mesh_up(:,:), rr2mesh_low(:,:), rr2mesh_mean(:,:), rr2mesh(:,:)
   real(wp) , allocatable      :: alpha_up(:), alpha_low(:), alpha_mean(:)
@@ -1311,9 +1310,8 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   real(wp) , allocatable      :: rr_sort(:,:), x_sort(:), x_unique(:)
   real(wp) , allocatable      :: csi_up(:), csi_low(:), csi_mean(:) 
   real(wp) , allocatable      :: rr_unique_up(:,:), rr_unique_low(:,:), rr_mean_dat(:,:)
-  real(wp) , allocatable      :: rr_up_int(:,:), xq_up(:), yq_up(:), xq_le(:), yq_le(:), yq_low(:), xq_low(:)
+  real(wp) , allocatable      :: xq_up(:), yq_up(:), xq_le(:), yq_le(:), yq_low(:), xq_low(:)
   real(wp)                    :: tang_te_up, tang_te_low, tang_mean_le, tang_mean_te, tang_mean_le_new
-  real(wp)                    :: tan_le_up, tan_le_low
   integer  , parameter        :: n_query = 20000 
   integer  , parameter        :: maxiter = 100
   integer  , parameter        :: num_points = 10000 !> density of points for interpolation 
@@ -1392,6 +1390,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     rr(2,:) = rr_geo_mean(2,:) 
     thickness = 0.12_wp !> dummy value (assumed a NACA0012) 
   else 
+
     !> leading edge index
     id_le = minloc(rr_dat(1,:), 1)  
     mean_id_min = sum(rr_dat(2,1:id_le))/real(size(rr_dat(2,1:id_le)),wp)
@@ -1399,7 +1398,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     if (mean_id_min .gt. 0.0_wp) then !>  Seilig format 
       allocate(rr_up(2, id_le));                    rr_up = 0.0_wp
       allocate(rr_low(2, size(rr_dat, 2) - id_le)); rr_low = 0.0_wp
-
       rr_up = rr_dat(:, 1:id_le) 
       ! reverse rr_up 
       rr_up = rr_up(:, size(rr_up, 2): 1: -1)
@@ -1407,7 +1405,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     else                              !> Original DUST format 
       allocate(rr_up(2, size(rr_dat, 2) - id_le)); rr_up = 0.0_wp
       allocate(rr_low(2, id_le));                  rr_low = 0.0_wp
-
       rr_up = rr_dat(:, id_le : size(rr_dat, 2))
       rr_low = rr_dat(:,1:id_le )
       !> reverse rr_low 
@@ -1463,10 +1460,10 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
                   (rr_unique_low(1, 2) - rr_unique_low(1, 3))
 
     !> tangent at mean line
-    tang_me_le = (rr_mean(2,2)- rr_mean(2,1)) / &
-                  (rr_mean(1,2)-rr_mean(1,1))
-    tang_me_te = (rr_mean(2, size(rr_mean,2))- rr_mean(2, size(rr_mean,2)-1)) / &
-                  (rr_mean(1, size(rr_mean,2))-rr_mean(1, size(rr_mean,2)-1)) 
+    tang_mean_le = (rr_mean(2,2)- rr_mean(2,1)) / &
+                    (rr_mean(1,2)-rr_mean(1,1))
+    tang_mean_te = (rr_mean(2, size(rr_mean,2))- rr_mean(2, size(rr_mean,2)-1)) / &
+                    (rr_mean(1, size(rr_mean,2))-rr_mean(1, size(rr_mean,2)-1)) 
     
     allocate(point_up_updated(2, size(rr_unique_up,2) - 2)); point_up_updated = 0.0_wp
     allocate(point_low_updated(2, size(rr_unique_low,2) -2)); point_low_updated = 0.0_wp
@@ -1487,34 +1484,34 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     allocate(xq_up(num_points)); xq_up = 0.0_wp 
     call linspace(rr_unique_up(1,3), rr_unique_up(1,size(rr_unique_up,2)), xq_up) 
     allocate(yq_up(num_points)); yq_up = 0.0_wp
+    call hermite_spline_profile(point_up_updated(1,:), point_up_updated(2,:), & 
+                                xq_up, tang_le_up, tang_te_up, yq_up)
+    
     !> lower part
     allocate(xq_low(num_points)); xq_low = 0.0_wp
     call linspace(rr_unique_low(1,3), rr_unique_low(1,size(rr_unique_up,2)), xq_low)
     allocate(yq_low(num_points)); yq_low = 0.0_wp 
-    !> leading edge part
-    allocate(xq_le(num_points)); xq_le = 0.0_wp
-    call linspace(point_le_updated(1,1), point_le_updated(1,5), xq_le)
-    allocate(yq_le(num_points)); yq_le = 0.0_wp
-    !> upper part
-    call hermite_spline_profile(point_up_updated(1,:), point_up_updated(2,:), & 
-                                xq_up, tang_le_up, tang_te_up, yq_up)
-    !> lower part
     call hermite_spline_profile(point_low_updated(1,:), point_low_updated(2,:), & 
                                 xq_low, tang_le_low, tang_te_low, yq_low)
-    !> leading edge part 
-    call hermite_spline_profile(point_le_updated(1,:), point_le_updated(2,:), & 
-                                xq_le, 1.0_wp/tang_le_low, 1.0_wp/tang_le_up, yq_le)
-    !> mean line 
-    allocate(xq_mean(100)); xq_mean = 0.0_wp
-    call linspace(0.0_wp, 1.0_wp, xq_mean)
-    allocate(yq_mean(100)); yq_mean = 0.0_wp
-    call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), xq_mean, &
-                                tang_me_le, tang_me_te, yq_mean)
-    
     !> flip lower part
     yq_low = yq_low(size(yq_low):1:-1)
     xq_low = xq_low(size(xq_low):1:-1)
 
+    !> leading edge part
+    allocate(xq_le(num_points)); xq_le = 0.0_wp
+    call linspace(point_le_updated(1,1), point_le_updated(1,5), xq_le)
+    allocate(yq_le(num_points)); yq_le = 0.0_wp
+    call hermite_spline_profile(point_le_updated(1,:), point_le_updated(2,:), & 
+                                xq_le, 1.0_wp/tang_le_low, 1.0_wp/tang_le_up, yq_le)
+    
+    !> mean line
+    allocate(xq_mean(num_points)); xq_mean = 0.0_wp
+    call linspace(0.0_wp, 1.0_wp, xq_mean)
+    allocate(yq_mean(num_points)); yq_mean = 0.0_wp
+    call hermite_spline_profile(rr_mean(1,:), rr_mean(2,:), &
+                                xq_mean, tang_mean_le, tang_mean_te, yq_mean)
+    
+    
     !> concatenate the upper and lower part 
     allocate(rr2mesh(2, size(xq_up) + size(xq_low) + size(xq_le) - 2)); rr2mesh = 0.0_wp
     rr2mesh(1,:) = (/xq_low, yq_le(2:size(yq_le)-1), xq_up/)
@@ -1526,11 +1523,13 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     allocate(rr2mesh_up(2, size(rr2mesh,2) - min_x + 1)); rr2mesh_up = 0.0_wp
     rr2mesh_up(1,:) = rr2mesh(1,min_x:size(rr2mesh,2))
     rr2mesh_up(2,:) = rr2mesh(2,min_x:size(rr2mesh,2)) 
+
     !> get length and derivative (alpha) along the upper line 
     allocate(alpha_up(size(rr2mesh_up, 2))); alpha_up = 0.0_wp
-    alpha_up(1) = atan(tang_le_up)
     allocate(dl_up(size(rr2mesh_up, 2))); dl_up = 0.0_wp
-
+    alpha_up(1) = atan((rr2mesh_up(2,2) - rr2mesh_up(2,1))/ &
+                  (max((rr2mesh_up(1,2) - rr2mesh_up(1,1)), 1e-16_wp)))
+    
     do i = 2, size(rr2mesh_up, 2)
       dl_up(i) = dl_up(i - 1) + sqrt((rr2mesh_up(1,i) - rr2mesh_up(1,i-1))**2.0_wp + &
                                     (rr2mesh_up(2,i) - rr2mesh_up(2,i-1))**2.0_wp)
@@ -1544,11 +1543,14 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     
     rr2mesh_low(1,:) = rr2mesh(1,1:min_x)
     rr2mesh_low(2,:) = rr2mesh(2,1:min_x)
-
+    !> flip lower part [0 to 1]
+    rr2mesh_low(1,:) = rr2mesh_low(1,size(rr2mesh_low,2):1:-1)
+    rr2mesh_low(2,:) = rr2mesh_low(2,size(rr2mesh_low,2):1:-1)
     !> get length and derivative (alpha) along the lower line 
     allocate(alpha_low(size(rr2mesh_low,2))); alpha_low = 0.0_wp
     allocate(dl_low(size(rr2mesh_low,2))); dl_low = 0.0_wp
-    alpha_low(1) = atan(tang_le_low)
+    alpha_low(1) =  atan((rr2mesh_low(2,2) - rr2mesh_low(2, 1))/ &
+                    (max((rr2mesh_low(1,2) - rr2mesh_low(1, 1)), 1e-16_wp)))
     
     do i = 2, size(rr2mesh_low,2)
       dl_low(i) = dl_low(i - 1) + sqrt((rr2mesh_low(1,i) - rr2mesh_low(1,i-1))**2.0_wp + &
@@ -1565,7 +1567,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     !> get length and derivative (alpha) along the mean line
     allocate(alpha_mean(size(rr2mesh_mean,2))); alpha_mean = 0.0_wp
     allocate(dl_mean(size(rr2mesh_mean,2))); dl_mean = 0.0_wp
-    alpha_mean(1) = atan(tang_me_le) 
+    alpha_mean(1) = atan(tang_mean_le) 
     do i = 2, size(rr2mesh_mean(1,:))
       dl_mean(i) = dl_mean(i - 1) + sqrt((rr2mesh_mean(1,i) - rr2mesh_mean(1,i-1))**2.0_wp + &
                                         (rr2mesh_mean(2,i) - rr2mesh_mean(2,i-1))**2.0_wp)
@@ -1601,7 +1603,10 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       enddo
     enddo
 
-    
+    !> flip lower part [1 to 0]
+    rr_geo_low(1,:) = rr_geo_low(1,size(rr_geo_low,2):1:-1) 
+    rr_geo_low(2,:) = rr_geo_low(2,size(rr_geo_low,2):1:-1)
+
     !> interpolation of the mean line
     !> rescale csi_half in the interval [0 dl_mean(size(dl_mean))]
     allocate(csi_mean(size(csi_half))); csi_mean = 0.0_wp
@@ -1619,43 +1624,53 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
 
     if (ElType .eq. 'p') then 
       allocate(rr(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); rr = 0.0_wp 
-      rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)), rr_geo_up(1,2:size(rr_geo_up,2))/) 
-      rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)), rr_geo_up(2,2:size(rr_geo_up,2))/)
+      rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)-1), rr_geo_up(1,1:size(rr_geo_up,2))/) 
+      rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)-1), rr_geo_up(2,1:size(rr_geo_up,2))/)
     elseif (ElType .eq. 'v') then 
       allocate(rr(2,size(rr_geo_mean, 2))); rr = 0.0_wp 
       rr(1,:) = rr_geo_mean(1,:)
       rr(2,:) = rr_geo_mean(2,:) 
     endif 
-    thickness = 0.12_wp !> dummy value (assumed a NACA0012)
+    thickness = maxval(rr(2,:)) - minval(rr(2,:))
   end if !> old format 
   
   !> cleanup
   if (allocated(rr_dat))            deallocate(rr_dat) 
   if (allocated(rr_up))             deallocate(rr_up)
   if (allocated(rr_low))            deallocate(rr_low)
+  if (allocated(rr_sort))           deallocate(rr_sort)
+  if (allocated(rr_unique_up))      deallocate(rr_unique_up)
+  if (allocated(rr_unique_low))     deallocate(rr_unique_low)
+  if (allocated(rr_mean_dat))       deallocate(rr_mean_dat)
   if (allocated(rr_mean))           deallocate(rr_mean)
-  if (allocated(point_up))          deallocate(point_up)
-  if (allocated(point_low))         deallocate(point_low)
   if (allocated(point_up_updated))  deallocate(point_up_updated)
   if (allocated(point_low_updated)) deallocate(point_low_updated)
+  if (allocated(point_le_updated))  deallocate(point_le_updated)
+  if (allocated(xq_up))             deallocate(xq_up)
+  if (allocated(yq_up))             deallocate(yq_up)
+  if (allocated(xq_low))            deallocate(xq_low)
+  if (allocated(yq_low))            deallocate(yq_low)
+  if (allocated(xq_le))             deallocate(xq_le)
+  if (allocated(yq_le))             deallocate(yq_le)
+  if (allocated(xq_mean))           deallocate(xq_mean)
+  if (allocated(yq_mean))           deallocate(yq_mean)
+  if (allocated(rr2mesh))           deallocate(rr2mesh)
   if (allocated(rr2mesh_up))        deallocate(rr2mesh_up)
-  if (allocated(rr2mesh_low))       deallocate(rr2mesh_low)  
-  if (allocated(y_mean))            deallocate(y_mean)
-  if (allocated(rr_geo_low))        deallocate(rr_geo_low)
-  if (allocated(rr_geo_up))         deallocate(rr_geo_up)
-  if (allocated(rr_geo_mean))       deallocate(rr_geo_mean)
-  if (allocated(csi_up))            deallocate(csi_up)
-  if (allocated(csi_low))           deallocate(csi_low)
-  if (allocated(csi_mean))          deallocate(csi_mean)
+  if (allocated(rr2mesh_low))       deallocate(rr2mesh_low)
+  if (allocated(rr2mesh_mean))      deallocate(rr2mesh_mean)
   if (allocated(alpha_up))          deallocate(alpha_up)
   if (allocated(alpha_low))         deallocate(alpha_low)
   if (allocated(alpha_mean))        deallocate(alpha_mean)
   if (allocated(dl_up))             deallocate(dl_up)
   if (allocated(dl_low))            deallocate(dl_low)
   if (allocated(dl_mean))           deallocate(dl_mean)
-  if (allocated(xq_mean))           deallocate(xq_mean)
-  if (allocated(yq_mean))           deallocate(yq_mean)
-
+  if (allocated(csi_up))            deallocate(csi_up)
+  if (allocated(csi_low))           deallocate(csi_low)
+  if (allocated(csi_mean))          deallocate(csi_mean)
+  if (allocated(rr_geo_up))         deallocate(rr_geo_up)
+  if (allocated(rr_geo_low))        deallocate(rr_geo_low)
+  if (allocated(rr_geo_mean))       deallocate(rr_geo_mean)
+  
 end subroutine read_airfoil
 
 !-------------------------------------------------------------------------------
