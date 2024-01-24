@@ -37,4 +37,5 @@ CMakeFiles/
 *.dat
 *.nc
 *.out 
+*.avi 
 __pycache__
