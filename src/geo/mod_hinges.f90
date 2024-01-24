@@ -270,7 +270,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   real(wp), allocatable :: rrb(:,:), rrh(:,:), rrb_wei(:,:)
   real(wp) :: Rot(3,3) = 0.0_wp
 
-  real(wp) :: span_wei
+  real(wp) :: span_wei, tol 
   real(wp), allocatable :: dist_all(:), wei_v(:)
   integer , allocatable ::              ind_v(:)
 
@@ -354,11 +354,11 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
                             (loc_points(:,ib) - &
                     matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
   enddo
-
+  tol = abs(this%ref%rr(2,nh) - this%ref%rr(2,1))/1000.0_wp  ! tolerance for the hinge width (relative)
   ! Loop over all the surface points
   do ib = 1, nb
     !> wind axis conditions
-    if ((rrb(2,ib) .ge. (this%ref%rr(2,1)-1e-3_wp)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+1e-3_wp))) then
+    if ((rrb(2,ib) .ge. (this%ref%rr(2,1) - tol)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+tol))) then
       
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
@@ -493,7 +493,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   real(wp), allocatable :: rrb(:,:), rrh(:,:), rrb_wei(:,:)
   real(wp) :: Rot(3,3) = 0.0_wp
 
-  real(wp) :: span_wei
+  real(wp) :: span_wei, tol
   real(wp), allocatable :: dist_all(:), wei_v(:)
   integer , allocatable ::              ind_v(:)
 
@@ -588,11 +588,13 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
     rrb_wei(:,ib) = matmul(coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1))))
   enddo
 
+  tol = abs(this%ref%rr(2,nh) - this%ref%rr(2,1))/1000.0_wp  !tolerance for the hinge width (relative)
+  
   ! Loop over all the surface points
   do ib = 1, nb
 
-    if ((rrb(2,ib) .gt. this%ref%rr(2,1)) .and. (rrb(2,ib) .lt. this%ref%rr(2,nh))) then
-
+    if ((rrb(2,ib) .gt. this%ref%rr(2,1) - tol) .and. (rrb(2,ib) .lt. this%ref%rr(2,nh) + tol)) then
+      
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
       z_hinge = this%ref%rr(3,1) + wei_hinge*(this%ref%rr(3,nh)- this%ref%rr(3,1))
@@ -609,7 +611,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
         !> Weights in chordwise direction
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
         wei_v = wei_v / sum(wei_v)
 
         !> Weights in spanwise direction
@@ -647,7 +649,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
         wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
 
-        !> Weights in spanwise direction
+        !> Weights in spanwise direction (is this needed?)
         if ( rrb(2,ib) .lt. (this%ref%rr(2,1) + this%span_blending) ) then
           span_wei = 1.0_wp + rrb_wei(2,ib) / this%span_blending
         elseif( rrb(2,ib) .lt. (this%ref%rr(2,nh) - this%span_blending)  ) then
@@ -789,7 +791,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   end do
 
   !> Allocate t_hinge%hin_rot
-  allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
+  allocate(this%hin_rot(3,n_h)); this%hin_rot = -333.3_wp
 
 end subroutine build_connectivity_hin
 
