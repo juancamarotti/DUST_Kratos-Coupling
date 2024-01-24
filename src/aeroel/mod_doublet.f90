@@ -113,7 +113,7 @@ end subroutine initialize_doublet
 !! Omega_ik = int_{S_k} { n \cdot (r_i - r) / |r_i - r|^3 }
 !!
 !! The relation with unitary surface doublet D_ik is:
-!!   D_ik = -(1/(4*pi)) * Omega_ik
+!!   D_ik = -(1/4pi) * Omega_ik
 !!
 subroutine potential_calc_doublet(this, dou, pos)
   class(c_pot_elem), intent(in) :: this

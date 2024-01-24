@@ -52,7 +52,7 @@
 module mod_wake
 
 use mod_param, only: &
-  wp, nl, pi, max_char_len, eps
+  wp, nl, pi, one_4pi, max_char_len, eps
 
 use mod_math, only: &
   cross, infinite_plate_spline, tessellate
@@ -1232,12 +1232,12 @@ end select
             call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, str)
             ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            stretch = stretch + str/(4.0_wp*pi)
+            stretch = stretch + str*one_4pi
 
             if(sim_param%use_divfilt) then
               call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
                     wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+              rotu = rotu + ru*one_4pi
 
             endif
           endif
@@ -2448,7 +2448,7 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
     vel = vel + v
   enddo
 
-  vel = vel/(4.0_wp*pi)  
+  vel = vel*one_4pi  
 
 end subroutine compute_vel_from_all
 

@@ -50,7 +50,7 @@
 module mod_post_flowfield_test
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len , pi
+  wp, nl, max_char_len, extended_char_len , pi, one_4pi
 
 use mod_test, only: &
   sim_param
@@ -319,7 +319,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
             enddo
 
             !> + u_inf
-            vel_probe = vel_probe/(4*pi) + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
+            vel_probe = vel_probe*one_4pi + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
           end if
 
           if ( probe_vel ) then

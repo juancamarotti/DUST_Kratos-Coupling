@@ -50,7 +50,7 @@
 module mod_octree_test
 
 use mod_param, only: &
-  wp, nl, pi, max_char_len
+  wp, nl, pi, one_4pi, max_char_len
 
 use mod_math, only: &
   cross
@@ -1136,20 +1136,20 @@ subroutine apply_multipole( part, octree )
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                   %compute_vel(pos, v)
-            vel = vel +v/(4.0_wp*pi)
+            vel = vel +v*one_4pi
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                   %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-              stretch = stretch + str/(4.0_wp*pi)
-              stretch_alone = stretch_alone + str/(4.0_wp*pi)
+              stretch = stretch + str*one_4pi
+              stretch_alone = stretch_alone + str*one_4pi
 !             !removed the parallel component
-!             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+!             stretch = stretch +(str - sum(str*dir)*dir)*one_4pi
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
               if(sim_param%use_divfilt) then
                 call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                     %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  ru)
-                rotu = rotu + ru/(4.0_wp*pi)
+                rotu = rotu + ru*one_4pi
               endif
             endif
             if(sim_param%use_vd) then
@@ -1170,20 +1170,20 @@ subroutine apply_multipole( part, octree )
 
          call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_vel(pos, v)
-         vel = vel +v/(4.0_wp*pi)
+         vel = vel +v*one_4pi
          if(sim_param%use_vs) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-           stretch = stretch + str/(4.0_wp*pi)
-           stretch_alone = stretch_alone + str/(4.0_wp*pi)
+           stretch = stretch + str*one_4pi
+           stretch_alone = stretch_alone + str*one_4pi
 !          !removed the parallel component
-!          stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+!          stretch = stretch +(str - sum(str*dir)*dir)*one_4pi
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
            if(sim_param%use_divfilt) then
              call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
                 %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, ru)
-             rotu = rotu + ru/(4.0_wp*pi)
+             rotu = rotu + ru*one_4pi
            endif
          endif
          if(sim_param%use_vd) then
@@ -1201,20 +1201,20 @@ subroutine apply_multipole( part, octree )
         if (ipp .ne. ip) then
           call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
                                                          v)
-          vel = vel +v/(4.0_wp*pi)
+          vel = vel +v*one_4pi
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                   alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            stretch = stretch + str/(4.0_wp*pi)
-            stretch_alone = stretch_alone + str/(4.0_wp*pi)
+            stretch = stretch + str*one_4pi
+            stretch_alone = stretch_alone + str*one_4pi
 !           !> removed the parallel component ( proj to avoid numerical instability ? )
-!           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+!           stretch = stretch +(str - sum(str*dir)*dir)*one_4pi
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             if(sim_param%use_divfilt) then
               call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_rotu(pos, &
                     alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+              rotu = rotu + ru*one_4pi
             endif
           endif
 

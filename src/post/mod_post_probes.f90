@@ -50,7 +50,7 @@
 module mod_post_probes
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len , pi, ascii_real
+  wp, nl, max_char_len, extended_char_len , pi, one_4pi, ascii_real
 
 use mod_sim_param, only: &
   sim_param
@@ -419,7 +419,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
         do ie = 1 , size( comps(ic)%el )
           call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
-          vel_probe = vel_probe + v/(4*pi)
+          vel_probe = vel_probe + v*one_4pi
 
         end do
 !$omp end parallel do
@@ -428,7 +428,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
         call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
-        vel_probe = vel_probe + v/(4*pi)
+        vel_probe = vel_probe + v*one_4pi
       enddo
 !$omp end parallel do
 

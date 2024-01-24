@@ -585,7 +585,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   nrot = 0; nble = 0
 
   do ib = 1, nb
-    rrb_wei(:,ib) = matmul(coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
+    rrb_wei(:,ib) = matmul(coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1))))
   enddo
 
   ! Loop over all the surface points
@@ -625,14 +625,12 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
         rot_ind(   :,nrot) = ind_v
         rot_span_wei(nrot) = span_wei
 
-        ! *****
         do iw = 1, this%n_wei
           rot_i2h(ind_v(iw)) = rot_i2h(ind_v(iw)) + 1
           rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
           rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
           rot_s2h(ind_v(iw),   rot_i2h(ind_v(iw))) = span_wei
         end do
-        ! *****
 
       elseif (rrb(1,ib) .lt. (this%offset + x_hinge) .and. rrb(1,ib) .gt. (x_hinge - this%offset))  then ! blending region
 
@@ -708,8 +706,8 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   deallocate(rrb, rrh, dist_all, wei_v, ind_v)
   deallocate(rot_node_id, rot_ind, rot_wei, rot_span_wei)
   deallocate(ble_node_id, ble_ind, ble_wei, ble_span_wei)
-  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) ! *****
-  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) ! *****
+  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) 
+  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) 
 
 
 end subroutine build_connectivity_cen
@@ -817,8 +815,6 @@ subroutine init_theta(this, t)
   else
     this%theta_old = 0.0_wp
   end if
-  !this%theta_old = 0.0_wp
-
 
 end subroutine init_theta
 
@@ -903,10 +899,10 @@ subroutine update_theta( this, t )
     !> final value
     elseif ( t .gt. this%f_initial_time +  2.0_wp*pi/this%f_omega*this%f_cosine_cycl) then
       !> check if this%f_cosine_cycl is a multiple of 0.5 (half cycle(s))
-      if (mod(this%f_cosine_cycl, 0.5) == 0.0 .and. modulo(this%f_cosine_cycl, 1.0) /= 0.0) then
+      if (mod(this%f_cosine_cycl, 0.5) .eq. 0.0 .and. modulo(this%f_cosine_cycl, 1.0) .ne. 0.0) then
         this%theta = 2.0_wp * this%f_ampl + this%f_ampl_init
       !> check if this%f_cosine_cycl is a multiple of 1 (full cycle(s))
-      elseif (mod(this%f_cosine_cycl, 1.0_wp) == 0.0  ) then
+      elseif (mod(this%f_cosine_cycl, 1.0_wp) .eq. 0.0  ) then
         this%theta = this%f_ampl_init
       !> otherwise, it takes the last calculated value
       else

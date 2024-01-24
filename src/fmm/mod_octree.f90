@@ -49,7 +49,7 @@
 module mod_octree
 
 use mod_param, only: &
-  wp, nl, pi, max_char_len
+  wp, nl, pi, one_4pi, max_char_len
 
 use mod_math, only: &
   cross
@@ -1263,20 +1263,20 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                   %compute_vel(pos, v)
-            vel = vel +v/(4.0_wp*pi)
+            vel = vel +v*one_4pi
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                   %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-              stretch = stretch + str/(4.0_wp*pi)
-              stretch_alone = stretch_alone + str/(4.0_wp*pi)
+              stretch = stretch + str*one_4pi
+              stretch_alone = stretch_alone + str*one_4pi
 !             !removed the parallel component
-!             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+!             stretch = stretch +(str - sum(str*dir)*dir)*one_4pi
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
               if(sim_param%use_divfilt) then
                 call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                     %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  ru)
-                rotu = rotu + ru/(4.0_wp*pi)
+                rotu = rotu + ru*one_4pi
               endif
             endif
             if(sim_param%use_vd) then
@@ -1297,20 +1297,20 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
 
           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_vel(pos, v)
-          vel = vel +v/(4.0_wp*pi)
+          vel = vel +v*one_4pi
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            stretch = stretch + str/(4.0_wp*pi)
-            stretch_alone = stretch_alone + str/(4.0_wp*pi)
+            stretch = stretch + str*one_4pi
+            stretch_alone = stretch_alone + str*one_4pi
 !           !removed the parallel component
-!           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+!           stretch = stretch +(str - sum(str*dir)*dir)*one_4pi
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             if(sim_param%use_divfilt) then
               call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
                 %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+              rotu = rotu + ru*one_4pi
            endif
          endif
          if(sim_param%use_vd) then
@@ -1328,20 +1328,20 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
         if (ipp .ne. ip) then
           call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
                                                          v)
-          vel = vel +v/(4.0_wp*pi)
+          vel = vel +v*one_4pi
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                   alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            stretch = stretch + str/(4.0_wp*pi)
-            stretch_alone = stretch_alone + str/(4.0_wp*pi)
+            stretch = stretch + str*one_4pi
+            stretch_alone = stretch_alone + str*one_4pi
 !           !> removed the parallel component ( proj to avoid numerical instability ? )
-!           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+!           stretch = stretch +(str - sum(str*dir)*dir)*one_4pi
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             if(sim_param%use_divfilt) then
               call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_rotu(pos, &
                     alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+              rotu = rotu + ru*one_4pi
             endif
           endif
 
@@ -1361,25 +1361,25 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
       !calculate the influence of the solid bodies
       do ie=1,size(elem)
         call elem(ie)%p%compute_vel(pos,  v)
-        vel = vel + v/(4*pi)
+        vel = vel + v*one_4pi
       enddo
 
       ! calculate the influence of the wake panels
       do ie=1,size(wpan)
         call wpan(ie)%p%compute_vel(pos,  v)
-        vel = vel + v/(4*pi)
+        vel = vel + v*one_4pi
       enddo
 
       ! calculate the influence of the wake rings
       do ie=1,size(wrin)
         call wrin(ie)%p%compute_vel(pos,  v)
-        vel = vel+ v/(4*pi)
+        vel = vel+ v*one_4pi
       enddo
 
       !calculate the influence of the end vortex
       do ie=1,size(wvort)
         call wvort(ie)%compute_vel(pos,  v)
-        vel = vel+ v/(4*pi)
+        vel = vel+ v*one_4pi
       enddo
 
       !at last, add the free stream velocity
@@ -1393,19 +1393,19 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
         do ie=1,size(elem)
           call elem(ie)%p%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
-              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+              matmul(transpose(grad_elem),alpha)*one_4pi
         enddo
         ! Influence of the wake panels
         do ie=1,size(wpan)
           call wpan(ie)%p%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
-              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+              matmul(transpose(grad_elem),alpha)*one_4pi
         enddo
         ! Influence of the end vortex
         do ie=1,size(wvort)
           call wvort(ie)%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
-              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+              matmul(transpose(grad_elem),alpha)*one_4pi
         enddo
         stretch = stretch + stretch_elem
       endif
@@ -1485,7 +1485,7 @@ subroutine apply_multipole_panels(octree, elem)
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_vel(pos, v)
-            vel = vel +v/(4.0_wp*pi)
+            vel = vel +v*one_4pi
           enddo
         endif
         endif
@@ -1497,7 +1497,7 @@ subroutine apply_multipole_panels(octree, elem)
 
          call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_vel(pos,  v)
-         vel = vel +v/(4.0_wp*pi)
+         vel = vel +v*one_4pi
        enddo
       enddo
 
@@ -1505,7 +1505,7 @@ subroutine apply_multipole_panels(octree, elem)
       do ipp = 1,octree%leaves(lv)%p%npart
         call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
                                                       v)
-        vel = vel +v/(4.0_wp*pi)
+        vel = vel +v*one_4pi
       enddo
 
       octree%leaves(lv)%p%cell_pans(ip)%p%uvort = &

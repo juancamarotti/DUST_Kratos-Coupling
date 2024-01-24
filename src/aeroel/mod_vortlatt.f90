@@ -68,7 +68,7 @@ use mod_sim_param, only: &
   sim_param
 
 use mod_param, only: &
-  wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
+  wp, pi, one_4pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_math, only: &
   cross, dot, linear_interp 
@@ -699,7 +699,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems)
   do iv=1,size(vort_elems)
 
     call vort_elems(iv)%p%compute_vel(this%cen, vel)
-    this%uvort = this%uvort + vel/(4*pi)
+    this%uvort = this%uvort + vel*one_4pi
 
   enddo
 

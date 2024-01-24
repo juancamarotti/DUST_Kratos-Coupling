@@ -50,7 +50,7 @@
 module mod_wake_test
 
 use mod_param, only: &
-  wp, nl, pi, max_char_len, eps
+  wp, nl, pi, one_4pi, max_char_len, eps
 
 use mod_math, only: &
   cross, infinite_plate_spline, tessellate
@@ -285,12 +285,12 @@ subroutine update_wake(wake, octree)
             call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, str)
             ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            stretch = stretch + str/(4.0_wp*pi)
+            stretch = stretch + str*one_4pi
 
             if(sim_param%use_divfilt) then
               call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
                     wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+              rotu = rotu + ru*one_4pi
             endif
             
           endif
@@ -670,7 +670,7 @@ subroutine compute_vel_from_all(wake, pos, vel)
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v/(4*pi)
+    vel = vel + v*one_4pi
   enddo
 
 end subroutine compute_vel_from_all
