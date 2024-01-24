@@ -1600,7 +1600,7 @@ select case (sim_param%integrator)
     do ip = 1, n_part
       if ( .not. wake%part_p(ip)%p%free) then
         if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
-          q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
+          q_1 = wake%part_p(ip)%p%vel*sim_param%dt*real(sim_param%ndt_update_wake,wp) 
           wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
           
           sigma_dot = 0.0_wp
@@ -1621,7 +1621,7 @@ select case (sim_param%integrator)
           !        wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
           !endif
 
-          alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt 
+          alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt*real(sim_param%ndt_update_wake,wp) 
           alpha_p_1 = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + 1.0_wp/3.0_wp*alpha_q_1  
           if(norm2(alpha_p_1) .ge. sim_param%mag_threshold) then 
             wake%part_p(ip)%p%mag = norm2(alpha_p_1) !> mag
@@ -1674,7 +1674,8 @@ select case (sim_param%integrator)
     do ip = 1, n_part
       if ( .not. wake%part_p(ip)%p%free) then 
         if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small) 
-          q_2 = wake%part_p(ip)%p%vel*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
+          q_2 = wake%part_p(ip)%p%vel*sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
+                5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
           wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2 
 
           sigma_dot = 0.0_wp
@@ -1688,26 +1689,18 @@ select case (sim_param%integrator)
                         * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
           endif
 
-          !add filtering (Pedrizzetti Relaxation)    
-          !if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-          !  wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-          !      filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
-          !      wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
-          !endif 
-
-          alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
+          alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
+                      5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
           alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
 
           if(norm2(alpha_p_2) .ge. sim_param%mag_threshold) then 
             wake%part_p(ip)%p%mag = norm2(alpha_p_2)
             wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag)  
-            !if (ip .eq. 18) then 
-            !    write(*,*) 'stage 2'
-            !    write(*,*) 'wake%part_p(ip)%p%dir', wake%part_p(ip)%p%dir
-            !endif
+
             if(sim_param%use_reformulated) then
               !r_Vortex update
-              r_Vortex_q_2 = sigma_dot * sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
+              r_Vortex_q_2 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
+                              5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
               wake%part_p(ip)%p%r_Vortex = wake%part_p(ip)%p%r_Vortex + 15.0_wp/16.0_wp*r_Vortex_q_2
 
             endif
@@ -1755,7 +1748,8 @@ select case (sim_param%integrator)
                               wake%part_p(ip)%p, vel_in, vel_out)
             wake%part_p(ip)%p%vel = vel_out
           endif
-          q_3 = wake%part_p(ip)%p%vel*sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev 
+          q_3 = wake%part_p(ip)%p%vel*sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
+                153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev 
           pos_p = wake%part_p(ip)%p%cen_prev + 8.0_wp/15.0_wp*q_3 
           sigma_dot = 0.0_wp
           if(sim_param%use_reformulated) then
@@ -1783,7 +1777,8 @@ select case (sim_param%integrator)
             alpha_p_3_dir = alpha_p_3/(alpha_p_3_mag)
             if (sim_param%use_reformulated) then
               !r_Vortex update
-              r_Vortex_q_3 = sigma_dot * sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%r_Vortex_prev
+              r_Vortex_q_3 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
+                              153.0_wp/128.0_wp*wake%part_p(ip)%p%r_Vortex_prev
               r_Vortex_p_3 = wake%part_p(ip)%p%r_Vortex + 8.0_wp/15.0_wp*r_Vortex_q_3
             endif
 
