@@ -236,7 +236,7 @@ real(wp), allocatable             :: jacobi(:,:)
 integer                           :: it_pan, n_pan_te
 
 !> VL viscous correction
-integer                           :: i_el, j_el, k_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
+integer                           :: i_el, j_el, k_el, i_c, i_s, i, sel, i_p, i_c2, i_s2, ih
 integer                           :: it_vl, it_stall
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3), a_v, area_stripe, dforce_stripe(3)
@@ -1104,6 +1104,21 @@ end if
     linsys%A = A_tmp !> restore the A matrix for the next time iteration
   endif !> sim_param%kutta 
 
+!> check normal for hinged surfaces 
+!$omp parallel do private(i_el, ih)
+  do i_el = 1, sel 
+    if (size(geo%components(elems(i_el)%p%comp_id)%hinge) .gt. 0) then 
+      do ih = 1, size(geo%components(elems(i_el)%p%comp_id)%hinge) 
+        if (abs(dot_product( (geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 - &
+                              geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1 ) , &
+                              elems(i_el)%p%nor)) .gt. 1e-2_wp) then
+          elems(i_el)%p%dforce = 0.0_wp 
+          elems(i_el)%p%pres = 0.0_wp
+        endif  
+      enddo   
+    endif 
+  end do 
+!$omp end parallel do 
 
   !> Vl correction for viscous forces 
   if (sim_param%vl_correction) then

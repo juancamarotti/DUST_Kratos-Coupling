@@ -174,7 +174,7 @@ type :: t_hinge
   !> Order of the norm used for computing distance-based weights
   ! *** to do *** hardcoded, so far. Read as an input, with a default value,
   ! equal to 1 (or 2?)
-  integer :: w_order = 1
+  real(wp) :: w_order = 1
 
   !> Type: parametric, from_file
   character(len=max_char_len) :: nodes_input
@@ -589,7 +589,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   enddo
 
   tol = abs(this%ref%rr(2,nh) - this%ref%rr(2,1))/1000.0_wp  !tolerance for the hinge width (relative)
-  
+
   ! Loop over all the surface points
   do ib = 1, nb
 
