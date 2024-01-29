@@ -394,8 +394,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1
             I = I + nnod + 1
           end do
-          ee_virtual = ee
-
           deallocate(nmixed)
 
         else
@@ -403,7 +401,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
             ielem = ielem + 1
             ee(1:nnod,ielem) = int(elemcg(:,idl),4)
           end do
-          ee_virtual = ee
         end if
 
 
@@ -450,9 +447,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
         enddo
 
       enddo
-      ! Virtual mesh
-      allocate(rr_virtual(ndim,nNodesUsed))
-      rr_virtual = rr;
 
     ! No selection of sections performed, read all nodes
     else
@@ -473,16 +467,16 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
         rr(i,:) = coordinateList
 
       enddo
-      ! Virtual mesh
-      allocate(rr_virtual(ndim,nNodes))
-      rr_virtual = rr;
+      
 
     endif
 
   end do ! Loop on zones
   
-
-  
+  ! Virtual mesh
+  allocate(rr_virtual(size(rr,1), size(rr, 2))); rr_virtual = 0.0_wp
+  rr_virtual = rr
+  ee_virtual = ee 
 
 end subroutine read_mesh_cgns
 
