@@ -285,9 +285,9 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
   do i = 1 , this%n_ver
 
     if ( this%n_ver .eq. 3 ) then
-      indp1 = next_tri(i1)
+      indp1 = next_tri(i)
     else if ( this%n_ver .eq. 4 ) then
-      indp1 = next_qua(i1)
+      indp1 = next_qua(i)
     end if
 
     i1 = i
@@ -380,7 +380,7 @@ subroutine linear_potential_calc_doublet(this, TL, TR, pos)
     R2 = norm2( pos - verp(:,indp1) )
     den = R1+R2-this%edge_len(i1)
 
-    if(den < 1e-6_wp .and. sim_param%debug_level .ge. 5) then
+    if(den .lt. 1e-6_wp .and. sim_param%debug_level .ge. 5) then
       write(msg(1),'(A)') 'Too small denominator in &
       &source computation with point projection, using actual &
       &points instead.'
