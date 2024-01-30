@@ -274,9 +274,9 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   r = rr
 
   !Rosenhead
-!  distn = sqrt(r**2+r_vort**2)
-!  c = -1.0_wp/distn**3
-!  d = 3.0_wp/distn**5
+  distn = sqrt(r**2+r_vort**2)
+  c = -1.0_wp/distn**3
+  d = 3.0_wp/distn**5
 
   !Rankine
   !if (r .ge. r_vort) then
@@ -298,9 +298,9 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
 !   d=0.0
 ! endif
   !!High Order Algebraic
-distn = sqrt(r**2+r_vort**2)
-c = -(r**2+2.5_wp*r_vort**2)/distn**5
-d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_vort**2)/distn**7
+! distn = sqrt(r**2+r_vort**2)
+! c = -(r**2+2.5_wp*r_vort**2)/distn**5
+! d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_vort**2)/distn**7
 !
 
 end subroutine
