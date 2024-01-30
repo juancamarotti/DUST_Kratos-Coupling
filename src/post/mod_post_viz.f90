@@ -273,6 +273,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                           .false.)
       i_var = i_var +1
     endif
+    if(out_vrad) then
+      call add_output_var(out_vars(i_var), vort, 'Vortex_Rad', &
+                          .false.)
+      i_var = i_var +1
+    endif
     if(out_vort_vec) then
       call add_output_var(out_vars(i_var), vort, 'Vorticity_Vector', &
                           .false.)
