@@ -1104,14 +1104,17 @@ end if
     linsys%A = A_tmp !> restore the A matrix for the next time iteration
   endif !> sim_param%kutta 
 
-!> check normal for hinged surfaces 
+!> check normal for hinged surfaces: mesure deviation from the reference hinge axis and panel normal
+!  if it is greater than 10 deg, set the pressure and force to zero 
 !$omp parallel do private(i_el, ih)
   do i_el = 1, sel 
     if (size(geo%components(elems(i_el)%p%comp_id)%hinge) .gt. 0) then 
       do ih = 1, size(geo%components(elems(i_el)%p%comp_id)%hinge) 
-        if (abs(dot_product( (geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 - &
-                              geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1 ) , &
-                              elems(i_el)%p%nor)) .gt. 1e-2_wp) then
+        if (abs(dot_product(((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 -  &
+                              geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1)/  & 
+                          abs((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 - &
+                              geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1))) , &
+                              elems(i_el)%p%nor)) .gt. sin(10*pi/180.0_wp)) then
           elems(i_el)%p%dforce = 0.0_wp 
           elems(i_el)%p%pres = 0.0_wp
         endif  
@@ -1120,7 +1123,7 @@ end if
   end do 
 !$omp end parallel do 
 
-  !> Vl correction for viscous forces 
+  !> VL correction for viscous forces 
   if (sim_param%vl_correction) then
     tol = sim_param%vl_tol
     diff = 1.0_wp 

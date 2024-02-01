@@ -277,8 +277,8 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
   real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
   real(wp) :: del , a2del2
 
-  ! del = sim_param % RankineRad
-  del = sim_param % VortexRad
+  del = sim_param % RankineRad
+  !del = sim_param % VortexRad
 
   grad_dou = 0.0_wp
 
@@ -298,7 +298,7 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
 
     R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
     R2 = pos-this%ver(:,i2) ;   a2 = cross( l , R2 )
-    a = norm2(a1)  ! = norm(a2)
+    a = norm2(a1)  
     a2del2 = a**2.0_wp + del**2.0_wp
 
     R1v(:,1) = R1 ;  a1v(:,1) = a1
