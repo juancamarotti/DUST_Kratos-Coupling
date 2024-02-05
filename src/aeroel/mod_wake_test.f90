@@ -369,7 +369,8 @@ subroutine complete_wake(wake, octree)
   integer                               :: n_part, count_free
   real(wp)                              :: vel_in(3), vel_out(3), wind(3), filt_eta
   real(wp)                              :: sigma_dot
-  
+  real(wp), allocatable                 :: alpha_pedrizzetti(:,:)
+
   character(len=max_char_len)           :: msg
   character(len=*), parameter           :: this_sub_name='complete_wake'
 
@@ -456,10 +457,23 @@ select case (sim_param%integrator)
   case('low_storage') ! Low storage Runge-Kutta 
     !> 1st stage
     count_free = 0
+    if(sim_param%use_divfilt) then 
+      allocate(alpha_pedrizzetti(n_part,3)) 
+      alpha_pedrizzetti = 0.0_wp
+    endif
 !$omp parallel do schedule(dynamic,4) private(ip, q_1, alpha_q_1, alpha_p_1, sigma_dot, r_Vortex_q_1)
     do ip = 1, n_part
       if ( .not. wake%part_p(ip)%p%free) then
         if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
+
+          if(sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then 
+            ! In this case (low_storage) the contribution to alpha is calculated
+            ! directly, instead of acting on stretch. Added to alpha_p_3 after 3rd stage
+            alpha_pedrizzetti(ip,:) = (1.0_wp-sim_param%alpha_divfilt)*wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir &
+                                    + sim_param%alpha_divfilt*wake%part_p(ip)%p%mag &
+                                    * wake%part_p(ip)%p%rotu/norm2(wake%part_p(ip)%p%rotu)
+          endif
+
           q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
           wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
           
@@ -472,14 +486,7 @@ select case (sim_param%integrator)
             sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
                         * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
                         * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-          endif
-          !write(*,*) 'ip: ', ip, wake%part_p(ip)%p%stretch
-          !add filtering (Pedrizzetti Relaxation)    
-          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                  filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
-                  wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
-          endif
+          endif        
           !write(*,*) 'ip: ', ip, wake%part_p(ip)%p%stretch
           alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt 
           alpha_p_1 = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + 1.0_wp/3.0_wp*alpha_q_1  
@@ -535,14 +542,6 @@ select case (sim_param%integrator)
                         * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
                         * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
           endif
-
-          !add filtering (Pedrizzetti Relaxation)    
-          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
-                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu)) 
-          endif 
-
           alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt - 5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
           alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
           if(norm2(alpha_p_2) .ge. sim_param%mag_threshold) then 
@@ -599,16 +598,13 @@ select case (sim_param%integrator)
                       * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
                       * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
           endif
-
-          !add filtering (Pedrizzetti Relaxation)
-          if (sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                filt_eta/real(sim_param%ndt_update_wake,wp)*(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir - &
-                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))  
-          endif
-
           alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev  
-          alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3 
+          alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3
+
+          !add Pedrizzetti contribution
+          if(sim_param%use_divfilt) then 
+            alpha_p_3 = alpha_p_3 + alpha_pedrizzetti(ip,:)
+          endif
 
           if(norm2(alpha_p_3) .ge. sim_param%mag_threshold) then
             alpha_p_3_mag = norm2(alpha_p_3)
@@ -650,7 +646,9 @@ select case (sim_param%integrator)
 !$omp end parallel do
 
 wake%n_prt = wake%n_prt - count_free
-
+if(sim_param%use_divfilt) then
+  deallocate(alpha_pedrizzetti)
+endif 
 end select 
 
 end subroutine complete_wake
