@@ -1204,7 +1204,7 @@ subroutine load_components(geo, in_file, out_file, te)
           call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
           call read_hdf5_al(thickness          ,'thickness'       ,geo_loc)
-
+          
           allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
           geo%components(i_comp)%airfoil_list = airfoil_list
           
@@ -2407,7 +2407,9 @@ subroutine create_strip_connectivity(geo)
       comp%n_c = n_c  
 
       allocate(comp%stripe(n_s))
+
       do i_s = 1, n_s
+
         allocate(comp%stripe(i_s)%panels(n_c))
         comp%stripe(i_s)%area = 0.0_wp
         allocate(comp%stripe(i_s)%ver(3,4))
@@ -2429,9 +2431,8 @@ subroutine create_strip_connectivity(geo)
               trim(comp%aero_correction) .eq. 'true') then
 
             comp%stripe(i_s)%n_ver = 4 ! hardcoded, but stripe should be always a quadrilateral element
-            comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
+            comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s)) 
             comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
-            comp%stripe(i_s)%thickness = 0.5_wp * sum(comp%thickness(:,i_s))
             !> stripe verteces 
             comp%stripe(i_s)%ver(:,1) = comp%el(1+(i_s-1)*n_c)%ver(:,1) 
             comp%stripe(i_s)%ver(:,2) = comp%el(1+(i_s-1)*n_c)%ver(:,2)
@@ -2481,6 +2482,8 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%bnorm_cen = cross(comp%stripe(i_s)%tang_cen, comp%stripe(i_s)%nor)
             comp%stripe(i_s)%bnorm_cen = comp%stripe(i_s)%bnorm_cen / norm2(comp%stripe(i_s)%bnorm_cen)
             comp%stripe(i_s)%chord = sum(comp%stripe(i_s)%edge_len((/2,4/)))*0.5_wp
+            
+            comp%stripe(i_s)%thickness = 0.12*comp%stripe(i_s)%chord !> workaround to make it compile 
             
             comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen +  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp

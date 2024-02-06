@@ -190,7 +190,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ref_chord_fr
   real(wp)                                                          :: twist_rad , theta
 
   real(wp)                                                          :: w1 , w2
-  integer                                                           :: i , i1 , i2, j
+  integer                                                           :: i , i1 , i2, j, k, kk
   integer                                                           :: iAirfoil, nAirfoils 
   real(wp) , allocatable                                            :: airfoil_list_actual_s(:)
 
@@ -300,10 +300,10 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ref_chord_fr
   endif
   
   !> first point
-  call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
-                     points(1)%theta , ElType , nelem_chord             , &
-                     type_chord , chord_fraction , ref_chord_fraction   , &
-                     (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section )
+  call define_section(points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
+                      points(1)%theta , ElType , nelem_chord             , &
+                      type_chord , chord_fraction , ref_chord_fraction   , &
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section )
   if (present(thickness)) thickness(1,1) = thickness_section 
   if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
@@ -438,7 +438,6 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ref_chord_fr
     !> i_airfoil_e, normalised_coord_e
     allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
     allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
-
     ! Find normalised_coord_e for ll interpolation ---
     j = 1
     do i = 1 , nelem_span_tot ! loop over the elements in the spanwise direction
@@ -468,12 +467,13 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , nelem_chord, ref_chord_fr
       ! i_airfoil_e and normalised_coord_e (of the edges of the element) for ll interpolation
       i_airfoil_e(1,i) = j
       i_airfoil_e(2,i) = j + 1
-
-      normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(j) ) / &
-                                ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
-      normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(j) ) / &
-                                ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
-
+      
+      k = lines(1)%end_points(1)
+      kk = lines(size(lines))%end_points(2)   
+      normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(k) ) / &
+                                ( airfoil_list_actual_s(kk) - airfoil_list_actual_s(k) )
+      normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(k) ) / &
+                                ( airfoil_list_actual_s(kk) - airfoil_list_actual_s(k) ) 
     end do
   end if
   ! optional output ----
@@ -544,7 +544,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, ElType, &
 
   !>
   integer                                                   :: nAirfoils, iAirfoil
-  integer                                                   :: i, i1, i2, j
+  integer                                                   :: i, i1, i2, j, k, kk
 
   character(len=*), parameter                               :: this_sub_name = 'read_mesh_pointwise_ll'
 
@@ -736,7 +736,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, ElType, &
     if ( trim(points(i)%airfoil) .ne. 'interp' ) nAirfoils = nAirfoils + 1
   end do
 
-  allocate(airfoil_list_actual(  nAirfoils))
+  allocate(airfoil_list_actual(  nAirfoils)) 
   allocate(airfoil_list_actual_s(nAirfoils))
 
   iAirfoil = 0
@@ -748,7 +748,6 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, ElType, &
       airfoil_list_actual(iAirfoil) = trim( points(i)%airfoil )
       airfoil_list_actual_s(iAirfoil) = s_in( i ) ! curvilinear coord. of a sec.
                                                   ! where an airfoil is defined
-
       !> check  if the file containing the .c81 table exists
       call check_file_exists(airfoil_list_actual(iAirfoil), this_sub_name, &
                             this_mod_name)
@@ -788,12 +787,13 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, ElType, &
 
     ! i_airfoil_e and normalised_coord_e (of the edges of the element) for ll interpolation
     i_airfoil_e(1,i) = j
-    i_airfoil_e(2,i) = j + 1
-
-    normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(j) ) / &
-                              ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
-    normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(j) ) / &
-                              ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
+    i_airfoil_e(2,i) = j + 1 
+    k = lines(1)%end_points(1)
+    kk = lines(size(lines))%end_points(2)
+    normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(k) ) / &
+                                ( airfoil_list_actual_s(kk) - airfoil_list_actual_s(k) )
+    normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(k) ) / &
+                                ( airfoil_list_actual_s(kk) - airfoil_list_actual_s(k) ) 
 
   end do
 
@@ -885,7 +885,8 @@ subroutine build_reference_line(mesh_file, npoint_span_tot   , points, lines    
       if ( allocated(s_in_1) ) deallocate(s_in_1) ; allocate(s_in_1(2))
       s_in_1 = (/ 0.0_wp , 1.0_wp /)
       s_in(lines(i)%end_points(2)) = &
-              s_in(lines(i)%end_points(1)) + s_in_1(2) * lines(i)%leng
+              s_in(lines(i)%end_points(1)) + s_in_1(2) * lines(i)%leng 
+      
       !> nor
       if ( allocated(nor_in_1) ) deallocate(nor_in_1) ; allocate(nor_in_1(2,3))
       nor_in_1(1,:) = ref_line_normal(i1,:)
