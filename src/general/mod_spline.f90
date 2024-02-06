@@ -52,7 +52,7 @@ use mod_handling, only: &
   error, warning, info, printout, new_file_unit, check_file_exists
 
 use mod_math, only: &
-  linspace 
+  linspace, geoseries, geoseries_both
 
 use, intrinsic :: ieee_arithmetic
 
@@ -81,7 +81,8 @@ contains
 ! ----------------------------------------------------------------------
 !> build hermite_spline
 subroutine hermite_spline ( mesh_file, spl, nelems , par_tension , par_bias      , &
-                            type_span, rr_spl , nn_spl , &
+                            type_span, r_ib, r_ob, y_refinement,  & 
+                            rr_spl , nn_spl , &
                             ip_spl, ss_spl , &
                             spl_spl, &
                             leng, s_in , nor_in )
@@ -90,6 +91,7 @@ subroutine hermite_spline ( mesh_file, spl, nelems , par_tension , par_bias     
   real(wp)                     , intent(in)    :: par_tension
   real(wp)                     , intent(in)    :: par_bias
   character(len=*)             , intent(in)    :: type_span
+  real(wp)                     , intent(in)    :: r_ib, r_ob, y_refinement
   character(len=*)             , intent(in)    :: mesh_file
   real(wp)                     , intent(out)   :: rr_spl(:,:)
   real(wp)                     , intent(out)   :: nn_spl(:,:)
@@ -103,7 +105,7 @@ subroutine hermite_spline ( mesh_file, spl, nelems , par_tension , par_bias     
   integer :: n_d , n_points , n_splines
   real(wp) , allocatable :: ll(:)  ! useless with this def of %t
 
-  real(wp) , allocatable :: spl_s(:)
+  real(wp) , allocatable :: spl_s(:), divisionIB(:), divisionOB(:)
 
   ! spline reconstruction
   integer , parameter :: n_points1 = 100  ! now hardcoded (pass as a default input)
@@ -259,6 +261,12 @@ subroutine hermite_spline ( mesh_file, spl, nelems , par_tension , par_bias     
     s_spl = 1.0_wp - cos(0.5_wp*(/(real(j,wp) , j = 0, nelems)/)*pi/ real(nelems,wp) )
   elseif ( trim(type_span) .eq. 'equalarea' ) then
     s_spl = sqrt((/(real(j,wp) , j = 0, nelems)/)/real(nelems,wp)) 
+  elseif ( trim(type_span) .eq. 'geoseries' ) then
+    call geoseries_both(0.0_wp, 1.0_wp, nelems, y_refinement, r_ib, r_ob, s_spl)  
+  elseif ( trim(type_span) .eq. 'geoseries_ob' ) then
+    call geoseries(0.0_wp, 1.0_wp, nelems, r_ob, divisionIB, s_spl)
+  elseif ( trim(type_span) .eq. 'geoseries_ib' ) then 
+    call geoseries(0.0_wp, 1.0_wp, nelems, r_ib, s_spl, divisionOB)
   else 
     write(*,*) ' Mesh file   : ' , trim(mesh_file)
     write(*,*) ' type_span   : ' , trim(type_span)

@@ -2353,7 +2353,7 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
           wake%end_pan_idou(wake%pan_neigh(1,iw))
     ave = ave/2.0_wp
   else !has no fixed neighbour
-    if(sim_param%join_te) then
+    if (sim_param%join_te) then
       ave = get_joined_intensity(wake, iw, 1)
     else
       ave = wake%end_pan_idou(iw)
@@ -2385,16 +2385,6 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
   !Calculate the center
   pos_p = sum(vertices,2)/4.0_wp
   
-!  select case(mod(typ,3))
-!    case 1 ! ghost_left
-!      pos_p = pos_p - 
-!  endif
-  !if (iw .eq. 18) then
-  !  write(*,*) 'vertices', vertices(:,1) 
-  !  write(*,*) 'vertices', vertices(:,2)
-  !  write(*,*) 'vertices', vertices(:,3)
-  !  write(*,*) 'vertices', vertices(:,4)
-  !endif 
   ! A = cross product of diagonals       
   area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
               points_end(:,p2)-wake%pan_w_points(:,p1,wake%nmax_pan+1)))
@@ -2405,7 +2395,7 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
   if (present(vertices_out)) then
     vertices_out = vertices
   endif
-              
+  
 end subroutine compute_partvec
 
 !----------------------------------------------------------------------

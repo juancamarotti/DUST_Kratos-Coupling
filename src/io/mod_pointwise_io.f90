@@ -61,6 +61,9 @@ module mod_pointwise_io
 use mod_param, only: &
   wp, max_char_len, nl, pi
 
+use mod_math, only: &
+  geoseries, geoseries_both, geoseries_hinge
+
 use mod_handling, only: &
   error, warning, info, printout, new_file_unit, check_file_exists
 
@@ -72,7 +75,7 @@ use mod_spline, only: &
   t_spline, hermite_spline , deallocate_spline
 
 use mod_parametric_io, only: &
-  define_section , define_division, geoseries, geoseries_both
+  define_section , define_division
 
 !----------------------------------------------------------------------
 
@@ -111,6 +114,9 @@ type :: t_line
   real(wp)                :: tension
   real(wp)                :: bias
   character(max_char_len) :: type_span   ! discretisation in span
+  real(wp)                :: r_ib        ! geometric series parameters
+  real(wp)                :: r_ob
+  real(wp)                :: y_ref 
   real(wp)                :: leng
   integer                 :: neigh_line(2) = 0
   real(wp), allocatable   :: t_vec1(:) , t_vec2(:)
@@ -859,6 +865,9 @@ subroutine build_reference_line(mesh_file, npoint_span_tot   , points, lines    
                           points( lines(i)%end_points(2) )%coord , &
                           lines(i)%nelems                        , &
                           lines(i)%type_span                     , &
+                          lines(i)%r_ib                          , &
+                          lines(i)%r_ob                          , &
+                          lines(i)%y_ref                         , &
                           ref_line_points(i1:i2,:)               , &
                           ref_line_normal(i1:i2,:)               , &
                           ref_line_interp_s(i1:i2)               , &
@@ -912,6 +921,9 @@ subroutine build_reference_line(mesh_file, npoint_span_tot   , points, lines    
                                 lines(i)%tension          , &
                                 lines(i)%bias             , &
                                 lines(i)%type_span        , &
+                                lines(i)%r_ib             , &
+                                lines(i)%r_ob             , &
+                                lines(i)%y_ref            , &
                                 ref_line_points(i1:i2,:)  , &
                                 ref_line_normal(i1:i2,:)  , &
                                 ip                        , &
@@ -959,12 +971,13 @@ end subroutine build_reference_line
 
 !----------------------------------------------------------------------
 !> straight_line subdivision
-subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s , &
-                          leng )
+subroutine straight_line( mesh_file, r1, r2, nelems, type_span, r_ib, r_ob, y_ref, &  
+                          rr, nor, s, leng )
   character(len=*)        , intent(in)    :: mesh_file
   real(wp)                , intent(in)    :: r1(3) , r2(3)
   integer                 , intent(in)    :: nelems
   character(max_char_len) , intent(in)    :: type_span
+  real(wp)                , intent(in)    :: r_ib, r_ob, y_ref
   real(wp)                , intent(inout) :: rr(:,:)
   real(wp)                , intent(inout) ::nor(:,:)
   real(wp)                , intent(inout) ::  s(:)
@@ -983,7 +996,8 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
   do i = 1, nelems + 1
 
     !> rr
-    if ( trim(type_span) .eq. 'uniform' ) then !> uniform spacing
+    if ( trim(type_span) .eq. 'uniform' ) then 
+      ! uniform spacing
       rr(i,:) = r1 + real(i - 1,wp)/real(nelems,wp) * ( r2 - r1 )
     elseif ( trim(type_span) .eq. 'cosine' ) then
       ! cosine  spacing in span
@@ -1006,18 +1020,21 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
       rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
     elseif ( trim(type_span) .eq. 'geoseries') then 
-      call geoseries_both(r1(2), r2(2), nelems, 0.5_wp, 1/10.0_wp, 1/10.0_wp, division) 
-      rr(i,2) = division(i-1) 
+      ! geometric series spacing in span
+      call geoseries_both(r1(2), r2(2), nelems, y_ref, r_ib, r_ob, division) 
+      rr(i,2) = division(i) 
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
       rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
     elseif ( trim(type_span) .eq. 'geoseries_ob') then
-      call geoseries(r1(2), r2(2), nelems, 1/10.0_wp, divisionIB, divisionOB) 
-      rr(i,2) = divisionIB(i-1) 
+      ! geometric series spacing in span: outboard refinement
+      call geoseries(r1(2), r2(2), nelems, r_ob, divisionIB, divisionOB) 
+      rr(i,2) = divisionOB(i)  
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
       rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))  
     elseif ( trim(type_span) .eq. 'geoseries_ib') then
-      call geoseries(r1(2), r2(2), nelems, 1/10.0_wp, divisionIB, divisionOB)  
-      rr(i,2) = divisionOB(i-1) 
+      ! geometric series spacing in span: inboard refinement
+      call geoseries(r1(2), r2(2), nelems, r_ib, divisionIB, divisionOB)  
+      rr(i,2) = divisionIB(i) 
       rr(i,1) = r1(1) + (rr(i,2) - r1(2))*(r2(1) - r1(1))/(r2(2) - r1(2))
       rr(i,3) = r1(3) + (rr(i,2) - r1(2))*(r2(3) - r1(3))/(r2(2) - r1(2))
     else
@@ -1456,6 +1473,22 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
     lines(i)%end_points = getintarray( line_prs , 'end_points' , 2 )
     lines(i)%nelems     = getint(      line_prs , 'Nelems' )
     lines(i)%type_span  = getstr(      line_prs , 'type_span')
+    !> geometric series parameters
+    if ( trim(lines(i)%type_span) .eq. 'geoseries' ) then
+      lines(i)%r_ib = getreal( line_prs , 'r_ib' )
+      lines(i)%r_ob = getreal( line_prs , 'r_ob' )
+      lines(i)%y_ref = getreal( line_prs , 'y_refinement' )
+    elseif ( trim(lines(i)%type_span) .eq. 'geoseries_ob' ) then
+      lines(i)%r_ob = getreal( line_prs , 'r_ob' )
+      lines(i)%y_ref = getreal( line_prs , 'y_refinement' )
+    elseif ( trim(lines(i)%type_span) .eq. 'geoseries_ib' ) then
+      lines(i)%r_ib = getreal( line_prs , 'r_ib' )
+      lines(i)%y_ref = getreal( line_prs , 'y_refinement' )
+    else 
+      lines(i)%r_ib = 0.0_wp
+      lines(i)%r_ob = 0.0_wp
+      lines(i)%y_ref = 0.0_wp
+    end if
 
     !> tension , bias parameters
     if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
@@ -1517,32 +1550,32 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                     multiple=.false.)
       
       !> geometric series parameters 
-    call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '1/8', &
+    call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', '0.125', &
                     multiple=.false.)
 
     call pmesh_prs%CreateRealOption( 'r_le', 'growth ratio of the elements at leading edge', &
-                    '1/7.0', multiple=.false.)
+                    '0.142', multiple=.false.)
 
     call pmesh_prs%CreateRealOption( 'r_te', 'growth ratio of the elements at trailing edge', &
-                    '1/15', multiple=.false.)
+                    '0.067', multiple=.false.)
 
     call pmesh_prs%CreateRealOption( 'r_le_fix', 'growth ratio of the elements at leading edge &
-                    & fixed part', '1/8', multiple=.false.)
+                    & fixed part', '0.125', multiple=.false.)
 
     call pmesh_prs%CreateRealOption( 'r_te_fix', 'growth ratio of the elements at trailing edge &
-                    & fixed part', '1/7.0', multiple=.false.)
+                    & fixed part', '0.142', multiple=.false.)
 
     call pmesh_prs%CreateRealOption( 'r_le_moving', 'growth ratio of the elements at leading edge &
-                    & moving part', '1/7', multiple=.false.)
+                    & moving part', '0.142', multiple=.false.)
 
     call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                    & moving part', '1/7', multiple=.false.) 
+                    & moving part', '0.142', multiple=.false.) 
 
     call pmesh_prs%CreateRealOption( 'r_te_moving', 'growth ratio of the elements at trailing edge & 
-                    & moving part', '1/10', multiple=.false.) 
+                    & moving part', '0.1', multiple=.false.) 
 
     call pmesh_prs%CreateRealOption( 'x_refinement', 'chordwise station to which the refinement start', &
-                    '1/2', multiple=.false.)
+                    '0.5', multiple=.false.)
 
     call pmesh_prs%CreateLogicalOption('airfoil_table_correction', &
                   'include presence of aerodynamic .c81 for corrections', &
@@ -1605,10 +1638,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                 'uniform' ) ! default
 
   !> geo series parameters
-  call line_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
-                multiple=.true.)
-
-  call line_prs%CreateRealOption( 'r_in', 'growth ratio of the elements inboard', &
+  call line_prs%CreateRealOption( 'r_ib', 'growth ratio of the elements inboard', &
                 multiple=.true.)
 
   call line_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &

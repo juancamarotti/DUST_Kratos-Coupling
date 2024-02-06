@@ -1230,7 +1230,7 @@ subroutine build_references(refs, reference_file)
 
                 refs(iref)%axis  = rot_axis
                 refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
-                refs(iref)%Omega = rot_rate
+                refs(iref)%Omega = rot_rate !> rad/s
                 refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_blades-1,wp) &
                                               /real(n_mult_blades,wp)
                 !TODO: check the norm vector to define an origin of the psi angle
