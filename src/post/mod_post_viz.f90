@@ -386,8 +386,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                   'Vorticity',.false.)
           call add_output_var(out_vars_w(i_var), vpvort_v, &
                   'Vorticity',.true.)
-          call add_output_var(out_vars(i_var), vpvort_v, &
-                  ' Vorticity',.true.)
+          !call add_output_var(out_vars(i_var), vpvort_v, &
+          !        ' Vorticity',.true.)
           i_var = i_var +1
         endif
         if(out_vrad) then
@@ -395,8 +395,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                   'VortexRad',.false.)
           call add_output_var(out_vars_w(i_var), v_rad, &
                   'VortexRad',.true.)
-          call add_output_var(out_vars(i_var), v_rad, &
-                  'VortexRad',.true.)
+          !call add_output_var(out_vars(i_var), v_rad, &
+          !        'VortexRad',.true.)
           i_var = i_var +1
         endif
         if (out_dforce) then 
