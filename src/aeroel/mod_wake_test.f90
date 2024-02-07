@@ -471,7 +471,8 @@ select case (sim_param%integrator)
             ! directly, instead of acting on stretch. Added to alpha_p_3 after 3rd stage
             alpha_pedrizzetti(ip,:) = (1.0_wp-sim_param%alpha_divfilt)*wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir &
                                     + sim_param%alpha_divfilt*wake%part_p(ip)%p%mag &
-                                    * wake%part_p(ip)%p%rotu/norm2(wake%part_p(ip)%p%rotu)
+                                    * wake%part_p(ip)%p%rotu/norm2(wake%part_p(ip)%p%rotu) &
+                                    - wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir ! Only the increment is considered
           endif
 
           q_1 = wake%part_p(ip)%p%vel*sim_param%dt 
