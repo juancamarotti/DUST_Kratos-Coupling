@@ -53,7 +53,7 @@ module mod_dust_io_test
 use mod_param, only: &
   wp, max_char_len, nl
 
-use mod_test, only: &
+use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &

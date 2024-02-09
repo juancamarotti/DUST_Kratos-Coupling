@@ -52,7 +52,7 @@ module mod_post_flowfield_test
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi, one_4pi
 
-use mod_test, only: &
+use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &

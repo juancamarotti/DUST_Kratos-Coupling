@@ -156,9 +156,9 @@ subroutine compute_vel_vortpart (this, pos, vel)
 
   !generic
   distn = norm2(dist)
-  call kernel_coeffs(this%r_Vortex, distn, c, d)
-  vel = c * cross(dist, this%dir)*this%mag
+  call kernel_coeffs(this%r_Vortex, distn, c, d) 
 
+  vel = c * cross(dist, this%dir)*this%mag
 
 end subroutine compute_vel_vortpart
 
@@ -194,38 +194,6 @@ subroutine compute_stretch_vortpart (this, pos, alpha, r_Vortex_p, stretch)
   dist = pos-this%cen
   distn = norm2(dist)
   r_ave = (this%r_Vortex + r_Vortex_p)*0.5_wp
-!!  !distn = sqrt(sum(dist**2)+r_Vortex**2) !rosenhead
-!!  !Rankine
-!!  distn = norm2(dist)
-!!  if ( distn .gt. r_Vortex ) then
-!!    Sr  =  1.0_wp / distn**3
-!!    dSr = -3.0_wp / distn**5
-!!  else
-!!    Sr  =  -1.0_wp / (r_Vortex**2*distn)
-!!    dSr =  1.0/ (r_Vortex**2*distn**2)
-!!  end if
-!!  !"original"
-!!  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
-!!  !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
-!!  !     sum(alpha*dist)
-!!  !"original" fixed sign
-!!  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
-!!  !     -3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
-!!  !     sum(alpha*dist)
-!!  !"transpose"
-!!! stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-!!!      +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
-!!
-!!  !stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-!!  !     +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
-!!
-!!  !transpose, rankinezed, old and wrong
-!!  !stretch = -cross(this%dir*this%mag, alpha) * Sr &
-!!  !     -dSr * dist * sum(dist*cross(this%dir*this%mag, alpha))
-!!
-!!  !transpose with rankine
-!!  !vecprod = cross(alpha, this%dir*this%mag)
-!!  !stretch = Sr*vecprod + dSr * dist * sum(dist*vecprod)
 
   !transpose, generic
   vecprod = cross(alpha, this%dir*this%mag)
@@ -259,8 +227,6 @@ subroutine compute_rotu_vortpart (this, pos, alpha, r_Vortex_p, rotu)
   call kernel_coeffs(this%r_Vortex, distn, c, d)
   rotu = -2.0_wp * c * this%dir*this%mag + d * cross(dist, cross(dist, this%dir*this%mag))
 
-
-
 end subroutine compute_rotu_vortpart
 
 !----------------------------------------------------------------------
@@ -271,37 +237,34 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
 
   real(wp) :: distn, r
 
-  r = rr
-
-  !Rosenhead
-!distn = sqrt(r**2+r_vort**2)
-!c = -1.0_wp/distn**3
-!d = 3.0_wp/distn**5
-
-  !Rankine
-  !if (r .ge. r_vort) then
-  !  c = -1.0_wp/r**3
-  !  d = 3.0_wp/r**5
-  !else
-  !  c = -1.0_wp/r_vort**3
-  !  d = 0.0_wp
-  !endif
-
-  !Gaussian from Alvarez
-! if(r.gt.1e-13_wp) then
-! c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3 + &
-!      2.0_wp/(r**2 * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2/(2.0_wp * r_vort**2))
-! d = 3.0_wp/r**5 * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2/(2.0_wp * r_vort**2)) * &
-!     (-6.0_wp/(r**4*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2*r_vort**3*sqrt(2.0_wp*pi)))
-! else
-!   c=0.0
-!   d=0.0
-! endif
-  !!High Order Algebraic
-distn = sqrt(r**2+r_vort**2)
-c = -(r**2+2.5_wp*r_vort**2)/distn**5
-d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_vort**2)/distn**7
-
+  r = rr 
+  if (trim(sim_param%kernel) .eq. 'rosenhead') then
+    distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
+    c = -1.0_wp/distn**3.0_wp
+    d = 3.0_wp/distn**5.0_wp
+  elseif (trim(sim_param%kernel) .eq. 'gaussian') then 
+    if(r.gt.1e-13_wp) then
+      c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3.0_wp + &
+           2.0_wp/(r**2.0_wp * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2.0_wp/(2.0_wp * r_vort**2.0_wp))
+      d = 3.0_wp/r**5.0_wp * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2.0_wp/(2.0_wp * r_vort**2.0_wp)) * &
+          (-6.0_wp/(r**4.0_wp*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2.0_wp*r_vort**3.0_wp*sqrt(2.0_wp*pi)))
+    else
+      c=0.0_wp 
+      d=0.0_wp 
+    endif 
+  elseif (trim(sim_param%kernel) .eq. 'rankine')  then
+    if (r .ge. r_vort) then
+      c = -1.0_wp/r**3.0_wp 
+      d = 3.0_wp/r**5.0_wp
+    else
+      c = -1.0_wp/r_vort**3
+      d = 0.0_wp
+    endif
+  elseif (trim(sim_param%kernel).eq. 'HOA') then 
+    distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
+    c = -(r**2.0_wp + 2.5_wp*r_vort**2.0_wp)/distn**5.0_wp
+    d = -2.0_wp/distn**5.0_wp + 5.0_wp*(r**2.0_wp+2.5_wp*r_vort**2.0_wp)/distn**7.0_wp 
+  endif 
 
 end subroutine
 
@@ -322,14 +285,10 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, volp, diff)
   dist = pos-this%cen
   distn = norm2(dist)
 
-!  volp = 4.0_wp/3.0_wp*pi*r_Vortex_p**3
-!  volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3 
   volq = this%vol
   
   diff = 1.0_wp/(this%r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
                                             *etaeps(distn,this%r_Vortex)
-  !diff = 1/(r_Vortex**2)*( - volq*alpha) &
-  !                                              *etaeps(distn,r_Vortex)
 
 end subroutine compute_diffusion_vortpart
 

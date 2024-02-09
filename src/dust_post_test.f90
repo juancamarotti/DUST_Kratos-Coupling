@@ -51,12 +51,8 @@ program dust_post_test
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
-use mod_test, only: &
-  sim_param
-
 use mod_sim_param, only: &
-  create_param_post
-
+  create_param_post, sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, new_file_unit, &

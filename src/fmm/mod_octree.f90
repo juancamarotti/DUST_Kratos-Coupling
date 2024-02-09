@@ -66,6 +66,9 @@ use mod_aeroel, only: &
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
 
+use mod_vortline, only: &
+  t_vortline
+
 use mod_multipole, only: &
   t_multipole, t_polyexp, t_ker_der, set_multipole_param
 
@@ -1141,7 +1144,7 @@ subroutine apply_multipole(part, octree, elem, wpan, wrin, wvort)
   type(t_pot_elem_p), intent(in)         :: elem(:)
   type(t_pot_elem_p), intent(in)         :: wpan(:)
   type(t_pot_elem_p), intent(in)         :: wrin(:)
-  class(c_elem), intent(in)              :: wvort(:)
+  class(t_vortline), intent(in)          :: wvort(:)
 
   integer                     :: i, j, k, lv, ip, ipp, m, ie, iln
   real(wp)                    :: Rnorm2, vel(3), pos(3), v(3), stretch(3), stretch_alone(3), str(3), alpha(3), dir(3)

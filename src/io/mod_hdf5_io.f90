@@ -274,7 +274,7 @@ subroutine open_hdf5_file(filename, file_id)
   call h5eset_auto_f(err_setting, h5err)
   call h5Fopen_f (filename, H5F_ACC_RDWR_F, file_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
-                             'Problems opening hdf5 file '//filename)
+                            'Problems opening hdf5 file '//filename)
   err_setting=1
   call h5eset_auto_f(err_setting, h5err)
   

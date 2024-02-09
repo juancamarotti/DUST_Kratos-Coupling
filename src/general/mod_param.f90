@@ -89,7 +89,7 @@ character(len=*), parameter :: &
 !----------------------------------------------------------------------
 ! mathematical parameters and usefull constants & arrays
 
-real(wp), parameter :: pi = 4.0_wp * atan(1.0_wp)
+real(wp), parameter :: pi = 4.0_wp*atan(1.0_wp)
 real(wp), parameter :: one_4pi = 1.0_wp / (4.0_wp * pi) ! 1/4pi
 integer, parameter :: prev_tri(3) = (/ 3 , 1 , 2 /)
 integer, parameter :: next_tri(3) = (/ 2 , 3 , 1 /)

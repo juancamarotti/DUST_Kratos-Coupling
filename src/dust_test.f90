@@ -52,8 +52,8 @@ program dust_test
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
-use mod_test, only: &
-  t_sim_param, sim_param, init_sim_param, create_param_test_particle
+use mod_sim_param , only: &
+  init_sim_param_particle, sim_param, t_sim_param, create_param_test_particle
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_basename, &
@@ -83,6 +83,7 @@ use mod_hdf5_io, only: &
 
 use mod_dust_io_test, only: &
   save_status
+
 use mod_octree_test, only: &
   initialize_octree, destroy_octree, sort_particles, t_octree
 
@@ -166,7 +167,7 @@ call prms%read_options(input_file_name, printout_val=.true.)
 !> Initialize all the parameters
 nout = 0  !> Reset the numbering for output files
 output_start = getlogical(prms, 'output_start')
-call init_sim_param(sim_param, prms, nout, output_start) 
+call init_sim_param_particle(sim_param, prms, nout, output_start) 
 
 call read_real_array_from_file (8 , sim_param%particles_file, particlesMat)
 sim_param%part_n0 = size(particlesMat,1)

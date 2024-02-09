@@ -55,7 +55,7 @@ use mod_param, only: &
 use mod_math, only: &
   cross, infinite_plate_spline, tessellate
 
-use mod_test, only: &
+use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &
