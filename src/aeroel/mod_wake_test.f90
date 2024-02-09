@@ -599,7 +599,7 @@ select case (sim_param%integrator)
                       * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
                       * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
           endif
-          alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.8_wp*wake%part_p(ip)%p%stretch_prev  
+          alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%stretch_prev  
           alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3
 
           !add Pedrizzetti contribution
