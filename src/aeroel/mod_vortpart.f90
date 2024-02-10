@@ -235,37 +235,43 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   real(wp), intent(in) :: r_vort, rr
   real(wp), intent(out) :: c,d
 
-  real(wp) :: distn, r
+  real(wp) :: distn, r, a, b
 
   r = rr 
-  if (trim(sim_param%kernel) .eq. 'rosenhead') then
-    distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
-    c = -1.0_wp/distn**3.0_wp
-    d = 3.0_wp/distn**5.0_wp
-  elseif (trim(sim_param%kernel) .eq. 'gaussian') then 
-    if(r.gt.1e-13_wp) then
-      c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3.0_wp + &
-           2.0_wp/(r**2.0_wp * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2.0_wp/(2.0_wp * r_vort**2.0_wp))
-      d = 3.0_wp/r**5.0_wp * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2.0_wp/(2.0_wp * r_vort**2.0_wp)) * &
-          (-6.0_wp/(r**4.0_wp*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2.0_wp*r_vort**3.0_wp*sqrt(2.0_wp*pi)))
-    else
-      c=0.0_wp 
-      d=0.0_wp 
-    endif 
-  elseif (trim(sim_param%kernel) .eq. 'rankine')  then
-    if (r .ge. r_vort) then
-      c = -1.0_wp/r**3.0_wp 
-      d = 3.0_wp/r**5.0_wp
-    else
-      c = -1.0_wp/r_vort**3
-      d = 0.0_wp
-    endif
-  elseif (trim(sim_param%kernel).eq. 'HOA') then 
-    distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
-    c = -(r**2.0_wp + 2.5_wp*r_vort**2.0_wp)/distn**5.0_wp
-    d = -2.0_wp/distn**5.0_wp + 5.0_wp*(r**2.0_wp+2.5_wp*r_vort**2.0_wp)/distn**7.0_wp 
-  endif 
-
+#if(DUST_KERNEL==1)
+  !> Rosenhead
+  distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
+  c = -1.0_wp/distn**3.0_wp
+  d = 3.0_wp/distn**5.0_wp
+#elif(DUST_KERNEL==2) 
+  !> HOA (Winckelmans)
+  distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
+  a = r**2.0_wp + 2.5_wp*r_vort**2.0_wp 
+  b = distn**(-5.0_wp)
+  c = -a*b
+  d = -2.0_wp*distn**5.0_wp + 5.0_wp*a/distn**7.0_wp  
+#endif 
+  
+  !> Other kernels to implement in FMM 
+  !elseif (trim(sim_param%kernel) .eq. 'gaussian') then 
+  !  if(r.gt.1e-13_wp) then
+  !    c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3.0_wp + &
+  !         2.0_wp/(r**2.0_wp * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2.0_wp/(2.0_wp * r_vort**2.0_wp))
+  !    d = 3.0_wp/r**5.0_wp * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2.0_wp/(2.0_wp * r_vort**2.0_wp)) * &
+  !        (-6.0_wp/(r**4.0_wp*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2.0_wp*r_vort**3.0_wp*sqrt(2.0_wp*pi)))
+  !  else
+  !    c=0.0_wp 
+  !    d=0.0_wp 
+  !  endif 
+  !elseif (trim(sim_param%kernel) .eq. 'rankine')  then
+  !  if (r .ge. r_vort) then
+  !    c = -1.0_wp/r**3.0_wp 
+  !    d = 3.0_wp/r**5.0_wp
+  !  else
+  !    c = -1.0_wp/r_vort**3
+  !    d = 0.0_wp
+  !  endif
+  
 end subroutine
 
 !----------------------------------------------------------------------

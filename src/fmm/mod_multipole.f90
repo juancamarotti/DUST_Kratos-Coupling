@@ -395,8 +395,7 @@ subroutine compute_der_ker(this, diff, delta, pexp)
   real(wp) :: kmod, Rnorm2
   real(wp) :: sum1, sum2, sum1_1, sum2_1, sum1_3, sum2_3
   real(wp), allocatable :: bk(:), bk_1(:), bk_3(:)
-  !real(wp) :: diffnor
-
+  
   !> From: Convergence Characteristics and Computational Cost of Two Algebraic Kernels in Vortex Methods
   !> with a Tree-Code Algorithm (WEE 2009)  
   allocate(this%D(3,pexp%n_mon_d(pexp%degree-1))); this%D = 0.0_wp
@@ -409,8 +408,8 @@ subroutine compute_der_ker(this, diff, delta, pexp)
   !Singular
   !Rnorm2 = sum(diff**2) 
   
-  select case(sim_param%kernel)  
-  case ('rosenhead') 
+!> Rosenhead
+#if (DUST_KERNEL==1) 
     do k=0, pexp%degree; do j=0, pexp%degree-k; do i=0, pexp%degree-j-k; 
       kmod = real(k+j+i, wp) 
 
@@ -432,8 +431,9 @@ subroutine compute_der_ker(this, diff, delta, pexp)
                             ((2.0_wp*kmod-1.0_wp)*sum1 - (kmod-1.0_wp)*sum2) !> (2.15)
       endif
     enddo; enddo; enddo
+!> High Order Algebraic (Wilkenmans) 
+#elif(DUST_KERNEL==2) 
 
-  case ('HOA')
     allocate(bk_1(pexp%n_mon)); bk_1 = 0.0_wp
     allocate(bk_3(pexp%n_mon)); bk_3 = 0.0_wp
     
@@ -480,7 +480,7 @@ subroutine compute_der_ker(this, diff, delta, pexp)
       endif 
     enddo; enddo; enddo
     deallocate(bk_1, bk_3)
-  end select
+#endif 
 
   do k=0,pexp%degree-1;  do j=0,pexp%degree-1-k; do i=0,pexp%degree-1-j-k;
     this%D(1,pexp%idx(i,j,k)) = - (1.0_wp+real(i,wp))*bk(pexp%idx(i+1,j,k))
