@@ -1112,9 +1112,10 @@ end if
       do ih = 1, size(geo%components(elems(i_el)%p%comp_id)%hinge) 
         if (abs(dot_product(((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 -  &
                               geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1)/  & 
-                          abs((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 - &
+                          norm2((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 - &
                               geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1))) , &
                               elems(i_el)%p%nor)) .gt. sin(10*pi/180.0_wp)) then
+                                
           elems(i_el)%p%dforce = 0.0_wp 
           elems(i_el)%p%pres = 0.0_wp
         endif  
