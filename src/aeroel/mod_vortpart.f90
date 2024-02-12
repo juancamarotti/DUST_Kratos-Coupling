@@ -232,8 +232,9 @@ end subroutine compute_rotu_vortpart
 !----------------------------------------------------------------------
 !> Compute kernel derivatives coefficients
 subroutine kernel_coeffs(r_vort, rr, c, d)
-  real(wp), intent(in) :: r_vort, rr
-  real(wp), intent(out) :: c,d
+  real(wp), intent(in)  :: r_vort ! vortex radius 
+  real(wp), intent(in)  :: rr ! distance between the two particles
+  real(wp), intent(out) :: c, d ! coefficients
 
   real(wp) :: distn, r, a, b
 
@@ -246,10 +247,8 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
 #elif(DUST_KERNEL==2) 
   !> HOA (Winckelmans)
   distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
-  a = r**2.0_wp + 2.5_wp*r_vort**2.0_wp 
-  b = distn**(-5.0_wp)
-  c = -a*b
-  d = -2.0_wp*distn**5.0_wp + 5.0_wp*a/distn**7.0_wp  
+  c = -(r**2.0_wp + 2.5_wp*r_vort**2.0_wp)/distn**5.0_wp 
+  d = 3.0_wp*(r**2.0_wp + 3.5_wp*r_vort**2.0_wp)/distn**7.0_wp  
 #endif 
   
   !> Other kernels to implement in FMM 
