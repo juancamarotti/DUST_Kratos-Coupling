@@ -292,7 +292,7 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, volp, diff)
 
   volq = this%vol
   
-  diff = 1.0_wp/(this%r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
+  diff = 1.0_wp/(this%r_Vortex**2.0_wp)*(volp*this%dir*this%mag - volq*alpha) &
                                             *etaeps(distn,this%r_Vortex)
 
 end subroutine compute_diffusion_vortpart
@@ -302,10 +302,18 @@ end subroutine compute_diffusion_vortpart
 function etaeps(dist, eps) result(eta)
   real(wp), intent(in) :: dist
   real(wp), intent(in) :: eps
-  real(wp) :: eta
 
-  eta = 105.0_wp/(8.0_wp*pi) / ((dist/eps)**2+1)**(9.0_wp/2.0_wp)
-  eta = eta/(eps**3)
+  real(wp)             :: eta 
+  !> (eq 182 theory manual) 
+#if(DUST_KERNEL==1)
+  !> low order algebraic
+  eta = 15.0_wp/(4.0_wp*pi) / ((dist/eps)**2.0_wp+1.0_wp)**(7.0_wp/2.0_wp)
+#elif(DUST_KERNEL==2) 
+  !> high order algebraic 
+  eta = 105.0_wp/(8.0_wp*pi) / ((dist/eps)**2.0_wp+1.0_wp)**(9.0_wp/2.0_wp)
+#endif
+
+  eta = eta/(eps**3.0_wp)
 
 end function etaeps
 !----------------------------------------------------------------------
