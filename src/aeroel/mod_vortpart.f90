@@ -215,9 +215,9 @@ subroutine compute_rotu_vortpart (this, pos, alpha, r_Vortex_p, rotu)
   real(wp), intent(in) :: alpha(3)
   real(wp), intent(out) :: rotu(3)
   real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
+
   real(wp) :: dist(3), distn, c, d
   real(wp) :: r_ave
-  !TODO: add far field approximations
 
   dist = pos-this%cen
   distn = norm2(dist)
@@ -236,19 +236,25 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   real(wp), intent(in)  :: rr ! distance between the two particles
   real(wp), intent(out) :: c, d ! coefficients
 
-  real(wp) :: distn, r, a, b
+  real(wp) :: distn, r, r_squared, r_vort_squared
 
   r = rr 
 #if(DUST_KERNEL==1)
   !> Rosenhead
-  distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
+  r_squared = r**2.0_wp
+  r_vort_squared = r_vort**2.0_wp
+  distn = sqrt(r_squared + r_vort_squared) 
+  
   c = -1.0_wp/distn**3.0_wp
   d = 3.0_wp/distn**5.0_wp
 #elif(DUST_KERNEL==2) 
   !> HOA (Winckelmans)
-  distn = sqrt(r**2.0_wp+r_vort**2.0_wp)
-  c = -(r**2.0_wp + 2.5_wp*r_vort**2.0_wp)/distn**5.0_wp 
-  d = 3.0_wp*(r**2.0_wp + 3.5_wp*r_vort**2.0_wp)/distn**7.0_wp  
+  r_squared = r**2.0_wp
+  r_vort_squared = r_vort**2.0_wp
+  distn = sqrt(r_squared + r_vort_squared)
+
+  c = -(r_squared + 2.5_wp*r_vort_squared)/distn**5.0_wp 
+  d = 3.0_wp*(r_squared + 3.5_wp*r_vort_squared)/distn**7.0_wp 
 #endif 
   
   !> Other kernels to implement in FMM 

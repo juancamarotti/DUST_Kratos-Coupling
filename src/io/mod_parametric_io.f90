@@ -1595,11 +1595,6 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       allocate(rr(2,(size(rr_geo_up, 2) + size(rr_geo_low, 2) - 1))); rr = 0.0_wp 
       rr(1,:) = (/rr_geo_low(1,1:size(rr_geo_low,2)-1), rr_geo_up(1,1:size(rr_geo_up,2))/) 
       rr(2,:) = (/rr_geo_low(2,1:size(rr_geo_low,2)-1), rr_geo_up(2,1:size(rr_geo_up,2))/)
-      !> check ends
-      rr(1, 1) = 1.0_wp
-      rr(2, 1) = 0.0_wp
-      rr(1, size(rr,2)) = 1.0_wp 
-      rr(2, size(rr,2)) = 0.0_wp  
     elseif (ElType .eq. 'v') then 
       allocate(rr(2,size(rr_geo_mean, 2))); rr = 0.0_wp 
       rr(1,:) = rr_geo_mean(1,:)
@@ -1607,8 +1602,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     endif 
     thickness = maxval(rr(2,:)) - minval(rr(2,:))
   end if !> old format 
-  write(*,*) 'rr(1,:)', rr(1,:)
-  write(*,*) 'rr(2,:)', rr(2,:) 
+
   !> cleanup
   if (allocated(rr_dat))            deallocate(rr_dat) 
   if (allocated(rr_up))             deallocate(rr_up)

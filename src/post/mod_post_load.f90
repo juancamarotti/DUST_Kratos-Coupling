@@ -578,7 +578,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     allocate(vpvort_v(3,size(wvort_read,2))) !vorticity vector 
     do ip = 1,size(vpvort)
       vpvort(ip) = norm2(wvort_read(:,ip))
-      vpvort_v(:,ip) = wvort_read(:,ip)/vpvort(ip)
+      vpvort_v(:,ip) = wvort_read(:,ip)/max(vpvort(ip),1e-10_wp) 
       !write(*,*) 'vorticity vector', vpvort_v(:,ip) !, vpvort(ip)
     enddo
     
