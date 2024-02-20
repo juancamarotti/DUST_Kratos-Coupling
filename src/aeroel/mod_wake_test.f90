@@ -83,7 +83,8 @@ use mod_hdf5_io, only: &
   check_dset_hdf5
 
 use mod_octree_test, only: &
-  t_octree, sort_particles, calculate_multipole, apply_multipole
+  t_octree, sort_particles, calculate_multipole, &
+  apply_multipole, apply_multipole_optimized
 
 use mod_wind, only: &
   variable_wind
@@ -336,7 +337,11 @@ subroutine update_wake(wake, octree)
 
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    call apply_multipole(wake%part_p, octree)
+    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then 
+      call apply_multipole_optimized(wake%part_p, octree)
+    else 
+      call apply_multipole(wake%part_p, octree)
+    endif 
     t1 = dust_time()
     write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
     if(sim_param%debug_level.ge.3) call printout(msg)
@@ -533,7 +538,11 @@ select case (sim_param%integrator)
 !$omp end parallel do
      
     !> 2nd stage 
-    call apply_multipole(wake%part_p, octree) 
+    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then 
+      call apply_multipole_optimized(wake%part_p, octree)
+    else 
+      call apply_multipole(wake%part_p, octree)
+    endif 
 !$omp parallel do schedule(dynamic,4) private(ip, q_2, alpha_q_2, alpha_p_2, sigma_dot, r_Vortex_q_2, r_Vortex_p_2)                        
     do ip = 1, n_part
       if ( .not. wake%part_p(ip)%p%free) then 
@@ -594,7 +603,11 @@ select case (sim_param%integrator)
 !$omp end parallel do
 
     !> 3rd stage 
-    call apply_multipole(wake%part_p, octree)
+    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then 
+      call apply_multipole_optimized(wake%part_p, octree)
+    else 
+      call apply_multipole(wake%part_p, octree)
+    endif 
   
 !$omp parallel do schedule(dynamic,4) private(ip, pos_p, vel_in,vel_out, q_3, &
 !$omp& alpha_q_3, alpha_p_3_mag, alpha_p_3_dir, alpha_p_3, sigma_dot, r_Vortex_q_3, r_Vortex_p_3)         

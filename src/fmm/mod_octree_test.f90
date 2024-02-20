@@ -77,7 +77,7 @@ use mod_wind, only: &
 implicit none
 
 public :: initialize_octree, destroy_octree, sort_particles, t_octree, &
-          calculate_multipole, apply_multipole
+          calculate_multipole, apply_multipole, apply_multipole_optimized
 
           
 
@@ -1255,7 +1255,193 @@ subroutine apply_multipole( part, octree )
   
 end subroutine apply_multipole
 
+subroutine apply_multipole_optimized(part, octree)
+  type(t_vortpart_p), intent(in), target :: part(:)
+  type(t_octree), intent(inout)          :: octree
 
+  integer :: i, j, k, lv, ip, ipp, m, ie, iln
+  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), stretch_alone(3), str(3), alpha(3), dir(3)
+  real(wp), allocatable :: velv(:,:), stretchv(:,:), rotuv(:,:)
+  real(wp) :: grad(3,3)
+  real(t_realtime) :: tsta , tend
+  real(wp) :: turbvisc, ave_ros
+  real(wp) :: rotu(3), ru(3)
+
+  real(wp) :: grad_elem(3,3) , stretch_elem(3)
+
+  tsta = dust_time()
+  !for all the leaves apply the local expansion and then local interactions
+  t0 = dust_time()
+  
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
+!$omp& v, stretch, stretch_alone, str, grad, alpha, dir, velv, stretchv, ave_ros, &
+!$omp& grad_elem, stretch_elem, iln, rotuv, rotu, ru) schedule(dynamic)
+  do lv = 1, octree%nleaves
+    !I am on a leaf, cycle on all the particles inside the leaf
+    allocate(velv(3,octree%leaves(lv)%p%npart),&
+              stretchv(3,octree%leaves(lv)%p%npart), &
+              rotuv(3,octree%leaves(lv)%p%npart))
+
+    ave_ros = 0.0_wp
+
+!$omp simd private(vel, stretch, stretch_alone, str, grad, pos, alpha, dir, m) reduction(+:ave_ros)
+    do ip = 1,octree%leaves(lv)%p%npart
+    if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
+      vel = 0.0_wp
+      stretch = 0.0_wp
+      stretch_alone = 0.0_wp
+      grad = 0.0_wp
+      rotu = 0.0_wp
+      pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
+      alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
+              octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
+
+      !first apply the local multipole expansion
+      do m = 1,size(octree%leaves(lv)%p%mp%b,2)
+        !velocity
+        vel = vel + &
+              octree%leaves(lv)%p%mp%b(:,m)* &
+              product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+        !stretching: grad_ij = d u_j / d x_i (transpose) 
+        grad = grad + octree%leaves(lv)%p%mp%c(:,:,m)* &
+                product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+      enddo
+      velv(:,ip) = vel
+      str = matmul(alpha, transpose(grad))
+      stretch = stretch + str
+      stretchv(:,ip) = stretch
+      rotu(1) = grad(2,3) - grad(3,2)
+      rotu(2) = grad(3,1) - grad(1,3)
+      rotu(3) = grad(1,2) - grad(2,1)
+      rotuv(:,ip) = rotu
+      ave_ros = ave_ros + sum((0.5_wp*(grad+transpose(grad)))**2)
+    endif
+    enddo !ip in the leave
+!$omp end simd
+
+    if(sim_param%use_vd)  then
+      if(octree%leaves(lv)%p%npart .gt. 0) then
+        ave_ros = ave_ros/real(octree%leaves(lv)%p%npart,wp)
+      endif
+      !if(sim_param%use_tv) then
+      !  turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
+      !             sqrt(2.0_wp*ave_ros)
+      !else
+      !  turbvisc = 0.0_wp
+      !endif
+
+    endif
+
+    do ip = 1,octree%leaves(lv)%p%npart
+    if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
+
+      vel = velv(:,ip)
+      stretch = stretchv(:,ip)
+      stretch_alone = stretchv(:,ip)
+      grad = 0.0_wp
+      rotu  = rotuv(:,ip)
+      pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
+      alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
+              octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      !if(sim_param%use_tv) then
+      !  !turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
+      !  !           sqrt(2.0_wp*ave_ros)
+      !  octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = &
+      !                (0.11_wp*octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex)**2 * &
+      !                sqrt(2.0_wp*ave_ros)
+      !else
+        octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = 0.0_wp
+      !endif
+      !octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = ! turbvisc
+
+
+      !then interact with all the neighbouring cell particles
+      do k=-1,1; do j=-1,1; do i=-1,1
+        if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
+          if(octree%leaves(lv)%p%neighbours(i,j,k)%p%active) then
+            do ipp = 1, octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
+              call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                    %compute_quantities(pos, alpha,  octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex , &
+                                        v, str, ru)
+              vel = vel +v*one_4pi
+              stretch = stretch + str*one_4pi
+              stretch_alone = stretch_alone + str*one_4pi
+              rotu = rotu + ru*one_4pi
+              !> diffusion 
+              call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                    %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
+                    octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
+              stretch = stretch +str*(2.0_wp*sim_param%nu_inf + octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)
+            enddo
+          endif
+        endif
+      enddo; enddo; enddo
+
+      !interact with the leaf neighbours
+      do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
+        do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
+          call  octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+                  %compute_quantities(pos, alpha,  octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
+                                      v, str, ru)
+          vel = vel + v*one_4pi
+          stretch = stretch + str*one_4pi
+          stretch_alone = stretch_alone + str*one_4pi
+          rotu = rotu + ru*one_4pi
+          !> diffusion 
+          call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+                %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
+                octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
+          stretch = stretch + str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)
+        enddo
+      enddo
+
+      !finally interact with the particles inside the cell
+      do ipp = 1, octree%leaves(lv)%p%npart
+        if (ipp .ne. ip) then
+          call octree%leaves(lv)%p%cell_parts(ipp)%p%&
+                compute_quantities(pos, alpha,  octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, &
+                                  v, str, ru) 
+          vel = vel + v*one_4pi
+          stretch = stretch + str*one_4pi
+          stretch_alone = stretch_alone + str*one_4pi
+          rotu = rotu + ru*one_4pi
+          !> diffusion 
+          call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
+                alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,&
+                octree%leaves(lv)%p%cell_parts(ip)%p%vol, str)
+          stretch = stretch + str*(2.0_wp*sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)
+        endif
+      enddo
+
+      !at last, add the free stream velocity
+      vel = vel + variable_wind(pos, sim_param%time)
+      octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
+      !evolve the intensity in time
+      octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
+      octree%leaves(lv)%p%cell_parts(ip)%p%stretch_alone = stretch_alone
+      octree%leaves(lv)%p%cell_parts(ip)%p%rotu = rotu
+
+    endif
+    enddo
+    deallocate(velv, stretchv, rotuv)
+  enddo
+!Don't ask me why, but without this pragma it is much faster!
+!$omp end parallel do
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
+  if(sim_param%debug_level.ge.5) call printout(msg)
+  tend = dust_time()
+  octree%t_lv = tend-tsta
+  if(sim_param%use_dyn_layers) then
+    if(real(octree%t_lv/octree%t_mp, wp) .gt. sim_param%LeavesTimeRatio .and. &
+        octree%nlevels .lt. sim_param%NMaxOctreeLevels) then
+      call add_layer(octree)
+    endif
+  endif
+
+end subroutine apply_multipole_optimized
 !----------------------------------------------------------------------
 
 !! DISCONTINUED

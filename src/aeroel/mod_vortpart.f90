@@ -105,12 +105,13 @@ type, extends(c_vort_elem) :: t_vortpart
   
 contains
 
-  procedure, pass(this) :: compute_vel       => compute_vel_vortpart
-  procedure, pass(this) :: compute_grad      => compute_grad_vortpart
-  procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart
-  procedure, pass(this) :: compute_rotu      => compute_rotu_vortpart
-  procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart
-  procedure, pass(this) :: calc_geo_data     => calc_geo_data_vortpart
+  procedure, pass(this) :: compute_vel        => compute_vel_vortpart
+  procedure, pass(this) :: compute_grad       => compute_grad_vortpart
+  procedure, pass(this) :: compute_stretch    => compute_stretch_vortpart
+  procedure, pass(this) :: compute_rotu       => compute_rotu_vortpart
+  procedure, pass(this) :: compute_diffusion  => compute_diffusion_vortpart
+  procedure, pass(this) :: calc_geo_data      => calc_geo_data_vortpart
+  procedure, pass(this) :: compute_quantities => compute_quantities_vortpart 
 
 end type
 
@@ -279,6 +280,34 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   
 end subroutine
 
+
+!> compute quantities of particle (when stretching, divfilter are enabled) 
+subroutine compute_quantities_vortpart (this, pos, alpha, r_Vortex_p, vel, stretch, rotu) 
+  class(t_vortpart), intent(in) :: this
+  real(wp), intent(in)  :: pos(:)
+  real(wp), intent(in)  :: alpha(3)
+  real(wp), intent(in)  :: r_Vortex_p ! vortex rad of the particle p (induced on)
+  
+  real(wp), intent(out) :: vel(3)
+  real(wp), intent(out) :: stretch(3)
+  real(wp), intent(out) :: rotu(3) 
+  real(wp) :: dist(3), distn, c, d, r_ave, vecprod(3) 
+
+  !> calc kernel coeffs (compute only once) 
+  dist = pos-this%cen
+  distn = norm2(dist) 
+  r_ave = (this%r_Vortex + r_Vortex_p)*0.5_wp
+  call kernel_coeffs(this%r_Vortex, distn, c, d)  
+
+  !> compute velocity
+  vel = c * cross(dist, this%dir)*this%mag 
+  !> compute stretching 
+  vecprod = cross(alpha, this%dir*this%mag) 
+  stretch = -( c * vecprod + d * dist * sum(dist*vecprod) ) 
+  !> compute rotu 
+  rotu = -2.0_wp * c * this%dir*this%mag + d * cross(dist, cross(dist, this%dir*this%mag)) 
+
+end subroutine compute_quantities_vortpart
 !----------------------------------------------------------------------
 !> Compute the vorticity diffusion induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)

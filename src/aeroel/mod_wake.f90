@@ -107,7 +107,7 @@ use mod_hdf5_io, only: &
 
 use mod_octree, only: &
   t_octree, sort_particles, calculate_multipole, apply_multipole, &
-  apply_multipole_panels
+  apply_multipole_panels, apply_multipole_optimized
 
 use mod_wind, only: &
   variable_wind
@@ -1175,10 +1175,13 @@ subroutine update_wake(wake, geo, elems, octree)
 
   if (sim_param%use_fmm) then
     t0 = dust_time()
-
-    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then
+      call apply_multipole_optimized(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts)
+    else  
+      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                           wake%end_vorts) 
-    
+    endif 
     if (sim_param%HCAS) then
       do ip = 1, wake%n_prt
         wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
@@ -1571,8 +1574,13 @@ select case (sim_param%integrator)
 !$omp end parallel do
 
     !> 2nd stage 
-    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                        wake%end_vorts)
+    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then
+      call apply_multipole_optimized(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts)
+    else  
+      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts) 
+    endif 
     !> HCAS 
     if (sim_param%HCAS) then
       hcas_vel = get_vel_hcas()
@@ -1640,8 +1648,13 @@ select case (sim_param%integrator)
 !$omp end parallel do
 
     !> 3rd stage 
-    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                        wake%end_vorts)
+    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then
+      call apply_multipole_optimized(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts)
+    else  
+      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                          wake%end_vorts) 
+    endif  
     !> HCAS
     if (sim_param%HCAS) then
       do ip = 1, n_part
