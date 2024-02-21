@@ -102,6 +102,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: r_Vortex_prev
   real(wp) :: r_cutoff
   real(wp) :: vol
+  real(wp) :: parent_id
   
 contains
 

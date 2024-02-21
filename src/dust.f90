@@ -1503,7 +1503,7 @@ end if
       !> Update geometry
       call update_geometry(geo, te, time, .false., .true.)
       if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-        call complete_wake(wake, geo, elems_tot, elems_virtual, te, octree)
+        call complete_wake(wake, geo, elems_tot, elems_virtual, te, octree, it)
       end if
     endif
     t1 = dust_time() 

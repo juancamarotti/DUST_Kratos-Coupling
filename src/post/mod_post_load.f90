@@ -426,7 +426,7 @@ end subroutine load_vl
 !----------------------------------------------------------------------
 
 subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
-                          vpvort_v, v_rad, vpturbvisc)
+                          vpvort_v, v_rad, vp_parentid, vpturbvisc)
   integer(h5loc), intent(in)                   :: floc
   real(wp), allocatable, intent(out)           :: wpoints(:,:)
   integer, allocatable, intent(out)            :: welems(:,:)
@@ -435,7 +435,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
   real(wp), allocatable, intent(out)           :: vpvort(:)
   real(wp), allocatable, intent(out)           :: vpvort_v(:,:)
   real(wp), allocatable, intent(out)           :: v_rad(:)
-
+  real(wp), allocatable, intent(out)           :: vp_parentid(:)
   real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
   
   integer(h5loc)                               :: gloc
@@ -573,6 +573,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
     call read_hdf5_al(v_rad,'VortexRad',gloc)
+    call read_hdf5_al(vp_parentid,'ParentId',gloc)
     if(present(vpturbvisc)) call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
     allocate(vpvort_v(3,size(wvort_read,2))) !vorticity vector 
