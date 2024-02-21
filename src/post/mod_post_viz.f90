@@ -124,7 +124,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   character(len=max_char_len)                               :: filename
   integer(h5loc)                                            :: floc , ploc
   logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
-  logical                                                   :: out_wake, out_surfvel, out_vrad
+  logical                                                   :: out_wake, out_surfvel, out_vrad, out_pid
   logical                                                   :: out_dforce, out_dmom
   logical                                                   :: out_turbvisc
   logical                                                   :: separate_wake
@@ -132,7 +132,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   character(len=max_char_len), allocatable                  :: var_names(:)
   real(wp), allocatable                                     :: points(:,:), points_exp(:,:) , wpoints(:,:)
   real(wp), allocatable                                     :: vppoints(:,:), vpvort(:)
-  real(wp), allocatable                                     :: vpvort_v(:,:), vpturbvisc(:), v_rad(:)
+  real(wp), allocatable                                     :: vpvort_v(:,:), vpturbvisc(:), v_rad(:), vp_parentid(:)
   integer , allocatable                                     :: elems(:,:) , welems(:,:)
   integer                                                   :: nelem , nelem_w, nelem_vp
 
@@ -162,7 +162,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   separate_wake = getlogical(sbprms,'separate_wake')
 
   !Check which variables to analyse
-  out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
+  out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.; out_pid = .false.
   n_var = countoption(sbprms, 'variable')
   
   allocate(var_names(n_var))
@@ -179,6 +179,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_vrad     = isInList('vortex_rad',         var_names)
   out_dforce   = isInList('force',              var_names)  
   out_dmom     = isInList('moment',             var_names)
+  out_pid      = isInList('parent_id',          var_names)
 
   nprint = 0; nprint_w = 0
   if(out_vort)      nprint = nprint+1
@@ -191,6 +192,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_vrad)      nprint = nprint+1
   if(out_dforce)    nprint = nprint+1
   if(out_dmom)      nprint = nprint+1 
+  if(out_pid) nprint = nprint+1
   
   allocate(out_vars(nprint))
   
@@ -319,10 +321,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
         if(out_turbvisc) then
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
-                            vpvort_v, v_rad, vpturbvisc)
+                            vpvort_v, v_rad, vp_parentid, vpturbvisc)
         else
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
-                              vpvort_v, v_rad)
+                              vpvort_v, v_rad, vp_parentid)
         endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
@@ -404,6 +406,15 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                               'Moment',.true.)
           i_var = i_var +1
         endif 
+        if(out_pid) then
+          call add_output_var(out_vars_vp(i_var), vp_parentid, &
+                  'ParentId',.false.)
+          call add_output_var(out_vars_w(i_var), vp_parentid, &
+                  'ParentId',.true.)
+          call add_output_var(out_vars(i_var), vp_parentid, &
+                  'ParentId',.true.)
+          i_var = i_var +1
+        endif
         
         !Output the results (with wake)
         select case (trim(out_frmt))

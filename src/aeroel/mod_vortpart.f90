@@ -94,6 +94,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: rotu(3)
   real(wp) :: r_Vortex
   real(wp) :: r_cutoff
+  real(wp) :: parent_id
   
 contains
 
