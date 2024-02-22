@@ -106,6 +106,7 @@ type t_sim_param
   logical :: output_detailed_geo
 
   !Physical parameters:
+  real(wp) :: altitude 
   !> Free stream pressure
   real(wp) :: P_inf
   !> Free stream density
@@ -162,8 +163,7 @@ type t_sim_param
   !> Trailing edge autoscaling
   logical :: autoscale_te
 
-  !Method parameters
-  character(len=max_char_len) :: kernel 
+  !Method parameters:  
   !> Multiplier for far field threshold computation on doublet
   real(wp) :: FarFieldRatioDoublet
   !> Multiplier for far field threshold computation on sources
@@ -382,7 +382,8 @@ subroutine create_param_main(prms)
   call prms%CreateRealOption('g','rVPM coefficient g','0.2')
 
   !> Integration 
-  call prms%CreateStringOption('integrator','time integrator','euler')  
+  call prms%CreateStringOption('integrator', &
+                            &'integrator solver: Euler or low storage RK','euler')  
   !> Input
   call prms%CreateStringOption('geometry_file','Main geometry definition file')
   call prms%CreateStringOption('reference_file','Reference frames file','no_set')
@@ -402,6 +403,7 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('reset_time','reset the time from previous execution?','F')
   
   !> Parameters: reference conditions 
+  call prms%CreateRealOption('altitude', "Altitude in meters", '0.0')  
   call prms%CreateRealArrayOption('u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
   call prms%CreateRealOption('u_ref', "reference velocity")             
   call prms%CreateRealOption('P_inf', "free stream pressure", '101325')    
@@ -434,7 +436,6 @@ subroutine create_param_main(prms)
 
   !> Regularisation 
   call prms%CreateStringOption('particles_file', 'file with particles initial condition', 'particles.dat') 
-  call prms%CreateStringOption('kernel','Kernel for the regularisation','rosenhead') ! HOA or rosenhead
   call prms%CreateRealOption('far_field_ratio_doublet', &
         "Multiplier for far field threshold computation on doublet", '10.0')
   call prms%CreateRealOption('far_field_ratio_source', &
@@ -727,7 +728,6 @@ subroutine create_param_test_particle(prms)
   call prms%CreateRealOption('mag_threshold', "Minimum particle magnitude allowed", '1.0e-9')
 
   !> Regularisation 
-  call prms%CreateStringOption('kernel','Kernel for the regularisation','rosenhead') ! HOA or rosenhead
   call prms%CreateRealOption('rankine_rad', &
         "Radius of Rankine correction for vortex induction near core", '0.1')
   call prms%CreateRealOption('vortex_rad', &
@@ -772,13 +772,13 @@ subroutine create_param_test_particle(prms)
             & eliminated','3.0')
 
   !> Reformulated formulation                                         
-  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','F')
+  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','T')
   call prms%CreateRealOption('f','rVPM coefficient f','0.0')
   call prms%CreateRealOption('g','rVPM coefficient g','0.2')
 
   !> Integrators
   call prms%CreateStringOption('integrator', 'integrator solver: Euler or low storage RK', &
-                              'Euler') 
+                              'euler') 
 
 
 end subroutine create_param_test_particle   
@@ -794,20 +794,26 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   character(len=*), parameter :: this_sub_name = 'init_sim_param'
   
   !> Timing
-  sim_param%t0                  = getreal(prms, 'tstart')
-  sim_param%tend                = getreal(prms, 'tend')
-  sim_param%dt_out              = getreal(prms,'dt_out')
-  sim_param%debug_level         = getint(prms, 'debug_level')
-  sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
-  sim_param%ndt_update_wake     = getint(prms, 'ndt_update_wake')
+  sim_param%t0                  = getreal(prms,     'tstart')
+  sim_param%tend                = getreal(prms,     'tend')
+  sim_param%dt_out              = getreal(prms,     'dt_out')
+  sim_param%debug_level         = getint(prms,      'debug_level')
+  sim_param%output_detailed_geo = getlogical(prms,  'output_detailed_geo')
+  sim_param%ndt_update_wake     = getint(prms,      'ndt_update_wake')
   
   !> Integration
-  sim_param%integrator          = getstr(prms, 'integrator') 
-  !> Reference environment values
-  sim_param%P_inf               = getreal(prms,'P_inf')
-  sim_param%rho_inf             = getreal(prms,'rho_inf')
-  sim_param%a_inf               = getreal(prms,'a_inf')
-  sim_param%mu_inf              = getreal(prms,'mu_inf')
+  sim_param%integrator          = getstr(prms,  'integrator') 
+  !> Reference environment values 
+  sim_param%altitude            = getreal(prms, 'altitude') 
+  if (sim_param%altitude .ne. 0.0_wp) then
+    call standard_atmosphere(sim_param) 
+  else
+    sim_param%P_inf               = getreal(prms, 'P_inf')
+    sim_param%rho_inf             = getreal(prms, 'rho_inf')
+    sim_param%a_inf               = getreal(prms, 'a_inf')
+    sim_param%mu_inf              = getreal(prms, 'mu_inf')
+  endif 
+
   sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
   sim_param%u_inf               = getrealarray(prms, 'u_inf', 3)
   
@@ -824,16 +830,16 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   end if
   
   !> Wake parameters
-  sim_param%n_wake_panels         = getint(prms, 'n_wake_panels')
-  sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
-  sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
-  sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
-  sim_param%mag_threshold         = getreal(prms, 'mag_threshold')
-  sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
+  sim_param%n_wake_panels         = getint(prms,      'n_wake_panels')
+  sim_param%n_wake_particles      = getint(prms,      'n_wake_particles')
+  sim_param%particles_box_min     = getrealarray(prms,'particles_box_min',3)
+  sim_param%particles_box_max     = getrealarray(prms,'particles_box_max',3)
+  sim_param%mag_threshold         = getreal(prms,     'mag_threshold')
+  sim_param%rigid_wake            = getlogical(prms,  'rigid_wake')
   sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
   sim_param%refine_wake           = getlogical(prms,  'refine_wake')
   sim_param%k_refine              = getint(prms,      'k_refine')
-  sim_param%tol_refine            = getreal(prms,      'tol_refine')
+  sim_param%tol_refine            = getreal(prms,     'tol_refine')
   sim_param%interpolate_wake      = getlogical(prms,  'interpolate_wake')
   sim_param%autoscale_te          = getlogical(prms,  'autoscale_te')
   !> Check on wake refinement
@@ -870,7 +876,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%ReferenceFile         = getstr(prms, 'reference_file')
 
   !> Method parameters
-  sim_param%kernel                = getstr(prms,     'kernel')
   sim_param%FarFieldRatioDoublet  = getreal(prms,    'far_field_ratio_doublet')
   sim_param%FarFieldRatioSource   = getreal(prms,    'far_field_ratio_source')
   sim_param%DoubletThreshold      = getreal(prms,    'doublet_threshold')
@@ -1260,7 +1265,6 @@ subroutine init_sim_param_particle(sim_param, prms, nout, output_start)
   endif
 
   !> Method parameters
-  sim_param%kernel                = getstr(prms,     'kernel')     
   sim_param%RankineRad            = getreal(prms,    'rankine_rad')
   sim_param%VortexRad             = getreal(prms,    'vortex_rad')
   sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
@@ -1315,6 +1319,37 @@ subroutine init_sim_param_particle(sim_param, prms, nout, output_start)
   sim_param%ndt_update_wake       = 1
 
 end subroutine init_sim_param_particle 
+
+subroutine standard_atmosphere(sim_param)
+  class(t_sim_param), intent(inout) :: sim_param 
+  real(wp), parameter :: P0    = 101325.0_wp ! Sea-level standard atmospheric pressure (Pa)
+  real(wp), parameter :: L     = 6.5_wp      ! Temperature lapse rate (K/km)
+  real(wp), parameter :: T0    = 288.15_wp   ! Sea-level standard temperature (K)
+  real(wp), parameter :: g     = 9.80665_wp  ! Acceleration due to gravity (m/s^2)
+  real(wp), parameter :: M     = 0.0289644_wp! Molar mass of Earth's air (kg/mol)
+  real(wp), parameter :: R     = 8.31447_wp  ! Universal gas constant (J/(mol·K))
+  real(wp), parameter :: gamma = 1.4_wp      ! Adiabatic index for air
+  real(wp) :: T, h
+
+  !> altitude in (m) 
+  h = sim_param%altitude 
+
+  ! Calculate temperature at altitude h (K)
+  T = T0 - L * h
+
+  ! Calculate pressure using the standard atmosphere model equation
+  sim_param%P_inf = P0 * (1.0_wp - (L * h) / T0)**(g * M / (R * L))
+
+  ! Calculate density using the ideal gas law (kg/m^3) 
+  sim_param%rho_inf = sim_param%P_inf * M / (R * T)
+
+  ! Calculate sound speed (m/s)
+  sim_param%a_inf = sqrt(gamma * R * T)
+
+  ! Calculate viscosity (approximately proportional to temperature)
+  sim_param%mu_inf = T / T0 * 1.7894e-5_wp ! Viscosity at sea level (Pa·s)
+
+end subroutine standard_atmosphere
 
 subroutine save_sim_param(this, loc)
   class(t_sim_param) :: this

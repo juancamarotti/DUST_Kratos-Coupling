@@ -336,6 +336,12 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
     $\tau$: Time at which the gust starts. 
 \end{itemize}
 
+\item \param{altitude}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 0 \textit{type:} real.
+
+Altidude in meters: if different from 0, then the other quantities ($P_\infty$, $\rho_\infty$, $a_\infty$, $\mu_\infty$) 
+are computed using the standard atmosphere model. 
+
 \item \param{P\_inf}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 101325.0 \textit{type:} real.
 
