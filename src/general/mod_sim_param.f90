@@ -106,7 +106,10 @@ type t_sim_param
   logical :: output_detailed_geo
 
   !Physical parameters:
+  !> Altitude
   real(wp) :: altitude 
+  !> Units of the input data
+  character(len=max_char_len) :: units 
   !> Free stream pressure
   real(wp) :: P_inf
   !> Free stream density
@@ -403,7 +406,8 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('reset_time','reset the time from previous execution?','F')
   
   !> Parameters: reference conditions 
-  call prms%CreateRealOption('altitude', "Altitude in meters", '0.0')  
+  call prms%CreateRealOption('altitude', "Altitude in meters", '0.0') 
+  call prms%CreateStringOption('units', "units of the input data", 'SI')  
   call prms%CreateRealArrayOption('u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
   call prms%CreateRealOption('u_ref', "reference velocity")             
   call prms%CreateRealOption('P_inf', "free stream pressure", '101325')    
@@ -805,6 +809,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%integrator          = getstr(prms,  'integrator') 
   !> Reference environment values 
   sim_param%altitude            = getreal(prms, 'altitude') 
+  sim_param%units               = getstr(prms,  'units')
   if (sim_param%altitude .ne. 0.0_wp) then
     call standard_atmosphere(sim_param) 
   else
@@ -1322,17 +1327,36 @@ end subroutine init_sim_param_particle
 
 subroutine standard_atmosphere(sim_param)
   class(t_sim_param), intent(inout) :: sim_param 
-  real(wp), parameter :: P0    = 101325.0_wp ! Sea-level standard atmospheric pressure (Pa)
-  real(wp), parameter :: L     = 6.5_wp      ! Temperature lapse rate (K/km)
-  real(wp), parameter :: T0    = 288.15_wp   ! Sea-level standard temperature (K)
-  real(wp), parameter :: g     = 9.80665_wp  ! Acceleration due to gravity (m/s^2)
-  real(wp), parameter :: M     = 0.0289644_wp! Molar mass of Earth's air (kg/mol)
-  real(wp), parameter :: R     = 8.31447_wp  ! Universal gas constant (J/(mol·K))
-  real(wp), parameter :: gamma = 1.4_wp      ! Adiabatic index for air
+
+  real(wp) :: P0    ! Sea-level standard atmospheric pressure (Pa) or (lbf/ft^2)
+  real(wp) :: L     ! Temperature lapse rate (K/m) or (R/ft)
+  real(wp) :: T0    ! Sea-level standard temperature (K) or (R)
+  real(wp) :: g     ! Acceleration due to gravity (m/s^2) or (ft/s^2)
+  real(wp) :: M     ! Molar mass of Earth's air (kg/mol) or (lb/mol)
+  real(wp) :: R     ! Universal gas constant (J/(mol·K)) or (ft·lbf/(lb·mol·R))
+  real(wp) :: gamma ! Adiabatic index for air
   real(wp) :: T, h
 
-  !> altitude in (m) 
-  h = sim_param%altitude 
+  select case(sim_param%units)
+    case('SI')
+      P0    = 101325.0_wp 
+      L     = 6.5e-3_wp 
+      T0    = 288.15_wp   
+      g     = 9.80665_wp  
+      M     = 0.0289644_wp
+      R     = 8.31447_wp  
+    case('imperial')
+      P0    = 2116.22_wp  
+      L     = 3.6e-3_wp 
+      T0    = 518.67_wp   
+      g     = 32.1740_wp  
+      M     = 0.0289644_wp
+      R     = 1545.35_wp  
+  end select
+
+  gamma = 1.4_wp      ! Adiabatic index for air
+  !> altitude in (ft)
+  h = sim_param%altitude
 
   ! Calculate temperature at altitude h (K)
   T = T0 - L * h
@@ -1347,7 +1371,12 @@ subroutine standard_atmosphere(sim_param)
   sim_param%a_inf = sqrt(gamma * R * T)
 
   ! Calculate viscosity (approximately proportional to temperature)
-  sim_param%mu_inf = T / T0 * 1.7894e-5_wp ! Viscosity at sea level (Pa·s)
+  select case (sim_param%units)
+    case('SI')
+      sim_param%mu_inf = T / T0 * 1.7894e-5_wp ! Viscosity at sea level (Pa·s)
+    case('imperial')
+      sim_param%mu_inf = T / T0 * 3.737e-7_wp ! Viscosity at sea level (lb/(ft·s))
+  end select
 
 end subroutine standard_atmosphere
 
