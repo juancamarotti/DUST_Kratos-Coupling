@@ -1330,7 +1330,7 @@ subroutine standard_atmosphere(sim_param)
 
   real(wp) :: P0    ! Sea-level standard atmospheric pressure (Pa) or (lbf/ft^2)
   real(wp) :: L     ! Temperature lapse rate (K/m) or (R/ft)
-  real(wp) :: T0    ! Sea-level standard temperature (K) or (R)
+  real(wp) :: T0    ! Sea-level standard temperature (Kelvin) or (Rankine)
   real(wp) :: g     ! Acceleration due to gravity (m/s^2) or (ft/s^2)
   real(wp) :: M     ! Molar mass of Earth's air (kg/mol) or (lb/mol)
   real(wp) :: R     ! Universal gas constant (J/(mol·K)) or (ft·lbf/(lb·mol·R))
@@ -1355,19 +1355,20 @@ subroutine standard_atmosphere(sim_param)
   end select
 
   gamma = 1.4_wp      ! Adiabatic index for air
-  !> altitude in (ft)
+
+  !> altitude (m) or (ft)
   h = sim_param%altitude
 
-  ! Calculate temperature at altitude h (K)
+  ! Calculate temperature at altitude h (K) or (R)
   T = T0 - L * h
 
-  ! Calculate pressure using the standard atmosphere model equation
+  ! Calculate pressure using the standard atmosphere model equation (Pa) or (lbf/ft^2)
   sim_param%P_inf = P0 * (1.0_wp - (L * h) / T0)**(g * M / (R * L))
 
-  ! Calculate density using the ideal gas law (kg/m^3) 
+  ! Calculate density using the ideal gas law (kg/m^3) or (slug/ft^3)
   sim_param%rho_inf = sim_param%P_inf * M / (R * T)
 
-  ! Calculate sound speed (m/s)
+  ! Calculate sound speed (m/s) or (ft/s)
   sim_param%a_inf = sqrt(gamma * R * T)
 
   ! Calculate viscosity (approximately proportional to temperature)
@@ -1384,95 +1385,95 @@ subroutine save_sim_param(this, loc)
   class(t_sim_param) :: this
   integer(h5loc), intent(in) :: loc
 
-  call write_hdf5_attr(this%t0, 't0', loc)
-  call write_hdf5_attr(this%dt, 'dt', loc)
-  call write_hdf5_attr(this%tend, 'tend', loc)
+  call write_hdf5_attr(this%t0,                  't0'                 , loc)
+  call write_hdf5_attr(this%dt,                  'dt'                 , loc)
+  call write_hdf5_attr(this%tend,                'tend'               , loc)
   call write_hdf5_attr(this%output_detailed_geo, 'output_detailed_geo', loc)
-  call write_hdf5_attr(this%P_inf, 'P_inf', loc)
-  call write_hdf5_attr(this%rho_inf, 'rho_inf', loc)
-  call write_hdf5_attr(this%u_inf, 'u_inf', loc)
-  call write_hdf5_attr(this%u_ref, 'u_ref', loc)
-  call write_hdf5_attr(this%a_inf, 'a_inf', loc)
-  call write_hdf5_attr(this%mu_inf, 'mu_inf', loc)
+  call write_hdf5_attr(this%P_inf,               'P_inf'              , loc)
+  call write_hdf5_attr(this%rho_inf,             'rho_inf'            , loc)
+  call write_hdf5_attr(this%u_inf,               'u_inf'              , loc)
+  call write_hdf5_attr(this%u_ref,               'u_ref'              , loc)
+  call write_hdf5_attr(this%a_inf,               'a_inf'              , loc)
+  call write_hdf5_attr(this%mu_inf,              'mu_inf'             , loc)
   call write_hdf5_attr(this%first_panel_scaling, 'first_panel_scaling', loc)
-  call write_hdf5_attr(this%min_vel_at_te, 'min_vel_at_te', loc)
-  call write_hdf5_attr(this%rigid_wake, 'rigid_wake', loc)
+  call write_hdf5_attr(this%min_vel_at_te,       'min_vel_at_te'      , loc)
+  call write_hdf5_attr(this%rigid_wake,          'rigid_wake'         , loc)
   if(this%rigid_wake) &
-    call write_hdf5_attr(this%rigid_wake_vel, 'rigid_wake_vel', loc)
-  call write_hdf5_attr(this%n_wake_panels, 'n_wake_panels', loc)
-  call write_hdf5_attr(this%n_wake_particles, 'n_wake_particles', loc)
-  call write_hdf5_attr(this%particles_box_min, 'particles_box_min', loc)
-  call write_hdf5_attr(this%particles_box_max, 'particles_box_max', loc)
-  call write_hdf5_attr(this%mag_threshold, 'mag_threshold', loc)
+    call write_hdf5_attr(this%rigid_wake_vel,    'rigid_wake_vel'     , loc)
+  call write_hdf5_attr(this%n_wake_panels,       'n_wake_panels'      , loc)
+  call write_hdf5_attr(this%n_wake_particles,    'n_wake_particles'   , loc)
+  call write_hdf5_attr(this%particles_box_min,   'particles_box_min'  , loc)
+  call write_hdf5_attr(this%particles_box_max,   'particles_box_max'  , loc)
+  call write_hdf5_attr(this%mag_threshold,       'mag_threshold'      , loc)
 
-  call write_hdf5_attr(this%join_te, 'join_te', loc)
+  call write_hdf5_attr(this%join_te,             'join_te'            , loc)
   if(this%join_te) &
-    call write_hdf5_attr(this%join_te_factor, 'join_te_factor', loc)
+    call write_hdf5_attr(this%join_te_factor,    'join_te_factor'     , loc)
 
 
   call write_hdf5_attr(this%FarFieldRatioDoublet, 'FarFieldRatioDoublet', loc)
-  call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
-  call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
-  call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
-  call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
-  call write_hdf5_attr(this%KVortexRad, 'KVortexRad', loc)
-  call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
-  call write_hdf5_attr(this%use_vs, 'Vortstretch', loc)
+  call write_hdf5_attr(this%FarFieldRatioSource,  'FarFieldRatioSource' , loc)
+  call write_hdf5_attr(this%DoubletThreshold,     'DoubletThreshold'    , loc)
+  call write_hdf5_attr(this%RankineRad,           'RankineRad'          , loc)
+  call write_hdf5_attr(this%VortexRad,            'VortexRad'           , loc)
+  call write_hdf5_attr(this%KVortexRad,           'KVortexRad'          , loc)
+  call write_hdf5_attr(this%CutoffRad,            'CutoffRad'           , loc)
+  call write_hdf5_attr(this%use_vs,               'Vortstretch'         , loc)
   if(this%use_vs) then
-    call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
-    call write_hdf5_attr(this%use_divfilt, 'DivergenceFiltering', loc)
-    call write_hdf5_attr(this%alpha_divfilt, 'AlphaDivFilt', loc)
+    call write_hdf5_attr(this%vs_elems,           'VortstretchFromElems', loc)
+    call write_hdf5_attr(this%use_divfilt,        'DivergenceFiltering' , loc)
+    call write_hdf5_attr(this%alpha_divfilt,      'AlphaDivFilt'        , loc)
   endif
-  call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
-  call write_hdf5_attr(this%use_tv, 'turbvort', loc)
-  call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
+  call write_hdf5_attr(this%use_vd,               'vortdiff'            , loc)
+  call write_hdf5_attr(this%use_tv,               'turbvort'            , loc)
+  call write_hdf5_attr(this%use_pa,               'PenetrationAvoidance', loc)
   if(this%use_pa) then
-    call write_hdf5_attr(this%pa_rad_mult, 'PenetrationAvoidanceCheckRadius', loc)
-    call write_hdf5_attr(this%pa_elrad_mult, 'PenetrationAvoidanceElementRadius', loc)
+    call write_hdf5_attr(this%pa_rad_mult,        'PenetrationAvoidanceCheckRadius', loc)
+    call write_hdf5_attr(this%pa_elrad_mult,      'PenetrationAvoidanceElementRadius', loc)
   endif
-  call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
-  call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
+  call write_hdf5_attr(this%use_ve,               'ViscosityEffects', loc)
+  call write_hdf5_attr(this%use_fmm,              'use_fmm', loc)
   if(this%use_fmm) then
-    call write_hdf5_attr(this%use_fmm_pan, 'use_fmm_panels', loc)
-    call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)
-    call write_hdf5_attr(this%Nbox, 'Nbox', loc)
-    call write_hdf5_attr(this%OctreeOrigin, 'OctreeOrigin', loc)
-    call write_hdf5_attr(this%NOctreeLevels, 'NOctreeLevels', loc)
-    call write_hdf5_attr(this%MinOctreePart, 'MinOctreePart', loc)
-    call write_hdf5_attr(this%MultipoleDegree, 'MultipoleDegree', loc)
-    call write_hdf5_attr(this%use_dyn_layers, 'use_dyn_layers', loc)
+    call write_hdf5_attr(this%use_fmm_pan,         'use_fmm_panels', loc)
+    call write_hdf5_attr(this%BoxLength,           'BoxLength', loc)
+    call write_hdf5_attr(this%Nbox,                'Nbox', loc)
+    call write_hdf5_attr(this%OctreeOrigin,        'OctreeOrigin', loc)
+    call write_hdf5_attr(this%NOctreeLevels,       'NOctreeLevels', loc)
+    call write_hdf5_attr(this%MinOctreePart,       'MinOctreePart', loc)
+    call write_hdf5_attr(this%MultipoleDegree,     'MultipoleDegree', loc)
+    call write_hdf5_attr(this%use_dyn_layers,      'use_dyn_layers', loc)
     if(this%use_dyn_layers) then
-      call write_hdf5_attr(this%NMaxOctreeLevels, 'NMaxOctreeLevels', loc)
-      call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
+      call write_hdf5_attr(this%NMaxOctreeLevels,  'NMaxOctreeLevels', loc)
+      call write_hdf5_attr(this%LeavesTimeRatio,   'LeavesTimeRatio', loc)
     endif
-    call write_hdf5_attr(this%use_pr, 'ParticlesRedistribution', loc)
+    call write_hdf5_attr(this%use_pr,              'ParticlesRedistribution', loc)
     if(this%use_pr) then
-      call write_hdf5_attr(this%lvl_solid, 'OctreeLevelSolid', loc)
+      call write_hdf5_attr(this%lvl_solid,         'OctreeLevelSolid', loc)
       call write_hdf5_attr(this%part_redist_ratio, &
-                                          'ParticlesRedistributionRatio', loc)
+                                                  'ParticlesRedistributionRatio', loc)
     endif
   endif
-   
-  call write_hdf5_attr(this%use_reformulated, 'use_reformulated', loc)
+
+  call write_hdf5_attr(this%use_reformulated,     'use_reformulated', loc)
   if(this%use_reformulated) then
     call write_hdf5_attr(this%f, 'f', loc)
     call write_hdf5_attr(this%g, 'g', loc)
   endif
 
-  call write_hdf5_attr(this%debug_level, 'debug_level', loc)
-  call write_hdf5_attr(this%dt_out, 'dt_out', loc)
-  call write_hdf5_attr(this%basename, 'basename', loc)
-  call write_hdf5_attr(this%GeometryFile, 'GeometryFile', loc)
-  call write_hdf5_attr(this%ReferenceFile, 'ReferenceFile', loc)
-  call write_hdf5_attr(this%restart_from_file, 'restart_from_file', loc)
+  call write_hdf5_attr(this%debug_level,          'debug_level', loc)
+  call write_hdf5_attr(this%dt_out,               'dt_out', loc)
+  call write_hdf5_attr(this%basename,             'basename', loc)
+  call write_hdf5_attr(this%GeometryFile,         'GeometryFile', loc)
+  call write_hdf5_attr(this%ReferenceFile,        'ReferenceFile', loc)
+  call write_hdf5_attr(this%restart_from_file,    'restart_from_file', loc)
   if(this%restart_from_file) then
-    call write_hdf5_attr(this%restart_file, 'restart_file', loc)
-    call write_hdf5_attr(this%reset_time, 'reset_time', loc)
+    call write_hdf5_attr(this%restart_file,       'restart_file', loc)
+    call write_hdf5_attr(this%reset_time,         'reset_time', loc)
   endif
-  call write_hdf5_attr(this%hcas, 'HCAS', loc)
+  call write_hdf5_attr(this%hcas,                 'HCAS', loc)
   if(this%hcas) then
-    call write_hdf5_attr(this%hcas_time, 'HCAS_time', loc)
-    call write_hdf5_attr(this%hcas_vel, 'HCAS_velocity', loc)
+    call write_hdf5_attr(this%hcas_time,          'HCAS_time', loc)
+    call write_hdf5_attr(this%hcas_vel,           'HCAS_velocity', loc)
   endif
 
 end subroutine save_sim_param
