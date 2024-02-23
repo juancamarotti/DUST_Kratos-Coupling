@@ -71,43 +71,9 @@ Please see the [installation guidelines](install.md)
 
 ## Publications
 <p>
-<details>
 
-  <summary markdown="span">Journal Papers</summary>
+You can find the complete list of publications here &rarr; https://www.dust.polimi.it/publications/
 
-* A. Zanotti, A. Savino, M. Palazzi, M. Tugnoli, and V. Muscarello. <i>Assessment of a mid-fidelity numerical approach for the investigation of tiltrotor aerodynamics</i>. Applied Sciences, 11(8):3385, 2021. <a href="https://www.mdpi.com/2076-3417/11/8/3385"><b>[PDF]</b></a><br><br>
-
-* M. Tugnoli, D. Montagnani, M. Syal, G Droandi, and Alex Zanotti. <i>Mid-fidelity approach to aerodynamic simulations of unconventional vtol aircraft configurations</i>. Aerospace Science and Technology, page 106804, 2021,doi.org/10.1016/j.ast.2021.106804. <a href="https://www.sciencedirect.com/science/article/abs/pii/S127096382100314X"><b>[PDF]</b></a><br><br>
-
-* A. Savino, A. Cocco, A. Zanotti, M. Tugnoli, P. Masarati, and V. Muscarello. <i>Coupling Mid-Fidelity Aerodynamics and Multibody Dynamics for the Aeroelastic Analysis of Rotary-Wing Vehicles</i>. Energies, 14(21), 6979. <a href="https://www.mdpi.com/1996-1073/14/21/6979"><b>[PDF]</b></a><br><br>
-
-</details>
-</p>
-<p>
-<details>
-
-  <summary markdown="span">Conference Papers</summary>
-
-* D. Montagnani, M. Tugnoli, F. Fonte, A. Zanotti, G. Droandi, and M. Syal. <i>Mid-fidelity analysis of unsteady interactional aerodynamics of complex vtol configurations</i>. In 45th European Rotorcraft Forum, Warsaw, Poland, September 2019. <a href="https://core.ac.uk/download/pdf/237171689.pdf"><b>[PDF]</b></a><br><br>
-
-* D. Montagnani, M. Tugnoli, A. Zanotti, M. Syal, and G. Droandi. <i>Analysis of the interactional aerodynamics of the vahana evtol using a medium fidelity open source tool</i>. In Proceedings of the VFS Aeromechanics for Advanced Vertical FlightTechnical Meeting, San Jose, CA, USA, January 21-23 2020. AHS International.
-
-* A. Cocco, A. Savino, D. Montagnani, M. Tugnoli, F. Guerroni, M. Palazzi, A. Zanoni, A. Zanotti, V. Muscarello. <i>Simulation of tiltrotor maneuvers by a coupled multibody-mid fidelity aerodynamic solver<i/>. In: 46th European Rotorcraft Forum, 2020. <a href="https://re.public.polimi.it/retrieve/handle/11311/1146478/540222/COCCA02-20.pdf"><b>[PDF]</b></a><br><br>
-
-* A Cocco, A Savino, A Zanotti, A Zanoni, P Masarati, and V Muscarello. <i>Coupled multibody-mid fidelity aerodynamic solver for tiltrotor aeroelastic simulation</i>. In 9th International Conference on Computational Methods for Coupled Problems in Science and Engineering, COUPLED PROBLEMS 2021, pages 1–12. CIMNE, 2021. <a href="https://re.public.polimi.it/retrieve/handle/11311/1177598/632671/COCCA01-21.pdf"><b>[PDF]</b></a><br><br>
-
-* A. Zanotti, A. Savino, M. Palazzi, M. Tugnoli, and V. Muscarello. <i>Mid-Fidelity Numerical Approach to Tiltrotor Aerodynamics</i>. In 47th European Rotorcraft Forum, Glasgow, UK, September 2021. <a href="https://re.public.polimi.it/retrieve/handle/11311/1184736/655321/ZANOA05-21.pdf"><b>[PDF]</b></a><br><br>
-
-* A. Savino, A. Cocco, A. Zanoni, A. Zanotti, and V. Muscarello. <i>A Coupled Multibody-Mid Fidelity Aerodynamic Tool for the Simulation of Tiltrotor Manoeuvres</i>. In 47th European Rotorcraft Forum, Glasgow, UK, September 2021. <a href="https://re.public.polimi.it/retrieve/handle/11311/1183864/653034/SAVIA01-21.pdf"><b>[PDF]</b></a><br><br>
-
-* A. Savino, A. Cocco, A. Zanoni, A. De Gaspari, A. Zanotti, J. Cardoso, D. Carvalhais and V. Muscarello. <i>Design and Optimization of Innovative Tiltrotor Wing Control Surfaces Through Coupled Multibody-Mid-Fidelity Aerodynamics Simulations</i>. In the Vertical Flight Society’s 78th Annual Forum Technology Display, Ft. Worth, Texas, USA, May 2022. 
-
-* A. Cocco, A. Savino, A. Colli, P. Masarati, A. Zanotti. <i>A non-linear unsteady vortex lattice method for aeroelastic rotor loads
-evaluation</i>. In 48th European Rotorcraft Forum, Winterthur, CH, September 2022. 
-
-* A. Savino, A. Cocco, A. Zanotti, V. Muscarello. <i>Numerical investigation of wing-propeller aerodynamic interaction through a vortex particle-based aerodynamic solver</i>. In 48th European Rotorcraft Forum, Winterthur, CH, September 2022. 
-
-</details>
 </p>
 
 #### Cite Us!
