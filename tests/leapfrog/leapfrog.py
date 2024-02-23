@@ -1,8 +1,11 @@
 import numpy as np
-import matplotlib.pyplot as plt # Import the matplotlib library
+import matplotlib.pyplot as plt 
 import matplotlib as mpl
 import concurrent.futures as cf # Import the concurrent.futures library (for parallel processing)
+from itertools import repeat    # Import the repeat function from the itertools library 
 import h5py 
+import pandas as pd 
+
 plt.rcParams['text.usetex'] = True
 mpl.rcParams['font.size'] = 14 
 
@@ -44,7 +47,7 @@ def calc_rings_weighted(leapfrog_file, nrings, intervals):
 
     return outZ, outR
 
-def process_time(t):
+def process_time(t, nrings):
 
     # Format the filename using the current time step (t)
     filehdf5 = f'output/ring_re3000_res_{str(time[t]+1).zfill(4)}.h5'
@@ -65,9 +68,6 @@ def process_time(t):
     # Get the number of particles from the shape of the position data
     nparticles = leapfrog_file.position.shape[0]
 
-    # Define the number of rings
-    nrings = 2
-
     # Initialize a 2x2 array for the intervals
     intervals = np.zeros((2, 2)) 
 
@@ -85,9 +85,15 @@ if __name__ == "__main__":
     time = np.arange(0, 1999)
     outZ = np.zeros((len(time), 2, 3))
     outR = np.zeros((len(time), 2)) 
-    nrings = 2
+    nrings = 2 # ring numbers 
+    # reference values from 'Leapfrogging of multiple coaxial viscous vortex rings, 2015'  
+    ring_1_lb_data = pd.read_csv('ring_1_lb.dat', delim_whitespace=True, header=None)
+    ring_1_lb = ring_1_lb_data.to_numpy()
+    ring_2_lb_data = pd.read_csv('ring_2_lb.dat', delim_whitespace=True, header=None) 
+    ring_2_lb = ring_2_lb_data.to_numpy() 
+    
     with cf.ProcessPoolExecutor() as executor: 
-        results = executor.map(process_time, range(len(time)))
+        results = executor.map(process_time, range(len(time)), repeat(nrings)) 
         for t, result in enumerate(results): 
             for ri in range(nrings): 
                 outR[t, ri] = result[1][ri] 
@@ -96,6 +102,8 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=plt.figaspect(0.5))
     plt.plot(outZ[:, 1, 2]/outR[0,1] + outZ[0, 0, 2], outR[:,1]/outR[0, 1], label='Ring 1', color='red',    linewidth=2.0)
     plt.plot(outZ[:, 0, 2]/outR[0,0] + outZ[0, 0, 2], outR[:,0]/outR[0, 0], label='Ring 2', color='blue',       linewidth=2.0)  
+    plt.scatter(ring_1_lb[:,1], ring_1_lb[:,0], label='LB Ring 1', color='black', s=8.0, marker = 'o') 
+    plt.scatter(ring_2_lb[:,1], ring_2_lb[:,0], label='LB Ring 2', color='black', s=8.0, marker = 'd')  
     # add labels
     plt.xlabel(r'Ring centroid $\frac{Z}{R_0}$')
     plt.ylabel(r'Ring radius   $\frac{R}{R_0}$')  
@@ -105,3 +113,5 @@ if __name__ == "__main__":
     plt.legend()  
     plt.grid(True)
     plt.show()  
+    fig.savefig('leapfrog3000.png')
+    plt.close(fig) 
