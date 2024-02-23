@@ -204,7 +204,6 @@ subroutine prepare_wake(wake, octree)
   integer                               :: k, ip, ir, iw, ie, n_end_vort
 
   if (sim_param%use_fmm) then
-    write(*,*) 'n_part (sort_particles) = ', wake%n_prt
     call sort_particles(wake%wake_parts, wake%n_prt, octree)
     call calculate_multipole(wake%part_p, octree)
   endif

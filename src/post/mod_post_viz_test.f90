@@ -148,7 +148,12 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_wake = getlogical(sbprms,'wake')
 
   !Check which variables to analyse
-  out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
+  out_vort = .false.; 
+  out_vort_vec = .false.;
+  out_turbvisc = .false.;
+  out_vel = .false.; 
+  out_vrad = .false.; 
+
   n_var = countoption(sbprms, 'variable')
   
   allocate(var_names(n_var))
@@ -164,14 +169,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   nprint = 0; nprint_w = 0
   if(out_vort)      nprint = nprint+1
   if(out_vort_vec)  nprint = nprint+1
-  if(out_cp)        nprint = nprint+1
-  if(out_surfvel)   nprint = nprint+1
   if(out_vel)       nprint = nprint+1  
-  if(out_press)     nprint = nprint+1  
   if(out_turbvisc)  nprint = nprint+1
   if(out_vrad)      nprint = nprint+1
-  if(out_dforce)    nprint = nprint+1
-  if(out_dmom)      nprint = nprint+1 
   if(out_wake) then
     allocate(out_vars_vp(nprint))
   endif
@@ -251,10 +251,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     call close_hdf5_file(floc)
 
     if (allocated(vort   ) ) deallocate(vort )
-    if (allocated(press  ) ) deallocate(press)
-    if (allocated(surfvel) ) deallocate(surfvel)
     if (allocated(vel    ) ) deallocate(vel  )
-    if (allocated(cp     ) ) deallocate(cp   )
     if (allocated(v_rad  ) ) deallocate(v_rad)
     if (allocated(vpturbvisc)) deallocate(vpturbvisc)
 
