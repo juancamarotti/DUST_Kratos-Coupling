@@ -322,14 +322,31 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, volp, diff)
   real(wp)                      :: dist(3), distn
   real(wp), intent(in)          :: volp
   real(wp)                      :: volq
-  
+  logical                       :: condition 
   dist = pos-this%cen
   distn = norm2(dist)
 
   volq = this%vol
   
-  diff = 1.0_wp/(this%r_Vortex**2.0_wp)*(volp*this%dir*this%mag - volq*alpha) &
-                                            *etaeps(distn,this%r_Vortex)
+  !> check singularities (vorticities on the pair of particles are zero) 
+  if (norm2(volp*this%dir*this%mag) .le. 1e-10_wp .and. norm2(volq*alpha) .le. 1e-10_wp ) then 
+    diff = 0.0_wp 
+  else 
+    diff = 1.0_wp/(this%r_Vortex**2.0_wp)*(volp*this%dir*this%mag - volq*alpha)*etaeps(distn,this%r_Vortex) 
+  endif 
+  
+  !> debug 
+  !write(*,*) 'condition', condition
+  !write(*,*) 'diff', diff
+  !write(*,*) 'volp', volp
+  !write(*,*) 'volq', volq
+  !write(*,*) 'alpha', alpha
+  !write(*,*) 'this%dir*this%mag', this%dir*this%mag
+  !write(*,*) 'etaeps', etaeps(distn,this%r_Vortex) 
+  !write(*,*) 'distn', distn
+  !write(*,*) 'this%r_Vortex', this%r_Vortex
+  !write(*,*) 'dist', dist 
+  !write(*,*) 'pos', pos   
 
 end subroutine compute_diffusion_vortpart
 
