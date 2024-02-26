@@ -319,7 +319,12 @@ subroutine update_wake(wake, octree)
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
                   wake%part_p(ip)%p%r_Vortex, wake%part_p(ip)%p%vol, df)
-            diff = diff + 2.0_wp*df*sim_param%nu_inf    ! 21/12/2023 Added factor 2 (see Winckelmans)
+            if ( (norm2(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir + 2.0_wp*df*sim_param%nu_inf*sim_param%dt)) .le. &
+                1.05_wp*max( wake%part_p(ip)%p%mag, wake%part_p(iq)%p%mag)) then
+                diff = diff + 2.0_wp*df*sim_param%nu_inf    ! 21/12/2023 Added factor 2 (see Winckelmans)
+            else
+                write(*,*) 'Unphysical diffusion'
+            endif
           endif
 
         enddo !iq
