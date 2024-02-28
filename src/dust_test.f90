@@ -207,7 +207,7 @@ if(sim_param%use_fmm) then
   call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                        sim_param%RankineRad, octree)
+                        sim_param%octree_vortex_rad, octree)
 endif
 
 call printout(nl//'====== Initializing Wake ======')

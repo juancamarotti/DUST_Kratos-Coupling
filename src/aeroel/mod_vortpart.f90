@@ -329,13 +329,13 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, volp, diff)
   volq = this%vol
   
   !> check singularities (vorticities on the pair of particles are zero) 
-  if (norm2(volp*this%dir*this%mag) .le. 1e-10_wp .and. norm2(volq*alpha) .le. 1e-10_wp ) then 
-    diff = 0.0_wp 
-    write(*,*) 'No diffusion due to vol*mag'
-  else 
-    diff = 1.0_wp/(this%r_Vortex**2.0_wp)*(volp*this%dir*this%mag - volq*alpha)*etaeps(distn,this%r_Vortex) 
-  endif 
-  
+  !if (norm2(volp*this%dir*this%mag) .le. 1e-10_wp .and. norm2(volq*alpha) .le. 1e-10_wp ) then 
+  !  diff = 0.0_wp 
+  !  write(*,*) 'No diffusion due to vol*mag'
+  !else 
+  !  diff = 1.0_wp/(this%r_Vortex**2.0_wp)*(volp*this%dir*this%mag - volq*alpha)*etaeps(distn,this%r_Vortex) 
+  !endif 
+  diff = 1.0_wp/(this%r_Vortex**2.0_wp)*(volp*this%dir*this%mag - volq*alpha)*etaeps(distn,this%r_Vortex) 
   !> debug 
   !write(*,*) 'condition', condition
   !write(*,*) 'diff', diff

@@ -394,7 +394,7 @@ if(sim_param%use_fmm) then
   call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                        sim_param%RankineRad, octree)
+                        sim_param%octree_vortex_rad, octree)
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'

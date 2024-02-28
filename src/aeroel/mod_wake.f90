@@ -2079,6 +2079,7 @@ end select
               wake%wake_parts(ip)%vel = vel_part
               exit
             endif
+           ! write(*,*) 'r_vortex = ',wake%wake_parts(ip)%r_Vortex
           enddo
     
           if (ip .gt. wake%nmax_prt) then

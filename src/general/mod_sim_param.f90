@@ -175,6 +175,8 @@ type t_sim_param
   real(wp) :: DoubletThreshold
   !> Rankine Radius for vortices
   real(wp) :: RankineRad
+  !> Octree vortex particle size core
+  real(wp) :: octree_vortex_rad
   !> Vortex Radius for vortex particles
   real(wp) :: VortexRad
   !> Vortex Radius coefficient for vortex particles
@@ -448,6 +450,8 @@ subroutine create_param_main(prms)
         "Thresold for considering the point in plane in doublets", '1.0e-6')
   call prms%CreateRealOption('rankine_rad', &
         "Radius of Rankine correction for vortex induction near core", '0.1')
+  call prms%CreateRealOption('octree_vortex_rad', &
+        "Vortex particle core size for octree initialization", '0.1')
   call prms%CreateRealOption('vortex_rad', &
         "Radius of vortex core, for particles", '0.1')
   call prms%CreateRealOption('k_vortex_rad', &
@@ -608,6 +612,8 @@ subroutine create_param_post(prms, sbprms, bxprms)
         "Thresold for considering the point in plane in doublets", '1.0e-6')
   call prms%CreateRealOption( 'rankine_rad', &
         "Radius of Rankine correction for vortex induction near core", '0.1')
+  call prms%CreateRealOption('octree_vortex_rad', &
+        "Vortex particle core size for octree initialization", '0.1')
   call prms%CreateRealOption( 'vortex_rad', &
         "Radius of vortex core, for particles", '0.1')
   call prms%CreateRealOption( 'cutoff_rad', &
@@ -734,6 +740,8 @@ subroutine create_param_test_particle(prms)
   !> Regularisation 
   call prms%CreateRealOption('rankine_rad', &
         "Radius of Rankine correction for vortex induction near core", '0.1')
+  call prms%CreateRealOption('octree_vortex_rad', &
+        "Vortex particle core size for octree initialization", '0.1')
   call prms%CreateRealOption('vortex_rad', &
         "Radius of vortex core, for particles", '0.1')
   call prms%CreateRealOption('k_vortex_rad', &
@@ -885,6 +893,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%FarFieldRatioSource   = getreal(prms,    'far_field_ratio_source')
   sim_param%DoubletThreshold      = getreal(prms,    'doublet_threshold')
   sim_param%RankineRad            = getreal(prms,    'rankine_rad')
+  sim_param%octree_vortex_rad     = getreal(prms,    'octree_vortex_rad')
   sim_param%VortexRad             = getreal(prms,    'vortex_rad')
   sim_param%KVortexRad            = getreal(prms,    'k_vortex_rad')
   sim_param%KVol                  = getreal(prms,    'k_vol')
@@ -1271,6 +1280,7 @@ subroutine init_sim_param_particle(sim_param, prms, nout, output_start)
 
   !> Method parameters
   sim_param%RankineRad            = getreal(prms,    'rankine_rad')
+  sim_param%octree_vortex_rad     = getreal(prms,    'octree_vortex_rad')
   sim_param%VortexRad             = getreal(prms,    'vortex_rad')
   sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
   sim_param%use_vs                = getlogical(prms, 'vortstretch')
