@@ -1425,17 +1425,25 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree, it)
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
   filt_eta = sim_param%alpha_divfilt/sim_param%dt
+  !> suppress initial vortex 
+  if (sim_param%suppress_wake .and. it .eq. sim_param%suppress_wake_nsteps) then
+  !$omp parallel do schedule(dynamic,4) private(ip)
+    do ip = 1, n_part 
+      if (wake%part_p(ip)%p%initial_layer) then
+        wake%part_p(ip)%p%free = .true. 
+!$omp atomic update
+        wake%n_prt = wake%n_prt -1
+!$omp end atomic
+      endif
+    enddo 
+!$omp end parallel do
+  endif 
+  n_part = wake%n_prt 
 select case (sim_param%integrator)
   case('euler') ! Explicit Euler
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out, sigma_dot, r_Vortex)
   do ip = 1, n_part
     
-    if (sim_param%suppress_wake .and. it .eq. sim_param%suppress_wake_nsteps .and. wake%part_p(ip)%p%initial_layer) then 
-      wake%part_p(ip)%p%free = .true. 
-!$omp atomic update
-      wake%n_prt = wake%n_prt -1
-!$omp end atomic
-    endif 
     if(.not. wake%part_p(ip)%p%free) then 
       if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
         !> penetration avoidance 
