@@ -103,7 +103,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: r_cutoff
   real(wp) :: vol
   real(wp) :: parent_id
-  
+  logical  :: initial_layer=.false.
 contains
 
   procedure, pass(this) :: compute_vel        => compute_vel_vortpart

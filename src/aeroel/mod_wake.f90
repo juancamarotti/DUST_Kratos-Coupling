@@ -1429,9 +1429,16 @@ select case (sim_param%integrator)
   case('euler') ! Explicit Euler
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out, sigma_dot, r_Vortex)
   do ip = 1, n_part
-
+    
+    if (sim_param%suppress_wake .and. it .eq. sim_param%suppress_wake_nsteps .and. wake%part_p(ip)%p%initial_layer) then 
+      wake%part_p(ip)%p%free = .true. 
+!$omp atomic update
+      wake%n_prt = wake%n_prt -1
+!$omp end atomic
+    endif 
     if(.not. wake%part_p(ip)%p%free) then 
       if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
+        !> penetration avoidance 
         if(sim_param%use_pa) then
           vel_in = wake%part_p(ip)%p%vel
           call avoid_collision(elems_virtual, wake, &
@@ -2067,7 +2074,10 @@ end select
               wake%wake_parts(ip)%cen = pos_p
 
               wake%wake_parts(ip)%parent_id = iw + real(it,wp)/10000.0_wp
-
+              !> treat initial vortex 
+              if (sim_param%suppress_wake .and. it .eq. 1) then
+                wake%wake_parts(ip)%initial_layer = .true.   
+              endif 
             if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
               wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
               rVol = sim_param%KVol * 0.5_wp*sqrt(area)
@@ -2079,7 +2089,6 @@ end select
               wake%wake_parts(ip)%vel = vel_part
               exit
             endif
-           ! write(*,*) 'r_vortex = ',wake%wake_parts(ip)%r_Vortex
           enddo
     
           if (ip .gt. wake%nmax_prt) then

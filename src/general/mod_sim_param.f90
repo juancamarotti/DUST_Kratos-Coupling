@@ -211,6 +211,10 @@ type t_sim_param
     !> rVPM coefficients
     real(wp)  :: f                   
     real(wp)  :: g
+  !> suppress the initial wake
+  logical :: suppress_wake
+  !> suppress the initial wake after n timesteps
+  integer :: suppress_wake_nsteps 
 
   !Lifting Lines
   character(len=max_char_len) :: llSolver
@@ -373,18 +377,21 @@ subroutine create_param_main(prms)
   
   !> Define the parameters to be read
   !> Time
-  call prms%CreateRealOption('tstart', "Starting time")
-  call prms%CreateRealOption('tend',   "Ending time")
-  call prms%CreateRealOption('dt',     "time step")
-  call prms%CreateIntOption ('timesteps', "number of timesteps")
-  call prms%CreateRealOption('dt_out', "output time interval")
-  call prms%CreateRealOption('dt_debug_out', "debug output time interval")
+  call prms%CreateRealOption('tstart', 'Starting time')
+  call prms%CreateRealOption('tend',   'Ending time')
+  call prms%CreateRealOption('dt',     'time step')
+  call prms%CreateIntOption ('timesteps', 'number of timesteps')
+  call prms%CreateRealOption('dt_out', 'output time interval')
+  call prms%CreateRealOption('dt_debug_out', 'debug output time interval')
   call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
   
   !> Reformulated formulation                                         
-  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','F')
+  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','T')
   call prms%CreateRealOption('f','rVPM coefficient f','0.0')
   call prms%CreateRealOption('g','rVPM coefficient g','0.2')
+  !> treatment of the initial wake 
+  call prms%CreateLogicalOption('suppress_wake','Suppress the initial wake','F') 
+  call prms%CreateIntOption('suppress_wake_nsteps','Suppress the initial wake after n timesteps', '100') 
 
   !> Integration 
   call prms%CreateStringOption('integrator', &
@@ -854,7 +861,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%k_refine              = getint(prms,      'k_refine')
   sim_param%tol_refine            = getreal(prms,     'tol_refine')
   sim_param%interpolate_wake      = getlogical(prms,  'interpolate_wake')
-  sim_param%autoscale_te          = getlogical(prms,  'autoscale_te')
+  sim_param%autoscale_te          = getlogical(prms,  'autoscale_te') 
   !> Check on wake refinement
   if (sim_param%interpolate_wake .and. .not. sim_param%refine_wake) then
         !call warning('dust', 'dust', 'Wake interpolation is selected, but wake refinement &
@@ -921,6 +928,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%f                   = getreal(prms, 'f')
     sim_param%g                   = getreal(prms, 'g')
   endif
+  !> suppress wake 
+  sim_param%suppress_wake         = getlogical(prms, 'suppress_wake') 
+  !> n time steps for wake suppression
+  sim_param%suppress_wake_nsteps  = getint(prms, 'suppress_wake_nsteps') 
 
   !> Lifting line elements
   sim_param%llSolver                        = getstr(    prms, 'll_solver')
