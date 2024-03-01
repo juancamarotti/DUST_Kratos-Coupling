@@ -148,13 +148,14 @@ subroutine load_res(floc, comps, vort, press, t, force, moment, surfvel)
   real(wp), allocatable, intent(out), optional :: moment(:,:)
   real(wp), allocatable, intent(out), optional :: surfvel(:,:)
 
-  integer                                      :: ncomps, icomp, ie
-  integer                                      :: nelems, offset, nelems_comp
+  integer                                      :: ncomps, icomp, ie, i1, is, ic, ie_comp
+  integer                                      :: nelems, offset, nelems_comp, nelem_span, nelems_chord 
   integer(h5loc)                               :: gloc1, gloc2, gloc3
   character(len=max_char_len)                  :: cname
   real(wp), allocatable                        :: vort_read(:)!, cp_read(:)
   real(wp), allocatable                        :: pres_read(:), dforce_read(:,:), surfvel_read(:,:)
-  real(wp), allocatable                        :: dmom_read(:,:)
+  real(wp), allocatable                        :: dmom_read(:,:), y_span(:)
+  real(wp)                                     :: F_bas(3)
   integer                                      :: ncomps_sol
   logical                                      :: got_surfvel
   logical                                      :: saved_dmom
@@ -185,6 +186,7 @@ subroutine load_res(floc, comps, vort, press, t, force, moment, surfvel)
   'Different number of components between solution and geometry')
 
   offset = 0
+  ie_comp = 0 
   do icomp = 1, ncomps
 
     nelems_comp = comps(icomp)%nelems
@@ -192,8 +194,8 @@ subroutine load_res(floc, comps, vort, press, t, force, moment, surfvel)
     call open_hdf5_group(gloc1,trim(cname),gloc2)
     call open_hdf5_group(gloc2,'Solution',gloc3)
 
-    call read_hdf5_al(vort_read,'Vort',gloc3)
-    call read_hdf5_al(pres_read,'Pres',gloc3)
+    call read_hdf5_al(vort_read,  'Vort',gloc3)
+    call read_hdf5_al(pres_read,  'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
     if(got_surfvel) then
       select type(el =>comps(icomp)%el)
@@ -218,22 +220,61 @@ subroutine load_res(floc, comps, vort, press, t, force, moment, surfvel)
 
 !   TODO: check if it is general enough *******
 !   TODO: check if something is broken after changing intent(in to inout) for comps
-
-    do ie = 1 , nelems_comp
-      comps(icomp)%el(ie)%pres = pres_read(ie)
-      comps(icomp)%el(ie)%dforce = dforce_read(:,ie)
-      if(got_surfvel) then
-        select type(el =>comps(icomp)%el(ie))
-          type is(t_surfpan)
-          el%surf_vel = surfvel_read(:,ie)
-        end select
-      endif
-      if(saved_dmom) then
-        comps(icomp)%el(ie)%dmom = dmom_read(:,ie)
-      else
-        comps(icomp)%el(ie)%dmom = (/0.0_wp, 0.0_wp, 0.0_wp/)
-      endif
-    end do
+    !select case (trim(comps(icomp)%comp_input)) 
+     ! case('parametric', 'pointwise') 
+     !   nelem_span = comps(icomp)%parametric_nelems_span 
+     !   nelems_chord = comps(icomp)%parametric_nelems_chor
+     !   do i1 = 1, size(comps(icomp)%loc_points, 2) 
+     !     comps(icomp)%loc_points(:, i1) = matmul(comps(icomp)%coupling_node_rot,comps(icomp)%loc_points(:,i1))
+     !   end do
+     !   allocate(y_span(nelem_span)); y_span = 0.0_wp 
+     !   
+     !   ie = 0
+     !   write(*,*) 'icomponent', icomp
+     !   write(*,*) 'size(comps(icomp)%el)', size(comps(icomp)%el) 
+     !   do is = 1 , nelem_span
+     !     ie = ie + 1
+     !     write(*,*) 'ie', ie_comp
+     !     write(*,*) 'comps(icomp)%el(ie)%i_ver(1)', comps(icomp)%el(ie)%i_ver(1)
+     !     write(*,*) comps(icomp)%el(ie)%i_ver(1) -  ie_comp
+     !     y_span(is) = &
+     !           abs(comps(icomp)%loc_points(2, comps(icomp)%el(ie)%i_ver(1)-ie_comp) - &
+     !               comps(icomp)%loc_points(2, comps(icomp)%el(ie)%i_ver(2)-ie_comp)) 
+     !     
+     !   enddo
+     !   ie_comp = ie_comp + ie + 1
+     !   write(*,*) 'y_span', y_span
+     !   write(*,*) 'nelem_span', nelem_span
+     !   write(*,*) 'nelems_chord', nelems_chord
+     !   ie = 0
+     !   do is = 1 , nelem_span
+     !     F_bas = 0.0_wp
+     !     do ic = 1, nelems_chord
+     !       ie = ie + 1 
+     !       F_bas = F_bas + dforce_read(:,ie) 
+     !     enddo
+     !     comps(icomp)%el(ie)%dforce = F_bas/y_span(is)
+     !   enddo
+!
+     !   deallocate(y_span)
+     ! case( 'cgns' )
+     !   do ie = 1 , nelems_comp
+     !     comps(icomp)%el(ie)%pres = pres_read(ie)
+     !     if(got_surfvel) then
+     !       select type(el =>comps(icomp)%el(ie))
+     !         type is(t_surfpan)
+     !         el%surf_vel = surfvel_read(:,ie)
+     !       end select
+     !     endif
+     !     if(saved_dmom) then
+     !       comps(icomp)%el(ie)%dmom = dmom_read(:,ie)
+     !     else
+     !       comps(icomp)%el(ie)%dmom = (/0.0_wp, 0.0_wp, 0.0_wp/)
+     !     endif
+     !   end do
+     ! case default
+!
+     ! endselect
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)
