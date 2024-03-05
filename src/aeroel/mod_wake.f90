@@ -1758,10 +1758,10 @@ subroutine complete_wake(wake, geo, elems, te, it)
 
               wake%wake_parts(ip)%parent_id = iw + real(it,wp)/10000.0_wp
 
-            if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
-              wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
+              if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
+                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
               else ! revert to sim_param vortex rad
-                wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+                  wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
               end if
               wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
               wake%wake_parts(ip)%vel = vel_part
@@ -1817,7 +1817,13 @@ subroutine complete_wake(wake, geo, elems, te, it)
               endif
 
               wake%wake_parts(ip)%cen = pos_p
-
+              
+              ! fixed vortex rad for actuator disk
+              wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+              
+              wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
+              wake%wake_parts(ip)%vel = vel_part
+              
               exit
             endif
           enddo  !ip
