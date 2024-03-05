@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -113,7 +113,7 @@ end subroutine initialize_doublet
 !! Omega_ik = int_{S_k} { n \cdot (r_i - r) / |r_i - r|^3 }
 !!
 !! The relation with unitary surface doublet D_ik is:
-!!   D_ik = -(1/(4*pi)) * Omega_ik
+!!   D_ik = -(1/4pi) * Omega_ik
 !!
 subroutine potential_calc_doublet(this, dou, pos)
   class(c_pot_elem), intent(in) :: this
@@ -140,37 +140,40 @@ subroutine potential_calc_doublet(this, dou, pos)
     !> initialisation
     dou = 0.0_wp
     !> old implmentation that did not distinguish TRIA from QUAD
-      do i1 = 1 , this%n_ver
+    do i1 = 1 , this%n_ver
 
-        !This is ugly but should be general and work...
-        indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
-
-        ! doublet  -----
-        ! it is possible to use ver, instead of ver_p for the doublet
-        ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
-        ap1 =   this%edge_vec(:,i1   ) - ei * dot_product( ei, this%edge_vec(:,i1   ) )
-        am1 = - this%edge_vec(:,indm1) + ei * dot_product( ei, this%edge_vec(:,indm1) )
-        ap1n= norm2(ap1)
-        am1n= norm2(am1)
-        ap1nxam1n = ap1n*am1n
-        if (ap1nxam1n .lt. eps) then !> avoid singularities 
-          sinB = 0.0_wp
-          cosB = 1.0_wp
-        else
-          sinB = dot_product(ei, cross(am1, ap1)) / ap1nxam1n
-          cosB = dot_product(am1, ap1) / ap1nxam1n
-        end if
-        beta = atan2( sinB , cosB )
-        dou = dou + beta
-      end do
-
-      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
-      !TODO: use "sign" here and check the results
-      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + eps ) then
-        dou = dou + real(this%n_ver-2,wp) * pi
-      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - eps ) then
-        dou = dou - real(this%n_ver-2,wp) * pi
+      if ( this%n_ver .eq. 3 ) then
+        indm1 = prev_tri(i1)
+      else if ( this%n_ver .eq. 4 ) then
+        indm1 = prev_qua(i1)
       end if
+      
+      ! doublet  -----
+      ! it is possible to use ver, instead of ver_p for the doublet
+      ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
+      ap1 =   this%edge_vec(:,i1   ) - ei * dot_product( ei, this%edge_vec(:,i1   ) )
+      am1 = - this%edge_vec(:,indm1) + ei * dot_product( ei, this%edge_vec(:,indm1) )
+      ap1n= norm2(ap1)
+      am1n= norm2(am1)
+      ap1nxam1n = ap1n*am1n
+      if (ap1nxam1n .lt. eps) then !> avoid singularities 
+        sinB = 0.0_wp
+        cosB = 1.0_wp
+      else
+        sinB = dot_product(ei, cross(am1, ap1)) / ap1nxam1n
+        cosB = dot_product(am1, ap1) / ap1nxam1n
+      end if
+      beta = atan2( sinB , cosB )
+      dou = dou + beta
+    end do
+
+    ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
+    !TODO: use "sign" here and check the results
+    if     ( dou .lt. -real(this%n_ver-2,wp)*pi + eps ) then
+      dou = dou + real(this%n_ver-2,wp) * pi
+    elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - eps ) then
+      dou = dou - real(this%n_ver-2,wp) * pi
+    end if
 
   end if
 
@@ -225,7 +228,11 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
     do i1 = 1 , this%n_ver
 
       !> index of next vertex (/2, 3, 4, 1/)
-      indp1 = 1+mod(i1,this%n_ver)  
+      if ( this%n_ver .eq. 3 ) then
+        indp1 = next_tri(i1)
+      else if ( this%n_ver .eq. 4 ) then
+        indp1 = next_qua(i1)
+      end if
       
       !> use this%ver instead of its projection this%verp
       av = pos-this%ver(:,i1)
@@ -270,15 +277,19 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
   real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
   real(wp) :: del , a2del2
 
-  ! del = sim_param % RankineRad
-  del = sim_param % VortexRad
+  del = sim_param % RankineRad
+  !del = sim_param % VortexRad
 
   grad_dou = 0.0_wp
 
   do i = 1 , this%n_ver
 
-    !This is ugly but should be general and work...
-    indp1 = 1+mod(i,this%n_ver)
+    if ( this%n_ver .eq. 3 ) then
+      indp1 = next_tri(i)
+    else if ( this%n_ver .eq. 4 ) then
+      indp1 = next_qua(i)
+    end if
+
     i1 = i
     i2 = indp1
 
@@ -287,7 +298,7 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
 
     R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
     R2 = pos-this%ver(:,i2) ;   a2 = cross( l , R2 )
-    a = norm2(a1)  ! = norm(a2)
+    a = norm2(a1)  
     a2del2 = a**2.0_wp + del**2.0_wp
 
     R1v(:,1) = R1 ;  a1v(:,1) = a1
@@ -369,7 +380,7 @@ subroutine linear_potential_calc_doublet(this, TL, TR, pos)
     R2 = norm2( pos - verp(:,indp1) )
     den = R1+R2-this%edge_len(i1)
 
-    if(den < 1e-6_wp .and. sim_param%debug_level .ge. 5) then
+    if(den .lt. 1e-6_wp .and. sim_param%debug_level .ge. 5) then
       write(msg(1),'(A)') 'Too small denominator in &
       &source computation with point projection, using actual &
       &points instead.'

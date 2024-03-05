@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -141,8 +141,8 @@ real(wp)                                                :: R_cen(3,3)
 real(wp), allocatable                                   :: vort(:), cp(:)
 real(wp), allocatable                                   :: ll_data(:,:,:), ll_data_ave(:,:,:)
 real(wp), allocatable                                   :: vl_data(:,:,:), vl_data_ave(:,:,:)
-real(wp), allocatable                                   :: points(:,:)
-integer                                                 :: nelem
+real(wp), allocatable                                   :: points(:,:), points_virtual(:,:)
+integer                                                 :: nelem, nelem_virtual
 integer                                                 :: n_comp , n_comp_tot  
 integer                                                 :: i_comp , id_comp , ax_coor , ref_id
 character(len=max_char_len), allocatable                :: all_components_names(:)
@@ -269,7 +269,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   allocate(components_names_tmp(1))
   components_names_tmp(1) = trim(components_names(1))
 
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                               components_names_tmp,  all_comp)
   call close_hdf5_file(floc)
 
@@ -420,7 +420,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       ! Load the references and move the points ---
       call load_refs(floc, refs_R, refs_off)
       ! Move the points ---------------------------
-      call update_points_postpro(comps, points, refs_R, refs_off, &
+      call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
                                   filen = trim(filename) )
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)
@@ -989,7 +989,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       ! Load the references and move the points ---
       call load_refs(floc,refs_R,refs_off)
       ! Move the points ---------------------------
-      call update_points_postpro(comps, points, refs_R, refs_off)
+      call update_points_postpro(comps, points, points_virtual, refs_R, refs_off)
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)
 

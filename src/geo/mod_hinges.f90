@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -174,7 +174,7 @@ type :: t_hinge
   !> Order of the norm used for computing distance-based weights
   ! *** to do *** hardcoded, so far. Read as an input, with a default value,
   ! equal to 1 (or 2?)
-  integer :: w_order = 1
+  real(wp) :: w_order = 1
 
   !> Type: parametric, from_file
   character(len=max_char_len) :: nodes_input
@@ -270,7 +270,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   real(wp), allocatable :: rrb(:,:), rrh(:,:), rrb_wei(:,:)
   real(wp) :: Rot(3,3) = 0.0_wp
 
-  real(wp) :: span_wei
+  real(wp) :: span_wei, tol 
   real(wp), allocatable :: dist_all(:), wei_v(:)
   integer , allocatable ::              ind_v(:)
 
@@ -354,11 +354,11 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
                             (loc_points(:,ib) - &
                     matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
   enddo
-
+  tol = abs(this%ref%rr(2,nh) - this%ref%rr(2,1))/1000.0_wp  ! tolerance for the hinge width (relative)
   ! Loop over all the surface points
   do ib = 1, nb
     !> wind axis conditions
-    if ((rrb(2,ib) .ge. (this%ref%rr(2,1)-1e-3_wp)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+1e-3_wp))) then
+    if ((rrb(2,ib) .ge. (this%ref%rr(2,1) - tol)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+tol))) then
       
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
@@ -493,7 +493,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   real(wp), allocatable :: rrb(:,:), rrh(:,:), rrb_wei(:,:)
   real(wp) :: Rot(3,3) = 0.0_wp
 
-  real(wp) :: span_wei
+  real(wp) :: span_wei, tol
   real(wp), allocatable :: dist_all(:), wei_v(:)
   integer , allocatable ::              ind_v(:)
 
@@ -585,14 +585,16 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   nrot = 0; nble = 0
 
   do ib = 1, nb
-    rrb_wei(:,ib) = matmul(coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
+    rrb_wei(:,ib) = matmul(coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1))))
   enddo
+
+  tol = abs(this%ref%rr(2,nh) - this%ref%rr(2,1))/1000.0_wp  !tolerance for the hinge width (relative)
 
   ! Loop over all the surface points
   do ib = 1, nb
 
-    if ((rrb(2,ib) .gt. this%ref%rr(2,1)) .and. (rrb(2,ib) .lt. this%ref%rr(2,nh))) then
-
+    if ((rrb(2,ib) .gt. this%ref%rr(2,1) - tol) .and. (rrb(2,ib) .lt. this%ref%rr(2,nh) + tol)) then
+      
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
       z_hinge = this%ref%rr(3,1) + wei_hinge*(this%ref%rr(3,nh)- this%ref%rr(3,1))
@@ -609,7 +611,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
         !> Weights in chordwise direction
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
         wei_v = wei_v / sum(wei_v)
 
         !> Weights in spanwise direction
@@ -625,14 +627,12 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
         rot_ind(   :,nrot) = ind_v
         rot_span_wei(nrot) = span_wei
 
-        ! *****
         do iw = 1, this%n_wei
           rot_i2h(ind_v(iw)) = rot_i2h(ind_v(iw)) + 1
           rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
           rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
           rot_s2h(ind_v(iw),   rot_i2h(ind_v(iw))) = span_wei
         end do
-        ! *****
 
       elseif (rrb(1,ib) .lt. (this%offset + x_hinge) .and. rrb(1,ib) .gt. (x_hinge - this%offset))  then ! blending region
 
@@ -649,7 +649,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
         wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
 
-        !> Weights in spanwise direction
+        !> Weights in spanwise direction (is this needed?)
         if ( rrb(2,ib) .lt. (this%ref%rr(2,1) + this%span_blending) ) then
           span_wei = 1.0_wp + rrb_wei(2,ib) / this%span_blending
         elseif( rrb(2,ib) .lt. (this%ref%rr(2,nh) - this%span_blending)  ) then
@@ -708,8 +708,8 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   deallocate(rrb, rrh, dist_all, wei_v, ind_v)
   deallocate(rot_node_id, rot_ind, rot_wei, rot_span_wei)
   deallocate(ble_node_id, ble_ind, ble_wei, ble_span_wei)
-  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) ! *****
-  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) ! *****
+  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) 
+  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) 
 
 
 end subroutine build_connectivity_cen
@@ -791,7 +791,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   end do
 
   !> Allocate t_hinge%hin_rot
-  allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
+  allocate(this%hin_rot(3,n_h)); this%hin_rot = -333.3_wp
 
 end subroutine build_connectivity_hin
 
@@ -817,8 +817,6 @@ subroutine init_theta(this, t)
   else
     this%theta_old = 0.0_wp
   end if
-  !this%theta_old = 0.0_wp
-
 
 end subroutine init_theta
 
@@ -903,10 +901,10 @@ subroutine update_theta( this, t )
     !> final value
     elseif ( t .gt. this%f_initial_time +  2.0_wp*pi/this%f_omega*this%f_cosine_cycl) then
       !> check if this%f_cosine_cycl is a multiple of 0.5 (half cycle(s))
-      if (mod(this%f_cosine_cycl, 0.5) == 0.0 .and. modulo(this%f_cosine_cycl, 1.0) /= 0.0) then
+      if (mod(this%f_cosine_cycl, 0.5) .eq. 0.0 .and. modulo(this%f_cosine_cycl, 1.0) .ne. 0.0) then
         this%theta = 2.0_wp * this%f_ampl + this%f_ampl_init
       !> check if this%f_cosine_cycl is a multiple of 1 (full cycle(s))
-      elseif (mod(this%f_cosine_cycl, 1.0_wp) == 0.0  ) then
+      elseif (mod(this%f_cosine_cycl, 1.0_wp) .eq. 0.0  ) then
         this%theta = this%f_ampl_init
       !> otherwise, it takes the last calculated value
       else

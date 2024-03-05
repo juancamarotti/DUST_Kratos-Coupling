@@ -78,6 +78,8 @@ join_te_factor = 1.0
 refine_wake = T
 k_refine = 1
 autoscale_te = F 
+! --- integrator
+integrator = Euler 
 
 ! --- model parameters ---
 far_field_ratio_doublet = 10.0
@@ -97,7 +99,8 @@ penetration_avoidance = F
 penetration_avoidance_check_radius = 5.0
 penetration_avoidance_element_radius = 1.5
 divergence_filtering = T
-filter_time_scale = 40.0
+alpha_divfilt = 0.3 
+reformulated = T
 fmm = T
 fmm_panels = F
 viscosity_effects = F
@@ -288,11 +291,11 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
     
     Select the gust type: \opt{ACM} or \opt{linear}.
     \begin{equation}
-        \vec{s} = -\sum \big[\vec{x} - \big(\vec{O} + U_{des}\vec{v}(t-\tau)\big)\vec]\vec{v}
+        \vec{s} = -\big[\vec{x} - \big(\vec{O} + \vec{U}_\mathrm{des}\vec{v}(t-\tau)\big)]\cdot\vec{v}
     \end{equation}
         
     \begin{equation}
-        \vec{U} = \vec{U}  + \dfrac{U_{des}}{2}\bigg(1-\cos{\frac{\pi s}{H}}\bigg)    
+        \vec{U} = \vec{U}  + \dfrac{\vec{U}_\mathrm{des}}{2}\bigg(1-\cos{\frac{\pi s}{H}}\bigg)    
     \end{equation}
     
     \item \param{gust_origin}: \textit{required:} yes. \textit{multiple:} no. 
@@ -332,6 +335,18 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
     
     $\tau$: Time at which the gust starts. 
 \end{itemize}
+
+\item \param{altitude}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 0 \textit{type:} real.
+
+Altidude: if different from 0, then the other quantities ($P_\infty$, $\rho_\infty$, $a_\infty$, $\mu_\infty$) 
+are computed using the standard atmosphere model. 
+
+\item \param{units}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} SI \textit{type:} string.
+
+Units of measurement of the input file. Can be \opt{SI} or \opt{imperial}. 
+
 
 \item \param{P\_inf}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 101325.0 \textit{type:} real.
@@ -435,6 +450,11 @@ $V_\mathrm{local} = \|V_\infty-V_\mathrm{te}\|$.
 When is false, the wake panel can be scaled by the \param{implicit_panel_scale} 
 parameter at simulation level and by the \param{scale\_te} at component level.
 
+\item \param{integrator}: \textit{required: } no. \textit{multiple:} no. 
+\textit{default:} Euler. \textit{type:} string. 
+
+Integrator for the wake motion: \param{Euler} (explicit Euler) or \param{low\_storage}
+Three-stage low-storage Runge Kutta.  
 
 \item \param{far_field_ratio_doublet}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} 10.0 \textit{type:} real.
@@ -502,7 +522,7 @@ Calculate the evolution of vorticity of the particles considering the vorticity 
 \textit{default:} F \textit{type:} logical.
 
 Introduce additional turbulent viscosity (Smagorinsky style) to the vorticity 
-diffusion term. Working only when \param{fmm} is turned on. Still experimental feature. 
+diffusion term. Working only when \param{FMM} is turned on. Still experimental feature. 
 
 \item \param{penetration_avoidance}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} F \textit{type:} logical.
@@ -537,14 +557,17 @@ while a smaller factor may let some particles slip through the surface.
 
 Employ the divergence filtering to keep the vorticity field divergence-free. 
 
-\item \param{filter_time_scale}: \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} 40.0 \textit{type:} real.
+\item \param{alpha_divfilt}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 0.3 \textit{type:} real.
 
-Timescale of the time filter to filter the divergence. 
-The input is not the actual timescale but the number of simulation timesteps 
-of which the timescale is consisting. 
+Pedrizzetti relaxation coefficient: the filter time scale is then computed as $\eta = 1/( \param{alpha_divfilt} \cdot \Delta t)$.
 
-\item \param{fmm}: \textit{required:} no. \textit{multiple:} no. \textit{default:} T 
+\item \param{reformulated}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} F \textit{type:} logical.
+
+Apply Alvarez's reformulated VPM: introduces a correction to the stretching term and an additional ODE to the vortex radius.  
+
+\item \param{FMM}: \textit{required:} no. \textit{multiple:} no. \textit{default:} T 
 \textit{type:} logical.
 
 Use the fast multipole method for particles evolution.
@@ -595,14 +618,6 @@ For this reason, a small \param{octree_level_solid} approaching 1 will lead
 to a wide zone around solid bodies in which redistribution does not occur, 
 while a \param{octree_level_solid} approaching \param{n_octree_levels} leads 
 to redistribution to be performed in areas up to close to the solid bodies.
-
-\item \param{turbulent_viscosity}: \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} F \textit{type:} logical.
-
-Employ an additional turbulent viscosity, using a Smagorinsky-like model to 
-take into account the dissipation of energy in turbulent conditions towards 
-small, not resolved turbulent scales. It works only in an octree environment, 
-so when \param{fmm} is active.
 
 \item \param{HCAS}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} F \textit{type:} logical.
@@ -941,14 +956,16 @@ Starting precisely from this consideration, it is advisable to set the
 parameter \param{vortex_rad}, which is the radius of the Rosenhead 
 regularized core employed for the vortex particles, to a value which
 allow the generated particles to represent the whole generated vorticity 
-field, by slightly overlapping one another. This can be done for example 
-by setting \param{VotexRad} equal to the (average) length of the trailing 
-edge element sides, where the particles are first generated and spaced.
+field, by slightly overlapping one another. This can be done, manually, for example 
+by setting \param{VortexRad} equal to the (average) length of the trailing 
+edge element sides, where the particles are first generated and spaced. 
+If anything is specified, the solver will automatically set the radius of each particle equal 
+to radius of the circle that circumscribes ghost wake element.  
 
 Since the generation of the particles from the trailing edges sets somehow 
 the spacing, and the resolution, of the vortical phenomena, the radius of 
-the vortex model of the panels, \param{rankine_rad} should be chosen at least 
-in the same order of magnitude of \param{vortex_rad}. The vortex 
+the vortex model of the panels, \param{rankine_rad} could be chosen as  
+the average value of the initial \param{vortex_rad} of the particles. The vortex 
 regularization performed on the panels is the classical Rankine one. 
 Since it is expected that the vortical phenomena on surfaces are more 
 confined than in the wake the user might want to take a little smaller 
@@ -959,7 +976,7 @@ too strong interactions with close particles or panels.
 Eventually for the panels the parameter \param{cutoff_rad} sets a radius 
 underneath which the interaction is set to zero, to avoid any kind of 
 modelling when a point is essentially coinciding with the vortex. 
-This parameter should be set \emph{much smaller} than \param{rankine_rad}. 
+This parameter is set as $10e^{-3}\cdot$\param{rankine_rad}. 
 
 
 \section{Reference frames}
@@ -1320,7 +1337,7 @@ multiplicity = {
   mult_type = rotor
   n_blades = 4
   rot_axis = (/0.0, 0.0, 1.0/)
-  rot_rate = 6.28318530717959 !2*pi, T=1
+  rot_rate = 6.28318530717959 !2*pi, T=1 rad/s
   psi_0 = 0.0
   hub_offset = 0.0
 

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -56,7 +56,7 @@ use mod_param, only: &
   wp , nl, &
   prev_tri , next_tri , &
   prev_qua , next_qua , &
-  pi, max_char_len
+  pi, one_4pi, max_char_len
 
 use mod_handling, only: &
   error, warning, printout
@@ -169,7 +169,7 @@ end subroutine initialize_surfpan
 !! I_ik = int_{S_k} { 1 / |r_i - r| }
 !!
 !! The relation with unitary surface doublet D_ik is:
-!!   S_ik = -(1/(4*pi)) * I_ik
+!!   S_ik = -(1/4pi) * I_ik
 !!
 subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
   class(t_surfpan), intent(inout) :: this
@@ -229,7 +229,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
       R2 = norm2( pos - this%verp(:,indp1) )
 
       den = R1+R2-this%edge_len(i1)
-      if ( den < 1e-6_wp ) then
+      if ( den .lt. 1e-6_wp ) then
 
         if(sim_param%debug_level .ge.5) then
           write(msg(1),'(A)') 'Too small denominator in &
@@ -339,7 +339,7 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
       if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
         souLog = 0.0_wp
       else
-        !> katz eqs 10.95 - 10.96 (the sign wrotten in the book is wrong)
+        !> katz eqs 10.95 - 10.96 (the sign in the book is wrong)
         souLog = log( (R1+R2 + this%edge_len(i1)) / (R1+R2 - this%edge_len(i1)) )
       endif
 
@@ -757,7 +757,7 @@ subroutine compute_psi_surfpan(this, A, b, pos, nor, i , j )
 
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  ! b = ... (sources from doublets)
+  ! b = (sources from doublets)
   b =   sum(-vsou * nor )
 
 end subroutine compute_psi_surfpan
@@ -787,7 +787,7 @@ subroutine compute_vel_surfpan(this, pos, vel )
   call velocity_calc_sou_surfpan(this, vsou, pos)
   
   wind = variable_wind(this%cen, sim_param%time)
-  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-wind-this%uvort)) )
+  vel = vdou*this%mag - vsou*(sum(this%nor*(this%ub-wind-this%uvort)))
 
 end subroutine compute_vel_surfpan
 
@@ -1099,7 +1099,7 @@ end subroutine calc_geo_data_surfpan
 
 !----------------------------------------------------------------------
 
-!> Calculat the vorticity induced velocity from vortical elements
+!> Calculate the vorticity induced velocity from vortical elements
 subroutine get_vort_vel_surfpan(this, vort_elems)
   class(t_surfpan), intent(inout)   :: this
   type(t_vort_elem_p), intent(in)   :: vort_elems(:)
@@ -1112,7 +1112,7 @@ subroutine get_vort_vel_surfpan(this, vort_elems)
 
   do iv=1,size(vort_elems)
     call vort_elems(iv)%p%compute_vel(this%cen, vel)
-    this%uvort = this%uvort + vel/(4*pi)
+    this%uvort = this%uvort + vel*one_4pi
   enddo
 
 end subroutine

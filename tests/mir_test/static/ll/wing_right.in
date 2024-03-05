@@ -8,6 +8,7 @@ reference_chord_fraction = 0.25
 ! First section
 chord = 1.0
 twist = 3.0
+airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0020_mod.c81 
 
 ! First region
@@ -20,4 +21,5 @@ type_span = uniform
 ! Second section
 chord = 0.5
 twist = -3.0
+airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0012.c81 

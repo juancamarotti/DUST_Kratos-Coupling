@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -105,7 +105,6 @@ type, abstract :: c_elem
   procedure(i_compute_grad), deferred, pass(this) :: compute_grad
 
 end type c_elem
-
 
 !----------------------------------------------------------------------
 

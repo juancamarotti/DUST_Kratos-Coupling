@@ -10,7 +10,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -54,7 +54,7 @@ use mod_param, only: &
   wp, nl, pi, max_char_len
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_math, only: &
   cross
@@ -385,53 +385,102 @@ end subroutine
 
 !----------------------------------------------------------------------
 
-subroutine compute_der_ker(this,diff,delta,pexp)
- class(t_ker_der) :: this
- real(wp), intent(in) :: diff(3)
- real(wp), intent(in) :: delta
- type(t_polyexp), intent(in) :: pexp
+subroutine compute_der_ker(this, diff, delta, pexp)
+  class(t_ker_der) :: this
+  real(wp), intent(in) :: diff(3)
+  real(wp), intent(in) :: delta
+  type(t_polyexp), intent(in) :: pexp
 
- integer :: i, j, k
- real(wp) :: kmod, Rnorm2
- real(wp) :: sum1, sum2
- real(wp), allocatable :: bk(:)
- !real(wp) :: diffnorm
-
-
-
-  allocate(this%D(3,pexp%n_mon_d(pexp%degree-1)))
-  allocate(this%Dc(3,3,pexp%n_mon_d(pexp%degree-2)))
-  allocate(bk(pexp%n_mon))
-  this%D = 0.0_wp
-  this%Dc = 0.0_wp
-  bk = 0.0_wp
-  !Rosenhead
-  Rnorm2 = sum(diff**2) + delta**2
+  integer :: i, j, k
+  real(wp) :: kmod, Rnorm2
+  real(wp) :: sum1, sum2, sum1_1, sum2_1, sum1_3, sum2_3
+  real(wp), allocatable :: bk(:), bk_1(:), bk_3(:)
+  
+  !> From: Convergence Characteristics and Computational Cost of Two Algebraic Kernels in Vortex Methods
+  !> with a Tree-Code Algorithm (WEE 2009)  
+  allocate(this%D(3,pexp%n_mon_d(pexp%degree-1))); this%D = 0.0_wp
+  allocate(this%Dc(3,3,pexp%n_mon_d(pexp%degree-2))); this%Dc = 0.0_wp
+  !> coefficients of the kernel derivatives 
+  allocate(bk(pexp%n_mon)); bk = 0.0_wp
+  
+  !Rosenhead and HOA 
+  Rnorm2 = sum(diff**2.0_wp) + delta**2.0_wp
   !Singular
-  !Rnorm2 = sum(diff**2)
+  !Rnorm2 = sum(diff**2) 
+  
+!> Rosenhead
+#if (DUST_KERNEL==1) 
+    do k=0, pexp%degree; do j=0, pexp%degree-k; do i=0, pexp%degree-j-k; 
+      kmod = real(k+j+i, wp) 
 
-  do k=0,pexp%degree;  do j=0,pexp%degree-k; do i=0,pexp%degree-j-k;
-    kmod = real(k+j+i,wp)
-
-    if (all((/i,j,k/).eq.0)) then
-      bk(pexp%idx(i,j,k)) = 1.0_wp/(4.0_wp*pi*sqrt(Rnorm2))
-    else
+      if (all((/i,j,k/).eq.0)) then
+        bk(pexp%idx(i,j,k)) = 1.0_wp/(4.0_wp*pi*sqrt(Rnorm2))
+      else
 
         sum1 = 0.0_wp; sum2 = 0.0_wp
 
-        if(i-1 .ge. 0) sum1 = sum1 + diff(1)*bk(pexp%idx(i-1,j,k))
-        if(j-1 .ge. 0) sum1 = sum1 + diff(2)*bk(pexp%idx(i,j-1,k))
-        if(k-1 .ge. 0) sum1 = sum1 + diff(3)*bk(pexp%idx(i,j,k-1))
+        if(i-1 .ge. 0) sum1 = sum1 + diff(1) * bk(pexp%idx(i-1,j,k))
+        if(j-1 .ge. 0) sum1 = sum1 + diff(2) * bk(pexp%idx(i,j-1,k))
+        if(k-1 .ge. 0) sum1 = sum1 + diff(3) * bk(pexp%idx(i,j,k-1))
 
         if(i-2 .ge. 0) sum2 = sum2 + bk(pexp%idx(i-2,j,k))
         if(j-2 .ge. 0) sum2 = sum2 + bk(pexp%idx(i,j-2,k))
         if(k-2 .ge. 0) sum2 = sum2 + bk(pexp%idx(i,j,k-2))
 
-
         bk(pexp%idx(i,j,k)) = 1.0_wp/(Rnorm2*kmod)*&
-                     ((2.0_wp*kmod-1.0_wp)*sum1 - (kmod-1.0_wp)*sum2)
-    endif
-  enddo; enddo; enddo
+                            ((2.0_wp*kmod-1.0_wp)*sum1 - (kmod-1.0_wp)*sum2) !> (2.15)
+      endif
+    enddo; enddo; enddo
+!> High Order Algebraic (Wilkenmans) 
+#elif(DUST_KERNEL==2) 
+
+    allocate(bk_1(pexp%n_mon)); bk_1 = 0.0_wp
+    allocate(bk_3(pexp%n_mon)); bk_3 = 0.0_wp
+    
+    do k=0, pexp%degree; do j=0, pexp%degree-k; do i=0, pexp%degree-j-k; 
+      kmod = real(k+j+i, wp) 
+      
+      if (all((/i,j,k/) .eq. 0)) then
+        bk_1(pexp%idx(i,j,k)) = Rnorm2**(-0.5_wp)
+        bk_3(pexp%idx(i,j,k)) = Rnorm2**(-1.5_wp) 
+        bk(pexp%idx(i,j,k)) = bk_1(pexp%idx(i,j,k))/(4.0_wp*pi) + & 
+                              delta**2.0_wp*bk_3(pexp%idx(i,j,k))/(8.0_wp*pi)
+      else 
+        
+        !> bk1  
+        sum1_1 = 0.0_wp; sum2_1 = 0.0_wp
+        
+        if(i-1 .ge. 0) sum1_1 = sum1_1 + diff(1) * bk_1(pexp%idx(i-1,j,k))
+        if(j-1 .ge. 0) sum1_1 = sum1_1 + diff(2) * bk_1(pexp%idx(i,j-1,k))
+        if(k-1 .ge. 0) sum1_1 = sum1_1 + diff(3) * bk_1(pexp%idx(i,j,k-1))
+
+        if(i-2 .ge. 0) sum2_1 = sum2_1 + bk_1(pexp%idx(i-2,j,k))
+        if(j-2 .ge. 0) sum2_1 = sum2_1 + bk_1(pexp%idx(i,j-2,k))
+        if(k-2 .ge. 0) sum2_1 = sum2_1 + bk_1(pexp%idx(i,j,k-2))
+
+        bk_1(pexp%idx(i,j,k)) = 1.0_wp/(Rnorm2*kmod)* &
+                              ((2.0_wp*kmod - 1.0_wp)*sum1_1 - (kmod - 1.0_wp)*sum2_1) !> (2.20)
+      
+        !> bk3 
+        sum1_3 = 0.0_wp; sum2_3 = 0.0_wp 
+        if(i-1 .ge. 0) sum1_3 = sum1_3 + diff(1) * bk_3(pexp%idx(i-1,j,k))
+        if(j-1 .ge. 0) sum1_3 = sum1_3 + diff(2) * bk_3(pexp%idx(i,j-1,k))
+        if(k-1 .ge. 0) sum1_3 = sum1_3 + diff(3) * bk_3(pexp%idx(i,j,k-1))
+
+        if(i-2 .ge. 0) sum2_3 = sum2_3 + bk_3(pexp%idx(i-2,j,k))
+        if(j-2 .ge. 0) sum2_3 = sum2_3 + bk_3(pexp%idx(i,j-2,k))
+        if(k-2 .ge. 0) sum2_3 = sum2_3 + bk_3(pexp%idx(i,j,k-2))
+
+        bk_3(pexp%idx(i,j,k)) = 1.0_wp/(Rnorm2*kmod)*&
+                              ((2.0_wp*kmod + 1.0_wp)*sum1_3 - (kmod + 1.0_wp)*sum2_3) !> (2.20) 
+        
+        !> bk
+        bk(pexp%idx(i,j,k)) = bk_1(pexp%idx(i,j,k))/(4.0_wp*pi) + &
+                              delta**2.0_wp*bk_3(pexp%idx(i,j,k))/(8.0_wp*pi) !> (2.21)   
+      endif 
+    enddo; enddo; enddo
+    deallocate(bk_1, bk_3)
+#endif 
 
   do k=0,pexp%degree-1;  do j=0,pexp%degree-1-k; do i=0,pexp%degree-1-j-k;
     this%D(1,pexp%idx(i,j,k)) = - (1.0_wp+real(i,wp))*bk(pexp%idx(i+1,j,k))

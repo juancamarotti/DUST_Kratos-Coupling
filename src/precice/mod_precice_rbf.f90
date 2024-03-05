@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -84,8 +84,12 @@ type :: t_precice_rbf
 
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
+  !> Grid virtual nodes connectivity
+  type(t_rbf_conn) :: nod_virtual
   !> Elem centers connectivity
   type(t_rbf_conn) :: cen
+  !> Elem virtual centers connectivity
+  type(t_rbf_conn) :: cen_virtual
   !> Ac stripe connectivity (for vl corrected) 
   type(t_rbf_conn) :: ctr_pt 
   !> Generic point 

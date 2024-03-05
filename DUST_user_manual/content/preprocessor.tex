@@ -225,7 +225,7 @@ the loaded points of the specified factor.
 
 offset and scaling are applied in the following order:
 \begin{equation*}
-  \mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
+  \mathbf{r} = \param{Scaling} (\mathbf{r}_\param{loaded} + \param{offset})
 \end{equation*}
 \end{itemize}
 
@@ -683,6 +683,7 @@ reference_chord_fraction = 0.0
 !mesh_flat = T
 
 nelem_chord = 10
+nelem_chord_virtual = 20
 type_chord = cosineLE
 
 ! First section
@@ -754,7 +755,7 @@ All the detailed parameters of the geometry input file for parametric geometry a
 
   offset and scaling are applied in the following order:
   \begin{equation*}
-    \mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
+    \mathbf{r} = \param{Scaling} (\mathbf{r}_\param{loaded} + \param{offset})
   \end{equation*}
 
 
@@ -821,6 +822,10 @@ All the detailed parameters of the geometry input file for parametric geometry a
   Number of elements in chord direction. Note: if the elements are vortex lattice \texttt{nelem\_chord} 
   elements will be generated, while in case of surface panels $2\cdot$\texttt{nelem\_chord} elements will be produced, 
   \texttt{nelem\_chord} on the lower and \texttt{nelem\_chord} on the upper side. In case of lifting lines this parameter is ignored.
+
+  \item \param{nelem\_chord\_virtual} \textit{required:} no. \textit{multiple:} no. \textit{type:} integer. 
+  Number of virtual elements in chord direction. This parameter is used to generate a surface panel virtual mesh need for the \param{penetration\_avoidance} 
+  condition. For the lifting line the default value is 20, while for the vortex lattice the default value is equal to \param{nelem\_chord}. 
 
   \item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. 
   \textit{default:} uniform \textit{type:} string.

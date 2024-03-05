@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -121,7 +121,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   logical, intent(in)                                       :: average
 
   type(t_geo_component), allocatable                        :: comps(:)
-  character(len=max_char_len)                               :: filename
+  character(len=max_char_len)                               :: filename, filename_virtual, filename_in
   integer(h5loc)                                            :: floc , ploc
   logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
   logical                                                   :: out_wake, out_surfvel, out_vrad, out_pid
@@ -131,10 +131,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   integer                                                   :: n_var , i_var
   character(len=max_char_len), allocatable                  :: var_names(:)
   real(wp), allocatable                                     :: points(:,:), points_exp(:,:) , wpoints(:,:)
+  real(wp), allocatable                                     :: points_virtual(:,:), points_virtual_exp(:,:)
   real(wp), allocatable                                     :: vppoints(:,:), vpvort(:)
   real(wp), allocatable                                     :: vpvort_v(:,:), vpturbvisc(:), v_rad(:), vp_parentid(:)
-  integer , allocatable                                     :: elems(:,:) , welems(:,:)
-  integer                                                   :: nelem , nelem_w, nelem_vp
+  integer , allocatable                                     :: elems(:,:) , elems_virtual(:,:), welems(:,:)
+  integer                                                   :: nelem , nelem_virtual, nelem_w, nelem_vp
 
   real(wp), allocatable                                     :: points_ave(:,:)
 
@@ -148,6 +149,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
   type(t_output_var), allocatable                           :: out_vars(:), ave_out_vars(:)
   type(t_output_var), allocatable                           :: out_vars_w(:), out_vars_vp(:)
+  type(t_output_var), allocatable                           :: out_vars_virtual(:)
   integer                                                   :: nprint , nprint_w, nelem_out
 
   integer                                                   :: it, ires
@@ -161,16 +163,27 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_wake = getlogical(sbprms,'wake')
   separate_wake = getlogical(sbprms,'separate_wake')
 
-  !Check which variables to analyse
-  out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.; out_pid = .false.
+  !Check which variables to analyse 
+  out_vort      = .false.
+  out_vort_vec  = .false.
+  out_vel       = .false. 
+  out_surfvel   = .false.
+  out_press     = .false. 
+  out_cp        = .false.
+  out_turbvisc  = .false.
+  out_vrad      = .false.
+  out_dforce    = .false.
+  out_dmom      = .false.  
+  out_pid       = .false.
   n_var = countoption(sbprms, 'variable')
   
   allocate(var_names(n_var))
   do i_var = 1, n_var
     var_names(i_var) = getstr(sbprms, 'variable') ; call LowCase(var_names(i_var))
   enddo
-  out_vort     = isInList('vorticity',          var_names) ! Always lower case string in the code !
-  out_vort_vec = isInList('vorticity_vector',   var_names) ! Always lower case string in the code !
+
+  out_vort     = isInList('vorticity',          var_names) 
+  out_vort_vec = isInList('vorticity_vector',   var_names) 
   out_vel      = isInList('velocity' ,          var_names)
   out_surfvel  = isInList('surface_velocity',   var_names)
   out_press    = isInList('pressure' ,          var_names)
@@ -195,7 +208,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_pid) nprint = nprint+1
   
   allocate(out_vars(nprint))
-  
+  allocate(out_vars_virtual(0))
+
   if(average) allocate(ave_out_vars(nprint))
   
   if(out_wake) then
@@ -207,7 +221,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   ! Load the components (just once)
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                                 components_names, all_comp)
 
   call close_hdf5_file(floc)
@@ -226,8 +240,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     ires = ires+1
 
     ! Open the file
-    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
-    call open_hdf5_file(trim(filename),floc)
+    write(filename_in,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+    call open_hdf5_file(trim(filename_in),floc)
 
     ! Load free-stream parameters
     call open_hdf5_group(floc,'Parameters',ploc)
@@ -240,10 +254,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     call load_refs(floc,refs_R,refs_off)
 
     !> Move the points
-    call update_points_postpro(comps, points, refs_R, refs_off, &
-                                filen = trim(filename) )
+    call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
+                                filen = trim(filename_in) )
     !> Expand the actuator disks
-    call expand_actdisk_postpro(comps, points, points_exp, elems)
+    call expand_actdisk_postpro(comps, points, points_virtual, points_exp, points_virtual_exp, elems, elems_virtual)
+
     if(average .and. it .eq. an_avg) then
       ! Save the points of this iteration for the average visualization
         allocate(points_ave(size(points_exp,1),size(points_exp,2)))
@@ -268,6 +283,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     i_var = 1
     if(out_vort) then
       call add_output_var(out_vars(i_var), vort, 'Singularity_Intensity', &
+                          .false.)
+      i_var = i_var +1
+    endif
+    if(out_vrad) then
+      call add_output_var(out_vars(i_var), vort, 'Vortex_Rad', &
                           .false.)
       i_var = i_var +1
     endif
@@ -316,7 +336,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     if(.not. average) then
       ! Output filename
       write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
-
+      write(filename_virtual,'(A,I4.4)') trim(basename)//'_virtual_'//trim(an_name)//'-',it
       if (out_wake) then
 
         if(out_turbvisc) then
@@ -379,8 +399,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                   'Vorticity',.false.)
           call add_output_var(out_vars_w(i_var), vpvort_v, &
                   'Vorticity',.true.)
-          call add_output_var(out_vars(i_var), vpvort_v, &
-                  ' Vorticity',.true.)
+          !call add_output_var(out_vars(i_var), vpvort_v, &
+          !        ' Vorticity',.true.)
           i_var = i_var +1
         endif
         if(out_vrad) then
@@ -388,8 +408,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                   'VortexRad',.false.)
           call add_output_var(out_vars_w(i_var), v_rad, &
                   'VortexRad',.true.)
-          call add_output_var(out_vars(i_var), v_rad, &
-                  'VortexRad',.true.)
+          !call add_output_var(out_vars(i_var), v_rad, &
+          !        'VortexRad',.true.)
           i_var = i_var +1
         endif
         if (out_dforce) then 
@@ -420,17 +440,23 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         select case (trim(out_frmt))
           case ('tecplot')
             filename = trim(filename)//'.plt'
+            filename_virtual = trim(filename_virtual)//'.plt'
             call  tec_out_viz(filename, t, &
                       points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
                       vp_rr=vppoints, vp_vars=out_vars_vp)
+            call  tec_out_viz(filename_virtual, t, &
+                      points_virtual_exp, elems_virtual, out_vars_virtual)
           case ('vtk')
             filename = trim(filename)//'.vtu'
+            filename_virtual = trim(filename_virtual)//'.vtu'
             call  vtk_out_viz(filename, &
                         points_exp, elems, out_vars, &
                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
                       vp_rr=vppoints, vp_vars=out_vars_vp, &
                       separate_wake = separate_wake)
+            call  vtk_out_viz(filename_virtual, &
+                      points_virtual_exp, elems_virtual, out_vars_virtual)
           case default
             call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
@@ -446,12 +472,18 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         select case (trim(out_frmt))
           case ('tecplot')
             filename = trim(filename)//'.plt'
+            filename_virtual = trim(filename_virtual)//'.plt'
             call  tec_out_viz(filename, t, &
                           points_exp, elems, out_vars)
+            call  tec_out_viz(filename_virtual, t, &
+                          points_virtual_exp, elems_virtual, out_vars_virtual)
           case ('vtk')
             filename = trim(filename)//'.vtu'
+            filename_virtual = trim(filename_virtual)//'.vtu'
             call  vtk_out_viz(filename, &
                           points_exp, elems, out_vars)
+            call  vtk_out_viz(filename_virtual, &
+                          points_virtual_exp, elems_virtual, out_vars_virtual)                          
           case default
             call error('dust_post','','Unknown format '//trim(out_frmt)//&
                         ' for visualization output')
@@ -501,7 +533,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     deallocate(points_ave)
   endif
 
-  deallocate(points)
+  deallocate(points, points_virtual)
   call destroy_elements(comps)
   deallocate(comps)
   deallocate(out_vars)

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -90,6 +90,9 @@ use mod_liftlin, only: &
 
 use mod_actuatordisk, only: &
   update_actdisk
+
+use mod_virtual, only: &
+  c_elem_virtual, t_elem_virtual_p
 
 use mod_vortline, only: &
   initialize_vortline
@@ -194,6 +197,8 @@ type(t_pot_elem_p), allocatable   :: elems_tot(:)
 type(t_pot_elem_p), allocatable   :: elems_non_corr(:)
 !> All the corrected vortex lattice elements 
 type(t_pot_elem_p), allocatable   :: elems_corr(:) 
+!> Elem virtual 
+type(t_elem_virtual_p), allocatable :: elems_virtual(:)
 
 !> Geometry
 type(t_geo)                       :: geo
@@ -231,7 +236,7 @@ real(wp), allocatable             :: jacobi(:,:)
 integer                           :: it_pan, n_pan_te
 
 !> VL viscous correction
-integer                           :: i_el, j_el, k_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
+integer                           :: i_el, j_el, k_el, i_c, i_s, i, sel, i_p, i_c2, i_s2, ih
 integer                           :: it_vl, it_stall
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3), a_v, area_stripe, dforce_stripe(3)
@@ -356,7 +361,7 @@ target_file = trim(sim_param%basename)//'_geo.h5'
 
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                    elems_ll, elems_corr, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
+                    elems_ll, elems_virtual, elems_corr, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -379,7 +384,7 @@ call finalizeParameters(prms)
   call precice%initialize_mesh( geo )
   call precice%initialize_fields()
   call precicef_initialize(precice%dt_precice)
-  call precice%update_elems(geo, elems_tot, te ) 
+  call precice%update_elems(geo, elems_tot, elems_virtual, te ) 
 #endif
 
 !> Initialization 
@@ -389,7 +394,7 @@ if(sim_param%use_fmm) then
   call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                        sim_param%RankineRad, octree)
+                        sim_param%octree_vortex_rad, octree)
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -478,12 +483,18 @@ end if
   end do
 
   !> Update dust geometry ( elems and first wake panels )
-  call precice%update_elems( geo, elems_tot, te )
+  call precice%update_elems( geo, elems_tot, elems_virtual, te )
 
   !> Update geo_data()
   do i_el = 1, size(elems_tot)
     call elems_tot(i_el)%p%calc_geo_data( &
                           geo%points(:,elems_tot(i_el)%p%i_ver) )
+  end do
+
+  !> Update geo_data()
+  do i_el = 1, size(elems_virtual)
+    call elems_virtual(i_el)%p%calc_geo_data_virtual( &
+              geo%points_virtual(:,elems_virtual(i_el)%p%i_ver) )
   end do
 
   !> Update near-field wake
@@ -625,12 +636,17 @@ it = 1
     end do
 
     !> Update dust geometry ( elems and first wake panels )
-    call precice%update_elems( geo, elems_tot, te )
+    call precice%update_elems( geo, elems_tot, elems_virtual, te )
 
     !> Update geo_data()
     do i_el = 1, size(elems_tot)
       call elems_tot(i_el)%p%calc_geo_data( &
                             geo%points(:,elems_tot(i_el)%p%i_ver) )
+    end do
+
+    do i_el = 1, size(elems_virtual)
+      call elems_virtual(i_el)%p%calc_geo_data_virtual( &
+                geo%points_virtual(:,elems_virtual(i_el)%p%i_ver) )
     end do
 
     !> Update near-field wake
@@ -1088,8 +1104,27 @@ end if
     linsys%A = A_tmp !> restore the A matrix for the next time iteration
   endif !> sim_param%kutta 
 
+!> check normal for hinged surfaces: mesure deviation from the reference hinge axis and panel normal
+!  if it is greater than 10 deg, set the pressure and force to zero 
+!$omp parallel do private(i_el, ih)
+  do i_el = 1, sel 
+    if (size(geo%components(elems(i_el)%p%comp_id)%hinge) .gt. 0) then 
+      do ih = 1, size(geo%components(elems(i_el)%p%comp_id)%hinge) 
+        if (abs(dot_product(((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 -  &
+                              geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1)/  & 
+                          norm2((geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr0 - &
+                              geo%components(elems(i_el)%p%comp_id)%hinge(ih)%ref%rr1))) , &
+                              elems(i_el)%p%nor)) .gt. sin(10*pi/180.0_wp)) then
+                                
+          elems(i_el)%p%dforce = 0.0_wp 
+          elems(i_el)%p%pres = 0.0_wp
+        endif  
+      enddo   
+    endif 
+  end do 
+!$omp end parallel do 
 
-  !> Vl correction for viscous forces 
+  !> VL correction for viscous forces 
   if (sim_param%vl_correction) then
     tol = sim_param%vl_tol
     diff = 1.0_wp 
@@ -1381,7 +1416,7 @@ end if
     end do
 
     !> Update dust geometry
-    call precice%update_elems( geo, elems_tot, te )
+    call precice%update_elems( geo, elems_tot,  elems_virtual, te)
 
     !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #endif
@@ -1452,6 +1487,10 @@ end if
       call elems_tot(i_el)%p%calc_geo_data( &
                             geo%points(:,elems_tot(i_el)%p%i_ver) )
     end do
+    do i_el = 1, size(elems_virtual)
+      call elems_virtual(i_el)%p%calc_geo_data_virtual( &
+                            geo%points_virtual(:,elems_virtual(i_el)%p%i_ver) )
+    end do
 
     !> Update near-field wake
     call precice%update_near_field_wake( geo, wake, te )
@@ -1464,7 +1503,7 @@ end if
       !> Update geometry
       call update_geometry(geo, te, time, .false., .true.)
       if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-        call complete_wake(wake, geo, elems_tot, te, it)
+        call complete_wake(wake, geo, elems_tot, elems_virtual, te, octree, it)
       end if
     endif
     t1 = dust_time() 

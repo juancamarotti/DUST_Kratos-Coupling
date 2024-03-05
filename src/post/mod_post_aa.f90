@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -118,8 +118,8 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   type(t_geo_component), allocatable  :: comps(:)
   character(len=max_char_len)         :: filename
   integer(h5loc)                      :: floc , ploc
-  real(wp), allocatable               :: points(:,:)
-  integer                             :: nelem, n_time
+  real(wp), allocatable               :: points(:,:), points_virtual(:,:)
+  integer                             :: nelem, nelem_virtual, n_time
   real(wp)                            :: time
   real(wp)                            :: p_inf, a_inf, rho_inf, mu_inf
   real(wp)                            :: u_inf(3)
@@ -140,7 +140,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   ! Load the components (just once)
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 
-  call load_components_postpro(comps, points, nelem, floc, &
+  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                                 components_names, all_comp)
 
   call close_hdf5_file(floc)
@@ -186,7 +186,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     call load_refs(floc, refs_R, refs_off, refs_G, refs_f)
 
     ! Move the points
-    call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f, &
+    call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, refs_G, refs_f, &
                                 filen = trim(filename) )
 
     !Load the results

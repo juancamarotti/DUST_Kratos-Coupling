@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -76,11 +76,11 @@ contains
 
 !----------------------------------------------------------------------
 
-subroutine read_mesh_basic(mesh_file,ee,rr)
+subroutine read_mesh_basic(mesh_file,ee,rr,ee_virtual,rr_virtual)
 
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:)
- real(wp) , allocatable, intent(out) :: rr(:,:)
+ integer  , allocatable, intent(out) :: ee(:,:), ee_virtual(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:), rr_virtual(:,:)
 
  character(len=max_char_len) :: filen_ee , filen_rr
  integer :: ee_size , rr_size
@@ -148,6 +148,11 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
   end do
   close(fid)
 
+  ! Virtual mesh
+  allocate(rr_virtual(3,rr_size)); 
+  rr_virtual = rr
+  allocate(ee_virtual(4,ee_size)); 
+  ee_virtual = ee
 
 end subroutine read_mesh_basic
 

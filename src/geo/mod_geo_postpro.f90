@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -89,6 +89,9 @@ use mod_vortlatt, only: &
 use mod_liftlin, only: &
   t_liftlin
 
+use mod_virtual, only: &
+  c_elem_virtual, t_elem_virtual_p
+
 use mod_actuatordisk, only: &
   t_actdisk
 
@@ -143,23 +146,23 @@ contains
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
 
-subroutine load_components_postpro(comps, points, nelem, floc, &
+subroutine load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
                                     components_names, all_comp)
   type(t_geo_component), allocatable, intent(inout) :: comps(:)
-  real(wp), allocatable, intent(out)                :: points(:,:)
-  integer, intent(out)                              :: nelem
+  real(wp), allocatable, intent(out)                :: points(:,:), points_virtual(:,:)
+  integer, intent(out)                              :: nelem, nelem_virtual
   integer(h5loc), intent(in)                        :: floc
   character(len=*), allocatable, intent(inout)      :: components_names(:)
   logical, intent(in)                               :: all_comp
 
   type(t_geo_component), allocatable                :: comp_temp(:)
   integer                                           :: i1 , i2, i3
-  integer, allocatable                              :: ee(:,:)
-  real(wp), allocatable                             :: rr(:,:)
+  integer, allocatable                              :: ee(:,:), ee_virtual(:,:)
+  real(wp), allocatable                             :: rr(:,:), rr_virtual(:,:)
   real(wp), allocatable                             :: ori(:,:)
   character(len=max_char_len)                       :: comp_el_type, comp_name
   character(len=max_char_len)                       :: comp_input, comp_name_stripped
-  integer                                           :: points_offset, n_vert
+  integer                                           :: points_offset, points_offset_virtual, n_vert
   real(wp), allocatable                             :: points_tmp(:,:)
   character(len=max_char_len)                       :: ref_tag
   integer                                           :: ref_id
@@ -167,7 +170,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   integer(h5loc)                                    :: gloc, cloc, geo_loc
   integer                                           :: n_comp, i_comp, n_comp_tot 
   integer                                           :: i_comp_tot, i_comp_tmp
-  integer                                           :: parametric_nelems_span , parametric_nelems_chor
+  integer                                           :: parametric_nelems_span
+  integer                                           :: parametric_nelems_chor, parametric_nelems_chor_virtual
   real(wp)                                          :: coupling_node_rot(3,3) = 0.0_wp
   
   !> Hinges
@@ -269,7 +273,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   end if
 
 !  allocate(comps(n_comp))
-  nelem = 0
+  nelem = 0; nelem_virtual = 0
   i_comp = 0; n_comp = 0
   do i_comp_tot = 1,n_comp_tot
 
@@ -322,12 +326,16 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
+      call read_hdf5_al(ee_virtual   ,'ee_virtual'   ,geo_loc)
+      call read_hdf5_al(rr_virtual   ,'rr_virtual'   ,geo_loc)
       if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' .or. & 
           trim(comps(i_comp)%comp_input) .eq. 'pointwise') then
         call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
         call read_hdf5( parametric_nelems_chor ,'parametric_nelems_chor',geo_loc)
+        call read_hdf5( parametric_nelems_chor_virtual ,'parametric_nelems_chor_virtual',geo_loc)
         comps(i_comp)%parametric_nelems_span = parametric_nelems_span
         comps(i_comp)%parametric_nelems_chor = parametric_nelems_chor
+        comps(i_comp)%parametric_nelems_chor_virtual = parametric_nelems_chor_virtual
       end if
 
       if ( trim(comps(i_comp)%comp_el_type) .eq. 'v' ) then
@@ -345,11 +353,17 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       else
         points_offset = 0
       endif
+      if(allocated(points_virtual)) then
+        points_offset_virtual = size(points_virtual,2)
+      else
+        points_offset_virtual = 0
+      endif
 
       !store the read points into the local points
       allocate(comps(i_comp)%loc_points(3,size(rr,2)))
       comps(i_comp)%loc_points = rr
-      
+      allocate(comps(i_comp)%loc_points_virtual(3,size(rr_virtual,2)))
+      comps(i_comp)%loc_points_virtual = rr_virtual
       !Now for the moments the points are stored here without moving them,
       !will be moved later, consider not storing them here at all
       allocate(points_tmp(3,size(rr,2)+points_offset))
@@ -359,11 +373,20 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       allocate(comps(i_comp)%i_points(size(rr,2)))
       comps(i_comp)%i_points = (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
+      allocate(points_tmp(3,size(rr_virtual,2)+points_offset_virtual))
+      if (points_offset_virtual .gt. 0) points_tmp(:,1:points_offset_virtual) = points_virtual
+      points_tmp(:,points_offset_virtual+1:points_offset_virtual+size(rr_virtual,2)) = rr_virtual
+      call move_alloc(points_tmp, points_virtual)
+      allocate(comps(i_comp)%i_points_virtual(size(rr_virtual,2)))
+      comps(i_comp)%i_points_virtual = (/((i3),i3=points_offset_virtual+1,points_offset_virtual+size(rr_virtual,2))/)
+
       ! --- treat the elements ---
 
       !allocate the elements of the component of the right kind
       comps(i_comp)%nelems = size(ee,2)
+      comps(i_comp)%nelems_virtual = size(ee_virtual,2)
       nelem = nelem + comps(i_comp)%nelems
+      nelem_virtual = nelem_virtual + comps(i_comp)%nelems_virtual
       select case(trim(comps(i_comp)%comp_el_type))
         case('p')
           allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
@@ -377,6 +400,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
           call error(this_sub_name, this_mod_name, &
                   'Unknown type of element: '//comps(i_comp)%comp_el_type)
       end select
+      allocate(comps(i_comp)%el_virtual(size(ee_virtual,2)))
 
       !> fill (some) of the elements fields
       do i2=1,size(ee,2)
@@ -388,6 +412,20 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         comps(i_comp)%el(i2)%i_ver(1:n_vert) = &
                                               ee(1:n_vert,i2) + points_offset
       enddo
+
+      n_vert = 0
+
+      !> fill (some) of the virtual elements fields
+      do i2=1,size(ee_virtual,2)
+
+        !> vertices
+        n_vert = count(ee_virtual(:,i2).ne.0)
+        allocate(comps(i_comp)%el_virtual(i2)%i_ver(n_vert))
+        comps(i_comp)%el_virtual(i2)%n_ver = n_vert
+        comps(i_comp)%el_virtual(i2)%i_ver(1:n_vert) = &
+                                              ee_virtual(1:n_vert,i2) + points_offset_virtual
+      enddo
+
 
       ! Update elems_offset for the next component
       !elems_offset = elems_offset + size(ee,2)
@@ -455,7 +493,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
 
       !cleanup
-      deallocate(ee,rr)
+      deallocate(ee, rr, ee_virtual, rr_virtual)
 
       if (allocated(ori)) then
         deallocate(ori) 
@@ -477,10 +515,11 @@ end subroutine load_components_postpro
 subroutine prepare_geometry_postpro(comps)
   type(t_geo_component), intent(inout), target :: comps(:)
 
-  integer                     :: i_comp, ie
-  integer                     :: nsides
-  class(c_pot_elem), pointer  :: elem
-  character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
+  integer                         :: i_comp, ie
+  integer                         :: nsides
+  class(c_pot_elem), pointer      :: elem
+  class(c_elem_virtual), pointer  :: elem_virtual
+  character(len=*), parameter     :: this_sub_name = 'prepare_geometry_postpro'
 
 
   do i_comp = 1,size(comps)
@@ -520,6 +559,13 @@ subroutine prepare_geometry_postpro(comps)
           call error(this_sub_name, this_mod_name, 'Unknown element type')
       end select
 
+    enddo
+    do ie = 1,size(comps(i_comp)%el_virtual)
+      elem_virtual => comps(i_comp)%el_virtual(ie)
+      nsides = size(elem_virtual%i_ver)
+      allocate(elem_virtual%edge_vec(3,nsides))
+      allocate(elem_virtual%edge_len(nsides))
+      allocate(elem_virtual%edge_uni(3,nsides))
     enddo
   enddo
 
@@ -641,17 +687,17 @@ function move_points(pp, R, of)  result(rot_pp)
 end function move_points
 
 !----------------------------------------------------------------------
-subroutine update_points_postpro(comps, points, refs_R, refs_off, &
+subroutine update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
                                   refs_G , refs_f, filen)
   type(t_geo_component), intent(inout)  :: comps(:)
-  real(wp), intent(inout)               :: points(:,:)
+  real(wp), intent(inout)               :: points(:,:), points_virtual(:,:)
   real(wp), intent(in)                  :: refs_R(:,:,0:)
   real(wp), intent(in)                  :: refs_off(:,0:)
   real(wp), optional , intent(in)       :: refs_G(:,:,0:)
   real(wp), optional , intent(in)       :: refs_f(:,0:)
 
 #if USE_PRECICE
-  real(wp), allocatable                  :: rr(:,:)
+  real(wp), allocatable                  :: rr(:,:), rr_virtual(:,:)
   real(wp), allocatable                  :: ori(:,:)
 #endif
   character(len=*), optional, intent(in) :: filen
@@ -660,7 +706,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 
   real(wp)                               :: time_todo = 0.0_wp  ! *** to do *** pass time as an input
   integer(h5loc)                         :: hiloc, hloc
-  real(wp), allocatable                  :: rr_hinge_contig(:,:)
+  real(wp), allocatable                  :: rr_hinge_contig(:,:), rr_hinge_contig_virtual(:,:)
   integer                                :: i_comp, ie, ih
   character(len=2)                       :: hinge_id_str
 
@@ -674,6 +720,9 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     points(:,comp%i_points) = move_points(comp%loc_points, &
                               refs_R(:,:,comp%ref_id), &
                               refs_off(:,comp%ref_id))
+    points_virtual(:,comp%i_points_virtual) = move_points(comp%loc_points_virtual, &
+                              refs_R(:,:,comp%ref_id), &
+                              refs_off(:,comp%ref_id))
 #if USE_PRECICE
   else
     !> Read points of a coupled component, from result files
@@ -685,9 +734,11 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     call open_hdf5_group( gloc, trim(cname), cloc )
     call open_hdf5_group( cloc, 'Geometry', rloc )
     call read_hdf5_al(rr,  'rr', rloc)
+    call read_hdf5_al(rr_virtual,  'rr_virtual', rloc)
     call read_hdf5_al(ori, 'ori', rloc)
     
     points(:,comp%i_points) = rr
+    points_virtual(:,comp%i_points_virtual) = rr_virtual
     do ie = 1, size(comp%el)
       comp%el(ie)%ori = ori(ie,:)
     enddo 
@@ -728,6 +779,16 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 
     deallocate(rr_hinge_contig)
 
+    !> Allocating virtual contiguous array
+    allocate(rr_hinge_contig_virtual(3,size(comp%i_points_virtual)))
+    rr_hinge_contig_virtual = points_virtual(:, comp%i_points_virtual)
+    call comp%hinge(ih)%hinge_deflection( comp%i_points_virtual, &
+                        rr_hinge_contig_virtual, time_todo, postpro=.true. )
+    points_virtual(:, comp%i_points_virtual) = rr_hinge_contig_virtual
+
+    deallocate(rr_hinge_contig_virtual)
+
+
     call close_hdf5_group(hiloc)
 
   end do
@@ -754,19 +815,22 @@ end subroutine update_points_postpro
 
 !----------------------------------------------------------------------
 
-subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
-  type(t_geo_component), intent(in)  :: comps(:)
-  real(wp), intent(in)               :: points(:,:)
-  real(wp), allocatable, intent(out) :: points_exp(:,:)
-  integer, allocatable, intent(out)  :: elems(:,:)
+subroutine expand_actdisk_postpro(comps, points, points_virtual, points_exp, & 
+                                  points_virtual_exp, elems, elems_virtual)
 
-  real(wp), allocatable              :: pt_tmp(:,:)
-  integer, allocatable               :: ee_tmp(:,:)
+  type(t_geo_component), intent(in)  :: comps(:)
+  real(wp), intent(in)               :: points(:,:), points_virtual(:,:)
+  real(wp), allocatable, intent(out) :: points_exp(:,:), points_virtual_exp(:,:)
+  integer, allocatable, intent(out)  :: elems(:,:), elems_virtual(:,:)
+
+  real(wp), allocatable              :: pt_tmp(:,:), pt_tmp_virtual(:,:)
+  integer, allocatable               :: ee_tmp(:,:), ee_tmp_virtual(:,:)
   integer                            :: i_comp, ie, extra_offset, iv, ipt, ipt1
   integer                            :: start_pts, start_cen
 
   extra_offset = 0
   allocate(points_exp(3,0), elems(4,0))
+  allocate(points_virtual_exp(3,0), elems_virtual(4,0))
   do i_comp = 1,size(comps)
     associate(cmp=>comps(i_comp))
     select type(el => cmp%el)
@@ -819,6 +883,20 @@ subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
                                                   el(ie)%i_ver+extra_offset
         enddo
         call move_alloc(ee_tmp, elems)
+
+        allocate(pt_tmp_virtual(3,size(points_virtual_exp,2)+size(cmp%loc_points_virtual,2)))
+        pt_tmp_virtual(:,1:size(points_virtual_exp,2)) = points_virtual_exp
+        pt_tmp_virtual(:,size(points_virtual_exp,2)+1:size(pt_tmp_virtual,2)) = points_virtual(:,cmp%i_points_virtual)
+        call move_alloc(pt_tmp_virtual, points_virtual_exp)
+
+        allocate(ee_tmp_virtual(4,size(elems_virtual,2)+cmp%nelems_virtual))
+        ee_tmp_virtual(:,1:size(elems_virtual,2)) = elems_virtual
+        ee_tmp_virtual(:,size(elems_virtual,2)+1:size(ee_tmp_virtual,2)) = 0
+        do ie = 1,cmp%nelems_virtual
+          ee_tmp_virtual(1:cmp%el_virtual(ie)%n_ver,size(elems_virtual,2)+ie) =  &
+                                                  cmp%el_virtual(ie)%i_ver + extra_offset
+        enddo
+        call move_alloc(ee_tmp_virtual, elems_virtual)
 
       end select
     end associate

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -63,7 +63,7 @@ module mod_stripe
     sim_param
 
   use mod_param, only: &
-    wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
+    wp, pi, one_4pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
   use mod_math, only: &
     cross, dot, linear_interp
@@ -379,7 +379,7 @@ module mod_stripe
     this%mag_inv = mag
     
     vel = vdou*this%mag_inv 
-    vel = vel/(4.0_wp*pi)
+    vel = vel*one_4pi
     
   end subroutine compute_vel_stripe   
 

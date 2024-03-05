@@ -70,7 +70,7 @@ LeavesTimeRatio,leaves_time_ratio
 Vortstretch,vortstretch
 VortstretchFromElems,vortstretch_from_elems
 DivergenceFiltering,divergence_filtering
-FilterTimescale,filter_time_scale
+AlphaDivFilt,alpha_divfilt
 Diffusion,diffusion
 TurbulentViscosity,turbulent_viscosity
 PenetrationAvoidance,penetration_avoidance

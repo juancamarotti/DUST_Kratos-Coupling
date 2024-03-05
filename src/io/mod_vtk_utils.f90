@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2023 Politecnico di Milano,
+!! Copyright (C) 2018-2024 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -86,10 +86,10 @@ contains
 !---------------------------------------------------------------------
 
 subroutine add_output_var_scal(output_var, var, var_name, skip)
- type(t_output_var), intent(inout) :: output_var
- real(wp), intent(in) :: var(:)
- character(len=*), intent(in) :: var_name
- logical, intent(in) :: skip
+  type(t_output_var), intent(inout) :: output_var
+  real(wp), intent(in) :: var(:)
+  character(len=*), intent(in) :: var_name
+  logical, intent(in) :: skip
 
   output_var%var_name = trim(var_name)
   output_var%vector = .false.
@@ -105,12 +105,12 @@ end subroutine add_output_var_scal
 !---------------------------------------------------------------------
 
 subroutine add_output_var_vec(output_var, var, var_name, skip)
- type(t_output_var), intent(inout) :: output_var
- real(wp), intent(in) :: var(:,:)
- character(len=*), intent(in) :: var_name
- logical, intent(in) :: skip
+  type(t_output_var), intent(inout) :: output_var
+  real(wp), intent(in) :: var(:,:)
+  character(len=*), intent(in) :: var_name
+  logical, intent(in) :: skip
 
- character(len=*), parameter :: this_sub_name = 'add_output_var_vec'
+  character(len=*), parameter :: this_sub_name = 'add_output_var_vec'
 
   output_var%var_name = trim(var_name)
   output_var%vector = .true.
@@ -129,12 +129,12 @@ end subroutine add_output_var_vec
 !---------------------------------------------------------------------
 
 subroutine copy_output_vars(output_vars, copy_vars, reset)
- type(t_output_var), intent(in)  :: output_vars(:)
- type(t_output_var), intent(out) :: copy_vars(:)
- logical, intent(in) :: reset
+  type(t_output_var), intent(in)  :: output_vars(:)
+  type(t_output_var), intent(out) :: copy_vars(:)
+  logical, intent(in)             :: reset
 
- integer :: i
- character(len=*), parameter :: this_sub_name = 'copy_output_vars'
+  integer                         :: i
+  character(len=*), parameter     :: this_sub_name = 'copy_output_vars'
 
   if(size(output_vars).ne.size(copy_vars)) call internal_error(this_sub_name,&
     this_mod_name, 'Copying output vectors of different lengths')
@@ -158,10 +158,10 @@ end subroutine copy_output_vars
 !---------------------------------------------------------------------
 
 subroutine clear_output_vars(output_vars)
- type(t_output_var), intent(out)  :: output_vars(:)
+  type(t_output_var), intent(out)  :: output_vars(:)
 
- integer :: i
- character(len=*), parameter :: this_sub_name = 'clear_output_vars'
+  integer                          :: i
+  character(len=*), parameter      :: this_sub_name = 'clear_output_vars'
 
   do i=1,size(output_vars)
     output_vars(i)%var_name = ''
@@ -176,33 +176,33 @@ end subroutine clear_output_vars
 !---------------------------------------------------------------------
 
 subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
-                                 npart, out_vars)
- integer, intent(in) :: fu
- integer, intent(inout) :: offset
- integer, intent(in) :: npoints
- integer, intent(in) :: ncells
- integer, intent(in) :: nquad
- integer, intent(in) :: ntria
- integer, intent(in) :: npart
- type(t_output_var), intent(in) :: out_vars(:)
+                                  npart, out_vars)
+  integer, intent(in)            :: fu
+  integer, intent(inout)         :: offset
+  integer, intent(in)            :: npoints
+  integer, intent(in)            :: ncells
+  integer, intent(in)            :: nquad
+  integer, intent(in)            :: ntria
+  integer, intent(in)            :: npart
+  type(t_output_var), intent(in) :: out_vars(:)
 
- character(len=200) :: buffer
- integer :: i_v
- character(len=20) :: ostr, str1, str2
- character(len=1)   :: lf
- character(len=*), parameter :: this_sub_name = 'vtk_print_piece_header'
+  character(len=200) :: buffer
+  integer :: i_v
+  character(len=20) :: ostr, str1, str2
+  character(len=1)   :: lf
+  character(len=*), parameter :: this_sub_name = 'vtk_print_piece_header'
 
   lf = char(10) !line feed char
   write(str1,'(I0)') npoints
   write(str2,'(I0)') ncells
   buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                   trim(str2)//'">'//lf; write(fu) trim(buffer)
+                    trim(str2)//'">'//lf; write(fu) trim(buffer)
   !Points
   buffer =  '   <Points>'//lf; write(fu) trim(buffer)
   write(ostr,'(I0)') offset
   buffer='    <DataArray type="Float32" Name="Coordinates" &
-                  &NumberOfComponents="3" format="appended" &
-         &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
+              &NumberOfComponents="3" format="appended" &
+              &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
 
   buffer =  '   </Points>'//lf; write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_fsize*3*npoints
@@ -212,7 +212,7 @@ subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+            &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad + &
                                 vtk_isize*1*npart
@@ -266,17 +266,17 @@ end subroutine vtk_print_piece_header
 !----------------------------------------------------------------------
 
 subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
-                                 npart, rr, ee)
- integer, intent(in) :: fu
- type(t_output_var), intent(in) :: out_vars(:)
- integer, intent(in) ::  nquad, ntria, npart
- real(wp), intent(in) :: rr(:,:)
- integer, intent(in), optional :: ee(:,:)
+                                npart, rr, ee)
+  integer, intent(in)            :: fu
+  type(t_output_var), intent(in) :: out_vars(:)
+  integer, intent(in)            ::  nquad, ntria, npart
+  real(wp), intent(in)           :: rr(:,:)
+  integer, intent(in), optional  :: ee(:,:)
 
- integer :: nbytes, ne, i_shift, etype
- integer :: i, i_v
- logical :: particles
- character(len=*), parameter :: this_sub_name='vtk_print_piece_data'
+  integer                        :: nbytes, ne, i_shift, etype
+  integer                        :: i, i_v
+  logical                        :: particles
+  character(len=*), parameter    :: this_sub_name='vtk_print_piece_data'
 
   if(nquad+ntria .gt. 0 .and. .not. present(ee)) call internal_error( &
   this_sub_name,this_mod_name,'Not passed connectivity to piece with elements')
@@ -285,17 +285,16 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
   if(nquad+ntria .le. 0) particles = .true.
   ne = nquad+ntria+npart
 
-
-
-  !Points
+  !> Points
   nbytes = vtk_fsize *  &
-               size(rr,1)*size(rr,2)
+                size(rr,1)*size(rr,2)
   write(fu) nbytes
+
   do i=1,size(rr,2)
-   write(fu) real(rr(:,i),vtk_fsize)
+    write(fu) real(rr(:,i),vtk_fsize)
   enddo
 
-  !Connectivity
+  !> Connectivity
   if(particles) then
     nbytes = vtk_isize*ne; write(fu) nbytes
     do i=1,npart
@@ -312,7 +311,7 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
     enddo
   endif
 
-  !Offset
+  !> Offset
   nbytes =  vtk_isize*ne; write(fu) nbytes
   if(particles) then
     do i=1,npart
@@ -330,7 +329,7 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
     enddo
   endif
 
-  !Cell types
+  !> Cell types
   nbytes = vtk_isize*ne; write(fu) nbytes
   if(particles) then
     do i=1,ne
@@ -348,7 +347,7 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
     enddo
   endif
 
-  !Variables
+  !> Variables
   do i_v = 1,size(out_vars)
     if(.not.out_vars(i_v)%vector) then
       nbytes =  vtk_fsize*ne; write(fu) nbytes
