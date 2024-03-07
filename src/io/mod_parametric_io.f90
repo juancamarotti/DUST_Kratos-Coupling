@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -63,8 +63,7 @@ use mod_spline, only: &
   hermite_spline_profile, catmull_rom_chain
 
 use mod_math, only: & 
-  linear_interp, unique, unique_row, linspace, sort_vector_real, & 
-  geoseries, geoseries_both, geoseries_hinge
+  linear_interp, unique, unique_row, linspace, sort_vector_real
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input 
@@ -86,7 +85,7 @@ contains
 
 !----------------------------------------------------------------------
 
-subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fraction, ElType, &
+subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     nelem_span_list, airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                     aero_table_out, thickness)
@@ -94,7 +93,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
   real(wp) , allocatable, intent(out)       :: rr(:,:)
-  integer  , intent(in)                     :: nelem_chord
   integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
   integer  , intent(in)                     :: n_hinges
   logical  , intent(in)                     :: mesh_mirror, mesh_symmetry
@@ -105,16 +103,16 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  real(wp), allocatable , intent(out), optional ::  thickness(:,:)
+  real(wp), allocatable , intent(out), optional                    ::  thickness(:,:)
   real(wp), allocatable                     :: thickness_section1(:), thickness_section2(:) 
   real(wp)                                  :: thickness_section
-  integer                                   :: nelem_chord_tot
+  integer                                   :: nelem_chord, nelem_chord_tot 
   integer                                   :: npoint_chord_tot, npoint_span_tot
   integer                                   :: nRegions, nSections
   integer                                   :: iRegion, iSection 
   integer                                   :: iChord, iSpan 
   integer                                   :: iElement, iPoint
-  real(wp), intent(in)                      :: ref_chord_fraction
+  real(wp)                                  :: ref_chord_fraction
   real(wp), allocatable                     :: ref_point(:)
   !> Data read from file
   !> Sections 
@@ -152,10 +150,10 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   logical                                   :: adjust_xz = .false.
   character(len=max_char_len), allocatable  :: type_span_list(:)
   integer                                   :: n_type_span
-  character, intent(in)                     :: ElType
+  character                                 :: ElType
   !> Sections 1. 2.
-  real(wp), allocatable :: xySection1(:,:), xySection2(:,:), xyAirfoil1(:,:), xyAirfoil2(:,:)
-  real(wp), allocatable :: rrSection1(:,:), rrSection2(:,:)
+  real(wp), allocatable :: xySection1(:,:), xySection2(:,:), xyAirfoil2(:,:)
+  real(wp), allocatable :: rrSection1(:,:), rrSection2(:,:), xyAirfoil1(:,:)
   real(wp)                                  :: dx_ref , dy_ref , dz_ref
   integer                                   :: ista, iend, i, j
 
@@ -177,10 +175,14 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
 
   !Prepare all the parameters to be read in the file
   ! Global parameters
-  
+  call pmesh_prs%CreateStringOption('el_type', &
+                'element type (temporary) p panel v vortex ring');
   call pmesh_prs%CreateLogicalOption('airfoil_table_correction', &
                 'include presence of aerodynamic .c81 for corrections', &
                 'F', &
+                multiple=.false.);
+  call pmesh_prs%CreateIntOption('nelem_chord',&
+                'number of chord-wise elements', &
                 multiple=.false.);
   call pmesh_prs%CreateStringOption('type_chord',&
                 'type of chord-wise division: uniform, cosine, cosineLE, cosineTE',&
@@ -189,6 +191,10 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   call pmesh_prs%CreateRealArrayOption('starting_point',&
                 'Starting point (inboard TE), (x, y, z)', &
                 '(/0.0, 0.0, 0.0/)',&
+                multiple=.false.);
+  call pmesh_prs%CreateRealOption('reference_chord_fraction',&
+                'Reference chord fraction', &
+                '0.0',&
                 multiple=.false.);
   call pmesh_prs%CreateLogicalOption('twist_linear_interpolation',&
                 'Linear interpolation of the twist angle, for the whole component',&
@@ -253,9 +259,12 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   
   !> Read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
+  
+  nelem_chord = getint(pmesh_prs,'nelem_chord')
+  ElType  = getstr(pmesh_prs,'el_type')
 
-  nSections  = countoption(pmesh_prs, 'chord')
-  nRegions   = countoption(pmesh_prs, 'span')
+  nSections = countoption(pmesh_prs, 'chord')
+  nRegions  = countoption(pmesh_prs, 'span')
   aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
 
   !> geometric series parameters 
@@ -274,6 +283,7 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
           &nSections .ne. nRegions. Stop.')
   end if
 
+  ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
 
   twist_linear_interp= getlogical(pmesh_prs,'twist_linear_interpolation')
@@ -329,6 +339,7 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
       if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
         y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+        write(*,*) ' r_in_list(iRegion) : ' , r_in_list(iRegion) 
         r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
       elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ib') then 
         r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
@@ -364,7 +375,6 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
     endif   
 
   enddo
-  type_chord = getstr(pmesh_prs,'type_chord')
 
   if (ElType.eq.'p') then
     nelem_chord_tot = 2*nelem_chord
@@ -392,9 +402,11 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   enddo
 
   allocate(rr(3,rr_size)) ; rr = 0.0_wp
+  
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
-
+  type_chord = getstr(pmesh_prs,'type_chord')
+  
   adaptive_mesh = .false. 
   do ih = 1, n_hinges
     if (hinges(ih)%adaptive_mesh) then
@@ -614,13 +626,12 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
     call define_division(type_chord, nelem_chord, chord_fraction, & 
                         r, r_le, r_te, r_le_fix, r_le_moving, r_te_fix, r_te_moving, x_refinement)
   endif 
-
-  if (allocated(rrSection1))  deallocate(rrSection1)
-  if (allocated(rrSection2)) deallocate(rrSection2) 
+  
   ! Initialize the span division to the maximum dimension
   allocate(span_fraction(maxval(nelem_span_list))) ; span_fraction = 0.0_wp
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
+
   ! Initialise dr_ref for the definition of the actual reference_point
   !  of each bay (by updating)
   dx_ref = ref_point(1)       ! 0.0_wp
@@ -640,24 +651,31 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   
   ista = 1
   iend = npoint_chord_tot
+  
   ! Loop over regions
   do iRegion = 1, nRegions
+
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
       thickness_section1(iRegion) = thickness_section2(iRegion-1)      
+
     else   ! first section                      ! build points
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
                           ref_point, xySection1, thickness_section)
-        rrSection1(1,:) = xySection1(1,:) + ref_point(1)
-        rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
-        rrSection1(3,:) = xySection1(2,:) + ref_point(3)
+
+      rrSection1(1,:) = xySection1(1,:) + ref_point(1)
+      rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
+      rrSection1(3,:) = xySection1(2,:) + ref_point(3)
+      
       ! Update rr
       rr(:,ista:iend) = rrSection1
       thickness_section1(iRegion) = thickness_section
+
     end if
-    
+
+
     ! It is possible to define the airfoils on some of the sections only.
     !  When the shape of the airfoil is not defined on a section, it is interpolated
     if ( trim(adjustl(airfoil_list(iRegion + 1))) .ne. 'interp' ) then  ! read the field 'airfoil'
@@ -666,8 +684,10 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
                             twist_list(iRegion+1), ElType, nelem_chord,                    &
                             type_chord , chord_fraction, ref_chord_fraction,               &
                             ref_point, xySection2, thickness_section)
-      thickness_section2(iRegion)         = thickness_section ! second section 
+      thickness_section2(iRegion) = thickness_section ! second section 
+
     else ! interpolation
+
       do iSec = iRegion + 1 , nRegions+1
         if ( airfoil_list(iSec) .ne. 'interp' ) then
           dy_actual_airfoils = sum( abs(span_list(iRegion:iSec-1)) )
@@ -680,12 +700,11 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
       call define_section( 1.0_wp , trim(adjustl(airfoil_list(iSec))), &
                             0.0_wp , ElType, nelem_chord,               &
                             type_chord , chord_fraction, 0.0_wp,        &
-                            ref_point, xyAirfoil2)
+                            ref_point, xyAirfoil2, thickness_section)
 
       ! Compute the coordinates xySection2(), after removing the offset
-      if ( allocated(xySection2) ) deallocate(xySection2)
-      
-      allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
+      if ( .not. allocated(xySection2) ) &
+                  allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
 
       if ( allocated(xyAirfoil1) ) deallocate(xyAirfoil1)
 
@@ -726,7 +745,7 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
     end if
 
     !> save before update
-    dx_ref_1 = dx_ref;  dy_ref_1 = dy_ref;  dz_ref_1 = dz_ref
+    dx_ref_1 = dx_ref ;  dy_ref_1 = dy_ref ;  dz_ref_1 = dz_ref
 
     dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref
     dy_ref = span_list(iRegion)                                             + dy_ref
@@ -895,6 +914,7 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
 
     end do ! iRegion 
 
+
   enddo ! iRegion 
   
   ! lots of deallocation missing causing memory leakage 
@@ -992,26 +1012,26 @@ subroutine read_mesh_parametric(mesh_file, ee, rr, nelem_chord, ref_chord_fracti
   ! optional output ----
 
 end subroutine read_mesh_parametric
+
 !-------------------------------------------------------------------------------
 
 subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
                           type_chord , chord_fraction, reference_chord_fraction,&
-                          reference_point, point_list, thickness_out)
+                          reference_point, point_list, thickness)
 
-  real(wp), allocatable , intent(out)               :: point_list(:,:)
-  real(wp), intent(in)                              :: reference_point(:) 
-  real(wp), intent(inout)                           :: chord_fraction(:)
-  character(len=*) , intent(in)                     :: type_chord
-  real(wp), intent(in)                              :: reference_chord_fraction, twist, chord
-  integer, intent(in)                               :: nelem_chord
-  character, intent(in)                             :: ElType
-  character(len=*) , intent(in)                     :: airfoil
-  real(wp),  intent(out), optional                  :: thickness_out
-  real(wp)                                          :: thickness
-  real(wp)                                          :: twist_rad
-  real(wp), allocatable                             :: points_mean_line(:,:)
-  integer                                           :: i, ascii
-  character(len=*), parameter                       :: this_sub_name='define_section'
+  real(wp), allocatable , intent(out)     :: point_list(:,:)
+  real(wp), intent(in)                    :: reference_point(:) 
+  real(wp), intent(inout)                 :: chord_fraction(:)
+  character(len=*) , intent(in)           :: type_chord
+  real(wp), intent(in)                    :: reference_chord_fraction, twist, chord
+  integer, intent(in)                     :: nelem_chord
+  character, intent(in)                   :: ElType
+  character(len=*) , intent(in)           :: airfoil
+  real(wp),  intent(out)                  :: thickness
+  real(wp), allocatable                   :: points_mean_line(:,:)
+  real(wp)                                :: twist_rad
+  integer                                 :: i, ascii
+  character(len=*), parameter :: this_sub_name='define_section'
 
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
 
@@ -1042,22 +1062,34 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
       call naca4digits(airfoil(5:8), nelem_chord, chord_fraction, &
                         points_mean_line , point_list, thickness)
 
+      if ( ElType .eq. 'v' ) then
+        deallocate(point_list)
+        allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) )
+        point_list = points_mean_line
+      end if
+
     elseif ( len_trim(airfoil) .eq. 9 ) then
       call naca5digits(airfoil(5:9), nelem_chord, chord_fraction, &
-                        points_mean_line , point_list, thickness)     
+                        points_mean_line , point_list, thickness)
+
+      if ( ElType .eq. 'v' ) then
+        deallocate(point_list)
+        allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) )
+        point_list = points_mean_line
+      end if
+      
     else
       call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
       &NACA airfoils implemented. Check your input syntax or provide the coordinates&
       & of the airfoil as a .dat file ')    
     end if
-    if (ElType .eq. 'v') then 
-      point_list = points_mean_line
-    end if
+
   else
     call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
       &NACA airfoils implemented. Check your input syntax or provide the coordinates&
       & of the airfoil as a .dat file ')
   end if
+
 
   ! Geometric transformation +++++++++++++++++++++++++++++++++++++++++++++++++++
   ! 1. translation : reference_chord_fraction (defined for a unit-chord airfoil)
@@ -1065,14 +1097,11 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   ! 2. scaling     : chord
   point_list = point_list * chord
   ! 3. rotation    : twist
-  point_list        = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-                                          sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+  point_list = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+                                  sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                     point_list )
   thickness = thickness * chord 
-  !> optional output
-  if (present(thickness_out)) then
-    thickness_out = thickness
-  end if
+
 end subroutine define_section
 
 !-------------------------------------------------------------------------------
@@ -1263,7 +1292,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
   character(len=*), intent(in)                :: ElType
   integer         , intent(in)                :: nelems_chord
   real(wp)        , intent(in)                :: csi_half(:)
-  real(wp), allocatable , intent(out)         :: rr(:,:)
+  real(wp)        , allocatable, intent(out)  :: rr(:,:)
   real(wp)        , intent(out)               :: thickness
 
   real(wp) , allocatable      :: rr_dat(:,:) 
@@ -1357,6 +1386,8 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
         endif
       enddo
     enddo
+    rr(1,:) = rr_geo_mean(1,:)
+    rr(2,:) = rr_geo_mean(2,:) 
     thickness = 0.12_wp !> dummy value (assumed a NACA0012) 
   else 
 
@@ -1602,7 +1633,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
     endif 
     thickness = maxval(rr(2,:)) - minval(rr(2,:))
   end if !> old format 
-
+  
   !> cleanup
   if (allocated(rr_dat))            deallocate(rr_dat) 
   if (allocated(rr_up))             deallocate(rr_up)
@@ -1692,6 +1723,111 @@ subroutine define_division(type_mesh, nelem, division, &
 
 end subroutine define_division
 
+subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te) 
+  real(wp), intent(in)               :: start_x, end_x
+  integer, intent(in)                :: n_elem
+  real(wp), intent(in)               :: r
+  real(wp), allocatable, intent(out) :: dcsi_le(:), dcsi_te(:) 
+
+  real(wp), allocatable              :: dl(:)
+  real(wp)                           :: r_d
+  integer :: i
+  character(len=*), parameter :: this_sub_name = 'geoseries' 
+
+  allocate(dl(n_elem)); dl = 0.0_wp
+  if (.not. allocated(dcsi_te)) allocate(dcsi_te(n_elem + 1)); dcsi_te = 0.0_wp 
+  if (.not. allocated(dcsi_le)) allocate(dcsi_le(n_elem + 1)); dcsi_le = 0.0_wp
+  
+  !> check series convergence 
+  if ((r .ge. 1.0_wp) .or. (r .le. 0.0_wp)) then 
+    call error(this_mod_name, this_sub_name, 'insert a growth value between 0 and 1') 
+  end if
+  
+  r_d = 1-r ! growth ratio (intended as decreasing ratio) 
+  ! get size of the first element knowing the sum of the geometric series
+  dl(1) = (1.0_wp-r_d)/(1.0_wp - r_d**real(n_elem,wp));
+  do i = 2, n_elem
+    dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
+  end do 
+  do i = 1, n_elem
+    dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
+  end do
+
+  dcsi_le = (1-dcsi_te)
+  !> flip dcsi_le
+  dcsi_le = dcsi_le(size(dcsi_le):1:-1)  
+  !> rescale in the interval 
+  dcsi_te = dcsi_te*(end_x - start_x) + start_x 
+  dcsi_le = dcsi_le*(end_x - start_x) + start_x
+  !> cleanup 
+  if (allocated(dl)) deallocate(dl)
+
+end subroutine geoseries 
+
+subroutine geoseries_both(start_x, end_x, n_elem, xh, r_le, r_te, dcsi)
+  real(wp),               intent(in)    :: start_x, end_x
+  integer,                intent(in)    :: n_elem
+  real(wp),               intent(in)    :: xh
+  real(wp),               intent(in)    :: r_le, r_te
+  real(wp), allocatable,  intent(out)   :: dcsi(:) 
+
+  real(wp), allocatable                 :: dcsi_le(:), dcsi_te(:) 
+  real(wp), allocatable                 :: dcsi_le_(:), dcsi_te_(:) !> dummy
+  real(wp)                              :: mid_point, start_x_le, end_x_le, start_x_te, end_x_te 
+  integer                               :: n_elem_le, n_elem_te
+  character(len=*), parameter           :: this_sub_name = 'geoseries_both' 
+  
+  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
+
+  n_elem_le = ceiling(real(n_elem,wp)*xh) 
+  n_elem_te = n_elem - n_elem_le
+  mid_point = (start_x + end_x)*xh
+  start_x_le = start_x
+  end_x_le = mid_point
+  start_x_te = mid_point
+  end_x_te = end_x
+  call geoseries(start_x_le, end_x_le, n_elem_le, r_le, dcsi_le, dcsi_te_)
+  call geoseries(start_x_te, end_x_te, n_elem_te, r_te, dcsi_le_, dcsi_te)
+  dcsi = (/dcsi_le(1:(size(dcsi_le)-1)), dcsi_te/) 
+  !> cleanup
+  if (allocated(dcsi_le))  deallocate(dcsi_le)
+  if (allocated(dcsi_te))  deallocate(dcsi_te)
+  if (allocated(dcsi_le_)) deallocate(dcsi_le_)
+  if (allocated(dcsi_te_)) deallocate(dcsi_te_)
+
+end subroutine geoseries_both
+
+subroutine geoseries_hinge(start_x, end_x, n_elem, xh, &
+                          r_le_aft, r_te_aft, r_le_fore, r_te_fore, dcsi)
+  real(wp),               intent(in)     :: start_x, end_x
+  integer,                intent(in)     :: n_elem
+  real(wp),               intent(in)     :: xh
+  real(wp),               intent(in)     :: r_le_aft, r_te_aft, r_le_fore, r_te_fore
+  real(wp), allocatable,  intent(out)    :: dcsi(:)
+
+  real(wp), parameter                 :: x_mid = 0.5_wp !> put as input? 
+  real(wp)                            :: start_x_aft, end_x_aft, start_x_fore, end_x_fore
+  real(wp), allocatable               :: dcsi_aft(:), dcsi_fore(:) 
+  integer                             :: n_elem_aft, n_elem_fore 
+  character(len=*), parameter         :: this_sub_name = 'geoseries_hinge' 
+  
+  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
+  n_elem_aft = ceiling(real(n_elem,wp)*xh) 
+  n_elem_fore = n_elem - n_elem_aft
+  start_x_aft = start_x
+  end_x_aft = xh
+  start_x_fore = xh
+  end_x_fore = end_x
+  call geoseries_both(start_x_aft, end_x_aft, n_elem_aft, x_mid, r_le_aft, r_te_aft, dcsi_aft);
+  call geoseries_both(start_x_fore, end_x_fore, n_elem_fore, x_mid, r_le_fore, r_te_fore, dcsi_fore);
+
+  dcsi = (/dcsi_aft(1:(size(dcsi_aft)-1)), dcsi_fore/)
+
+  !> cleanup
+  if (allocated(dcsi_aft))  deallocate(dcsi_aft)
+  if (allocated(dcsi_fore)) deallocate(dcsi_fore)  
+
+end subroutine geoseries_hinge
 
 !-------------------------------------------------------------------------------
 subroutine define_thickness(rr_geo, thickness)

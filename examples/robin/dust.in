@@ -1,13 +1,13 @@
-basename = ./Output/robin
+basename       = ./Output/robin
 
 ! free-stream conditions ---------------
-u_inf = (/ 0.0 , 0.0 , 0.0 /)
-u_ref = 100.0
+u_inf   = (/ 27.0 , 0.0 , 0.0 /)
+
 ! Time ---------------------------------
 tstart = 0.0
 tend = 0.630063
-dt = 0.000151577
-dt_out = 0.000151577
+dt = 0.000751577
+dt_out = 0.000751577
 output_start = T
 
 ! geometry -----------------------------
@@ -27,8 +27,6 @@ fmm = T
 vortstretch = T
 diffusion = T
 penetration_avoidance = T
-reformulated = F
-integrator = euler 
 
 ! wake parameters ----------------------
 n_wake_panels = 1

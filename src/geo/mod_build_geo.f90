@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -46,8 +46,6 @@
 !!          Andrea Colli
 !!          Alessandro Cocco
 !!          Alberto Savino
-!!          Federico Gentile
-!!          Matteo Dall'Ora
 !!=========================================================================
 
 !> Module to generate the geometry from different kinds of inputs, from mesh
@@ -168,9 +166,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   real(wp),intent(in)          :: global_tol_sew , global_inner_prod_te
   type(t_parse)                :: geo_prs
   character(len=max_char_len)  :: mesh_file
-  integer, allocatable         :: ee(:,:), ee_virtual(:,:)
-  real(wp), allocatable        :: rr(:,:), rr_virtual(:,:)
-  real(wp), allocatable        :: rr_sym(:,:), rr_sym_virtual(:,:)
+  integer, allocatable         :: ee(:,:)
+  real(wp), allocatable        :: rr(:,:)
+  real(wp), allocatable        :: rr_sym(:,:)
   real(wp), allocatable        :: theta_e(:), theta_p(:), chord_p(:)
   character(len=max_char_len)  :: comp_el_type
   character                    :: ElType
@@ -218,12 +216,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !> Offset and scaling factor for CGNS
   real(wp)         :: offset(3)
   real(wp)         :: scaling
-  integer          :: npoints_chord_tot, npoints_chord_tot_virtual, nelems_span, nelems_span_tot
-
-  !> Chord elements for parametric meshing
-  integer          :: nelem_chord, nelem_chord_virtual
-  real(wp)         :: ref_chord_fraction
-
+  integer          :: npoints_chord_tot, nelems_span, nelems_span_tot
+  
   !> Connectivity and te structures
   integer , allocatable                    :: neigh(:,:)
 
@@ -370,18 +364,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               'Number of elements along the length of the body revolution.')
   call geo_prs%CreateIntOption('rev_nelem_rev', &
           'Number of elements around the body of revolution circumference.')
-
-  !> Parametric mesh
-  call geo_prs%CreateIntOption('nelem_chord',&
-          'number of chord-wise elements', &
-          multiple=.false.);
-  call geo_prs%CreateIntOption('nelem_chord_virtual',&
-          'number of virtual chord-wise elements', &
-          multiple=.false.);
-  call geo_prs%CreateRealOption('reference_chord_fraction',&
-          'Reference chord fraction', &
-          '0.25',&
-          multiple=.false.);
 
   !=====
   !===== Read the parameters ====
@@ -586,7 +568,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   case('basic')
     mesh_file = getstr(geo_prs,'mesh_file')
-    call read_mesh_basic(trim(mesh_file),ee, rr, ee_virtual, rr_virtual)
+    call read_mesh_basic(trim(mesh_file),ee, rr)
 
     
   case('cgns')
@@ -601,7 +583,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       sectionNamesCGNS(iSection) = trim(getstr(geo_prs, 'SectionName'))
     enddo
 
-    call read_mesh_cgns(trim(mesh_file), sectionNamesCGNS,  ee, rr, ee_virtual, rr_virtual)
+    call read_mesh_cgns(trim(mesh_file), sectionNamesCGNS,  ee, rr)
 
   case('revolution')
 
@@ -654,45 +636,26 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     endif
 
     ! 3D section
-    allocate (rr (3,nSections*(nelems_span-1)+2), rr_virtual (3,nSections*(nelems_span-1)+2), &
-                ee (4,nSections*nelems_span), ee_virtual (4,nSections*nelems_span))
-    rr = 0; ee = 0; rr_virtual = 0; ee_virtual = 0
-    call meshbyrev (rr_te(:,1),rr_te(:,2), nSections, rr, ee, rr_virtual, ee_virtual)
+    allocate (rr (3,nSections*(nelems_span-1)+2), &
+                ee (4,nSections*nelems_span) )
+    rr = 0; ee = 0
+    call meshbyrev (rr_te(:,1),rr_te(:,2), nSections, rr, ee)
 
     deallocate (rr_te)
 
   case('parametric')
 
-    if ((ElType .eq. 'v' .or. ElType .eq. 'p')) then
-      nelem_chord = getint(geo_prs,'nelem_chord')  
-      if (countoption(geo_prs, 'nelem_chord_virtual') .eq. 1) then
-        nelem_chord_virtual = getint(geo_prs,'nelem_chord_virtual')
-      else
-        nelem_chord_virtual = nelem_chord
-      end if
-    end if
-    ref_chord_fraction = getreal(geo_prs,'reference_chord_fraction')
-    mesh_file          = geo_file
+    mesh_file = geo_file
 
     if ((ElType .eq. 'v')) then
 
       !> TODO : actually it is possible to define the parameters in the GeoFile
       !> directly, find a good way to do this
-    
-      !> Construction of the virtual panels for collision avoidance
-      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, & 
-                                nelem_chord_virtual, ref_chord_fraction, 'p', &
-                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges,  &
-                                mesh_mirror, mesh_symmetry, nelem_span_list, airfoil_list, & 
-                                i_airfoil_e, normalised_coord_e, aero_table, thickness) 
-      
-      !> Construction of the actual VL elements                         
-      call read_mesh_parametric(trim(mesh_file), ee, rr, & 
-                                nelem_chord, ref_chord_fraction, ElType, &
-                                npoints_chord_tot, nelems_span, hinges, n_hinges, & 
-                                mesh_mirror, mesh_symmetry, nelem_span_list, airfoil_list, & 
-                                i_airfoil_e, normalised_coord_e, aero_table, thickness)  
-      
+      call read_mesh_parametric(trim(mesh_file), ee, rr, &
+                              npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
+                              nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
+                              aero_table, thickness)  
+
       !> Write additional fields for vl correction
       if (aero_table) then 
 
@@ -718,46 +681,21 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       nelems_span_tot =   nelems_span
         
     elseif (ElType .eq. 'p') then
-
-      !> Construction of the virtual panels for collision avoidance
-      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, &
-                                nelem_chord_virtual, ref_chord_fraction, 'p', &
-                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges, &
-                                mesh_mirror, mesh_symmetry, nelem_span_list)
-
-      !> Construction of the actual panels
-      call read_mesh_parametric(trim(mesh_file), ee, rr, & 
-                                nelem_chord, ref_chord_fraction, ElType, &
-                                npoints_chord_tot, nelems_span, hinges, n_hinges, & 
-                                mesh_mirror, mesh_symmetry, nelem_span_list)
-                                
+      call read_mesh_parametric(trim(mesh_file), ee, rr, &
+                                npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry, nelem_span_list)
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
     elseif(ElType .eq. 'l') then ! LIFTING LINE element
 
-        if (countoption(geo_prs, 'nelem_chord_virtual') .eq. 1) then
-          nelem_chord_virtual = getint(geo_prs,'nelem_chord_virtual')
-        else
-          nelem_chord_virtual = 20 ! Default value
-        end if
-
-      !> Construction of the virtual panels for collision avoidance
-      call read_mesh_parametric(trim(mesh_file), ee_virtual, rr_virtual, &
-                                nelem_chord_virtual, 0.25_wp, 'p', &
-                                npoints_chord_tot_virtual, nelems_span, hinges, n_hinges,  &
-                                mesh_mirror, mesh_symmetry, nelem_span_list, airfoil_list, & 
-                                i_airfoil_e, normalised_coord_e, aero_table, thickness)
-
-      !> Construction of the actual LL elements  
-      call read_mesh_ll(trim(mesh_file), ee, rr, &
+      call read_mesh_ll(trim(mesh_file),ee,rr, &
                         airfoil_list   , nelem_span_list   , &
                         i_airfoil_e    , normalised_coord_e, &
                         npoints_chord_tot, nelems_span, &
                         chord_p, theta_p, theta_e )
       
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
-      nelems_span_tot = nelems_span
+      nelems_span_tot =   nelems_span
 
       !> x_AC Offset
       xac_offset_io = getlogical(geo_prs,'Offset_xac')
@@ -799,82 +737,42 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     end if
     
   case('pointwise')
-    
-    if ((ElType .eq. 'v' .or. ElType .eq. 'p')) then
-      nelem_chord         = getint(geo_prs,'nelem_chord')  
-      if (countoption(geo_prs, 'nelem_chord_virtual') .eq. 1) then
-        nelem_chord_virtual = getint(geo_prs,'nelem_chord_virtual')
-      else
-        nelem_chord_virtual = nelem_chord
-      end if
-    end if
-    
-    ref_chord_fraction = getreal(geo_prs,'reference_chord_fraction') 
+
     mesh_file = geo_file
 
     if ( ( ElType .eq. 'v' )) then  
-
-      !> Construction of the virtual panels for collision avoidance
-      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual,      & 
-                              nelem_chord_virtual, ref_chord_fraction, 'p',  &
-                              npoints_chord_tot_virtual, nelems_span,        &
+    
+      call read_mesh_pointwise(trim(mesh_file), ee, rr, &
+                              npoints_chord_tot, nelems_span, &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
                               aero_table, thickness)  
-
-      !> Construction of the actual VL elements
-      call read_mesh_pointwise(trim(mesh_file), ee, rr,                      & 
-                              nelem_chord, ref_chord_fraction, ElType,       &
-                              npoints_chord_tot, nelems_span,                &
-                              airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table, thickness)  
-
       !> Write additional fields for vl correction
       if (aero_table) then 
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
         call write_hdf5('true',             'aero_table',         geo_loc)
-        call write_hdf5(thickness,          'thickness',          geo_loc)        
+        call write_hdf5(thickness,          'thickness',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif
 
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
-      nelems_span_tot = nelems_span
+      nelems_span_tot =   nelems_span
     
     elseif (( ElType .eq. 'p' ) ) then
 
-      !> Construction of the virtual panels for collision avoidance
-      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual,     & 
-                              nelem_chord_virtual, ref_chord_fraction, 'p', &
-                              npoints_chord_tot_virtual, nelems_span )
+      call read_mesh_pointwise( trim(mesh_file) , ee , rr , &
+                                npoints_chord_tot, nelems_span )
+      nelems_span_tot =   nelems_span
 
-      !> Construction of the actual surface panels
-      call read_mesh_pointwise(trim(mesh_file), ee, rr,                & 
-                              nelem_chord, ref_chord_fraction, ElType, &
-                              npoints_chord_tot, nelems_span )
-      nelems_span_tot = nelems_span
+    elseif ( ElType .eq. 'l' ) then
 
-    elseif ( ElType .eq. 'l' ) then 
-
-      if (countoption(geo_prs, 'nelem_chord_virtual') .eq. 1) then
-        nelem_chord_virtual = getint(geo_prs,'nelem_chord_virtual')
-      else
-        nelem_chord_virtual = 20 ! Default value
-      end if
-
-      !> Construction of the virtual panels for collision avoidance
-      call read_mesh_pointwise(trim(mesh_file), ee_virtual, rr_virtual, & 
-                              nelem_chord_virtual, 0.25_wp, 'p',        &
-                              npoints_chord_tot_virtual, nelems_span )
-
-      !> Construction of the actual LL elements
-      call read_mesh_pointwise_ll(trim(mesh_file), ee, rr, 'l',    &
-                                  airfoil_list, nelem_span_list,   &
-                                  i_airfoil_e, normalised_coord_e, &
-                                  npoints_chord_tot, nelems_span,  &
-                                  chord_p, theta_p, theta_e )
-                                  
+      call read_mesh_pointwise_ll(trim(mesh_file),ee,rr, &
+                                  airfoil_list   , nelem_span_list   , &
+                                  i_airfoil_e    , normalised_coord_e, &
+                                  npoints_chord_tot, nelems_span, &
+                                  chord_p,theta_p,theta_e )
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
@@ -918,15 +816,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     do i = 1,size(rr,2)
       rr(:,i) = rr(:,i) + offset
     enddo
-    do i = 1,size(rr_virtual,2)
-      rr_virtual(:,i) = rr_virtual(:,i) + offset
-    enddo
   endif
 
   !> Apply scaling 
   if (scaling .ne. 1.0_wp) then
     rr = rr * scaling
-    rr_virtual = rr_virtual * scaling
   endif
 
   !> coupling with preCICE 
@@ -938,17 +832,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       if ( mesh_mirror ) then
         select case (trim(mesh_file_type))
           case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-            call mirror_mesh(ee_virtual, rr_virtual, mirror_point, mirror_normal)
             call mirror_mesh(ee, rr, mirror_point, mirror_normal)
-            
           case('parametric','pointwise')
-            call mirror_mesh_structured(ee_virtual, rr_virtual,  &
-                                        npoints_chord_tot_virtual , nelems_span , &
-                                        mirror_point, mirror_normal)
             call mirror_mesh_structured(ee, rr,  &
                                         npoints_chord_tot , nelems_span , &
                                         mirror_point, mirror_normal)
-
           case default
             call error(this_sub_name, this_mod_name,&
                 'Mirror routines implemented for MeshFileType = &
@@ -960,12 +848,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       if ( mesh_symmetry ) then
         select case (trim(mesh_file_type))
           case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-            call symmetry_mesh(ee_virtual, rr_virtual, symmetry_point, symmetry_normal)
             call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
           case('parametric','pointwise')
-            call symmetry_mesh_structured(ee_virtual, rr_virtual,  &
-                                          npoints_chord_tot_virtual , nelems_span , &
-                                          symmetry_point, symmetry_normal, rr_sym_virtual)
             call symmetry_mesh_structured(ee, rr,  &
                                           npoints_chord_tot , nelems_span , &
                                           symmetry_point, symmetry_normal, rr_sym)
@@ -1020,7 +904,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
         rr = matmul( transpose(coupling_node_rot), rr )
-        rr_virtual = matmul( transpose(coupling_node_rot), rr_virtual )
     end if
 
   else 
@@ -1028,13 +911,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if ( mesh_symmetry ) then
       select case (trim(mesh_file_type))
         case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-          call symmetry_mesh(ee_virtual, rr_virtual, symmetry_point, symmetry_normal)
           call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-          
+        
         case('parametric','pointwise')
-          call symmetry_mesh_structured(ee_virtual, rr_virtual,  &
-                                          npoints_chord_tot_virtual , nelems_span , &
-                                          symmetry_point, symmetry_normal, rr_sym_virtual)                                                   
           call symmetry_mesh_structured(ee, rr,  &
                                           npoints_chord_tot , nelems_span , &
                                           symmetry_point, symmetry_normal, rr_sym)
@@ -1052,12 +931,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       select case (trim(mesh_file_type))
         case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-          call mirror_mesh(ee_virtual, rr_virtual, mirror_point, mirror_normal)
           call mirror_mesh(ee, rr, mirror_point, mirror_normal)
         case('parametric','pointwise')
-          call mirror_mesh_structured(ee_virtual, rr_virtual,  &
-                                        npoints_chord_tot_virtual , nelems_span , &
-                                        mirror_point, mirror_normal)          
           call mirror_mesh_structured(ee, rr,  &
                                         npoints_chord_tot , nelems_span , &
                                         mirror_point, mirror_normal)
@@ -1074,13 +949,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   if ( mesh_symmetry ) then
     select case (trim(mesh_file_type))
       case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-        call symmetry_mesh(ee_virtual, rr_virtual, symmetry_point, symmetry_normal)
         call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
 
       case('parametric','pointwise')
-        call symmetry_mesh_structured(ee_virtual, rr_virtual,  &
-                                        npoints_chord_tot_virtual , nelems_span , &
-                                        symmetry_point, symmetry_normal, rr_sym_virtual)        
         call symmetry_mesh_structured(ee, rr,  &
                                         npoints_chord_tot , nelems_span , &
                                         symmetry_point, symmetry_normal, rr_sym)
@@ -1098,12 +969,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
     select case (trim(mesh_file_type))
       case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-        call mirror_mesh(ee_virtual, rr_virtual, mirror_point, mirror_normal)
         call mirror_mesh(ee, rr, mirror_point, mirror_normal)
       case('parametric','pointwise')
-        call mirror_mesh_structured(ee_virtual, rr_virtual,  &
-                                      npoints_chord_tot_virtual , nelems_span , &
-                                      mirror_point, mirror_normal)        
         call mirror_mesh_structured(ee, rr,  &
                                       npoints_chord_tot , nelems_span , &
                                       mirror_point, mirror_normal)
@@ -1121,14 +988,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !=====
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
-  call write_hdf5(rr_virtual,'rr_virtual',geo_loc)
-  call write_hdf5(ee_virtual,'ee_virtual',geo_loc)
   if (( trim(mesh_file_type) .eq. 'parametric' ) .or. &
       ( trim(mesh_file_type) .eq. 'pointwise'  ) ) then
     !write HDF5 fields
     call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
     call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
-    call write_hdf5(npoints_chord_tot_virtual-1,'parametric_nelems_chor_virtual',geo_loc)
   end if
 
 
@@ -1277,7 +1141,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   !> cleanup
   deallocate(ee,rr)
-  deallocate(ee_virtual,rr_virtual)
   !> hinges cleanup
   do i = 1 , n_hinges
     deallocate( hinges(i)%rr )
@@ -2668,12 +2531,12 @@ end subroutine cigar2D
 !! RR   coordinates of the mesh nodes, size (3,nphi*nc+2)
 !! EE   element to node connectivity, size (4,nphi*(n-1))
 
-subroutine meshbyrev ( x, y, nphi, rr, ee, rr_virtual, ee_virtual )
+subroutine meshbyrev ( x, y, nphi, rr, ee )
 
   real(wp), dimension(:),   intent(in)  :: x, y
   integer,                  intent(in)  :: nphi
-  real(wp), dimension(:,:), intent(out) :: rr, rr_virtual
-  integer,  dimension(:,:), intent(out) :: ee, ee_virtual
+  real(wp), dimension(:,:), intent(out) :: rr
+  integer,  dimension(:,:), intent(out) :: ee
 
   real(wp) :: dphi, phi
   integer  :: i, ip, j, e, n, nc
@@ -2744,9 +2607,7 @@ subroutine meshbyrev ( x, y, nphi, rr, ee, rr_virtual, ee_virtual )
     ee(1,e) = size(rr,2)
     ee(3,e) = 1 + nc*ip
   enddo
-  ! Virtual Mesh
-  rr_virtual = rr;
-  ee_virtual = ee;
+
 end subroutine meshbyrev
 
 end module mod_build_geo

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -89,12 +89,12 @@ contains
 !! WARNING: this is still experimental and based on an incomplete reverse
 !! engineering of cgns mesh files, it shall be extended to be more reliable
 !! and general
-subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_virtual)
+subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
  character(len=*), intent(in) :: mesh_file
  character(len=*), intent(in) :: sectionNamesUsed(:)
- integer, allocatable, intent(out) :: ee(:,:), ee_virtual(:,:)
- real(wp) , allocatable, intent(out) :: rr(:,:), rr_virtual(:,:)
+ integer, allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
 
 
 
@@ -299,7 +299,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
     call printout(trim(msg))
 
     allocate(ee(4,nelem_zone)) ; ee = 0
-    allocate(ee_virtual(4,nelem_zone)) ; ee_virtual = 0
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -394,6 +393,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1
             I = I + nnod + 1
           end do
+
           deallocate(nmixed)
 
         else
@@ -467,16 +467,12 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr, ee_virtual, rr_vi
         rr(i,:) = coordinateList
 
       enddo
-      
 
     endif
 
   end do ! Loop on zones
-  
-  ! Virtual mesh
-  allocate(rr_virtual(size(rr,1), size(rr, 2))); rr_virtual = 0.0_wp
-  rr_virtual = rr
-  ee_virtual = ee 
+
+
 
 end subroutine read_mesh_cgns
 

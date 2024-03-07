@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -127,8 +127,8 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   integer(h5loc)                                          :: floc, gloc, cloc, ploc 
   real(wp), allocatable                                   :: refs_R(:,:,:), refs_off(:,:)
   real(wp), allocatable                                   :: vort(:), cp(:)
-  real(wp), allocatable                                   :: points(:,:), points_virtual(:,:)
-  integer                                                 :: nelem, nelem_virtual
+  real(wp), allocatable                                   :: points(:,:)
+  integer                                                 :: nelem
   integer                                                 :: n_comp , n_comp_tot  
   integer                                                 :: i_comp , id_comp , ax_coor , ref_id
   character(len=max_char_len), allocatable                :: all_components_names(:)
@@ -258,7 +258,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   allocate(components_names_tmp(1))
   components_names_tmp(1) = trim(components_names(1))
 
-  call load_components_postpro(comps, points, points_virtual, nelem, nelem_virtual, floc, &
+  call load_components_postpro(comps, points, nelem, floc, &
                               components_names_tmp,  all_comp)
   call close_hdf5_file(floc)
 
@@ -414,7 +414,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       ! Load the references and move the points ---
       call load_refs(floc, refs_R, refs_off)
       ! Move the points ---------------------------
-      call update_points_postpro(comps, points, points_virtual, refs_R, refs_off, &
+      call update_points_postpro(comps, points, refs_R, refs_off, &
                                   filen = trim(filename) )
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)

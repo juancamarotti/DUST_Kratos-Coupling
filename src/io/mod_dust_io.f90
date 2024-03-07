@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -71,9 +71,6 @@ use mod_vortlatt, only: &
 
 use mod_liftlin, only: &
   t_liftlin
-
-use mod_virtual, only: &
-  c_elem_virtual, t_elem_virtual_p
 
 use mod_reference, only: &
   t_ref
@@ -350,8 +347,6 @@ subroutine save_status(geo, wake,  it, time, run_id)
       call new_hdf5_group(gloc2, 'Geometry', gloc3)
       call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
                       'rr',gloc3)
-      call write_hdf5(geo%points_virtual(:,geo%components(icomp)%i_points_virtual), &
-                      'rr_virtual',gloc3)
       call close_hdf5_group(gloc3)
     endif
 
@@ -360,9 +355,6 @@ subroutine save_status(geo, wake,  it, time, run_id)
       call new_hdf5_group(gloc2, 'Geometry', gloc3)
       call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
                       'rr', gloc3)
-      call write_hdf5(geo%points_virtual(:,geo%components(icomp)%i_points_virtual), &
-                      'rr_virtual',gloc3)   
-                                         
       !> get orientation for sectional loads 
       ne = size(geo%components(icomp)%el)
       allocate(ori(ne, 3))
