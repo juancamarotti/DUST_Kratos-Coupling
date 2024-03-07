@@ -138,7 +138,7 @@ Then export llvm libraries:
 - CGNS folder is located in /opt/homebrew, therefore the cmake command will be:
 
   ```bash
-  cmake -DCMAKE_BUILD_TYPE=Release -DWITH_PRECICE=NO -DCGNS_LIB=/opt/homebrew/lib -DCGNS_INC=/opt/homebrew/include ../
+  cmake -DCMAKE_BUILD_TYPE=Release -DWITH_PRECICE=NO -DCGNS_LIB=/opt/homebrew/lib -DCGNS_LIB=/opt/homebrew/include ../
   ```
 - Build DUST:
 

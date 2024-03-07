@@ -4,29 +4,27 @@ basename =     ./Postpro/robin
 analysis = {
 
 type = viz  
-name = viz_classic  
+name = viz  
 start_res = 1
-end_res   = 170
+end_res   = 41
 step_res  = 1
 format = vtk
 
 wake = T
-separate_wake = T
 component = Rotor 
 component = Fuselage 
 
 variable = vorticity 
 variable = pressure  
-variable = vorticity_vector
-variable = vortex_rad
+
 }
 
 analysis = {
 
 type = integral_loads
-name = loads_rotor_abs_classic
+name = loads_rotor_abs
 start_res = 1 
-end_res   = 170 
+end_res   = 41  
 step_res  = 1
 format   = dat
 
@@ -38,9 +36,9 @@ reference_tag = 0
 analysis = {
 
 type = integral_loads
-name = loads_rotor_shaft_classic
+name = loads_rotor_shaft
 start_res = 1 
-end_res   = 170
+end_res   = 41
 step_res  = 1
 format   = dat
 

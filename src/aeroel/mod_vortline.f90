@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -70,6 +70,9 @@ use mod_math, only: &
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -121,15 +124,15 @@ end subroutine initialize_vortline
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_vortline (this, pos, vel)
-  class(t_vortline), intent(in) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(out) :: vel(3)
+ class(t_vortline), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(out) :: vel(3)
 
-  real(wp) :: vdou(3)
-  real(wp) :: av(3) , hv(3)
-  real(wp) :: ai    , hi
-  real(wp) :: R1 , R2
-  real(wp) :: r_Ran
+ real(wp) :: vdou(3)
+ real(wp) :: av(3) , hv(3)
+ real(wp) :: ai    , hi
+ real(wp) :: R1 , R2
+ real(wp) :: r_Ran
 
   !TODO: add far field approximations
   !radius_v = pos-this%cen
@@ -169,21 +172,21 @@ end subroutine compute_vel_vortline
 !----------------------------------------------------------------------
 
 subroutine compute_grad_vortline(this, pos, grad)
-  class(t_vortline), intent(in) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(out) :: grad(3,3)
+ class(t_vortline), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(out) :: grad(3,3)
 
-  integer  :: i1 , i2
-  real(wp) :: R1(3) , R2(3) , a1(3) , a2(3) , l(3) , a
-  real(wp) :: R1v(3,1) , R2v(3,1) , a1v(3,1) , a2v(3,1) , lv(3,1)
-  real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
-  real(wp) :: del , a2del2
+ integer  :: i1 , i2
+ real(wp) :: R1(3) , R2(3) , a1(3) , a2(3) , l(3) , a
+ real(wp) :: R1v(3,1) , R2v(3,1) , a1v(3,1) , a2v(3,1) , lv(3,1)
+ real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
+ real(wp) :: del , a2del2
 
   !TODO: add far field approximations
   !radius_v = pos-this%cen
   !radius   = norm2(radius_v)
-  del = sim_param % RankineRad
-  !del = sim_param % VortexRad
+  ! del = sim_param % RankineRad
+  del = sim_param % VortexRad
 
   if(associated(this%mag)) then
 

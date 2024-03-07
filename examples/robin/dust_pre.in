@@ -1,8 +1,8 @@
 ! components -------------------
 
-!comp_name = Fuselage
-!geo_file = robin-helo.in 
-!ref_tag = Root
+comp_name = Fuselage
+geo_file = robin-helo.in 
+ref_tag = Root
 
 comp_name = Rotor
 geo_file = ll_blade_robin_refined.in 

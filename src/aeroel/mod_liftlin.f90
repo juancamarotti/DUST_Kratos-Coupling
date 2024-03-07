@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -52,7 +52,7 @@
 module mod_liftlin
 
 use mod_param, only: &
-  wp, pi, one_4pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
+  wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_handling, only: &
   error, warning, printout
@@ -534,7 +534,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   enddo
 !$omp end parallel do
 
-  vel_w = vel_w*one_4pi
+  vel_w = vel_w/(4.0_wp*pi)
 
   ! allocate array containing aoa, aero coeffs and relative velocity
   allocate(a_v(size(elems_ll)));    a_v  = 0.0_wp
@@ -569,7 +569,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       ! overall relative velocity computed in the centre of the ll elem
       wind = variable_wind(el%cen,sim_param%time)
-      vel = vel*one_4pi + wind - el%ub + vel_w(:,i_l)
+      vel = vel/(4.0_wp*pi) + wind - el%ub + vel_w(:,i_l)
         
       ! "effective" velocity = proj. of vel in the n-t plane
       up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
@@ -873,7 +873,7 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
   enddo
 
   wind = variable_wind(this%ctr_pt, sim_param%time)
-  this%vel_ctr_pt = this%vel_ctr_pt*one_4pi &
+  this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
                 + wind + this%uvort - this%ub
 
   this%al_ctr_pt = atan2(sum(this%vel_ctr_pt * this%nor    ) , &

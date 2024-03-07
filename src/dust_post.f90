@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -68,9 +68,6 @@ use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
-use mod_virtual, only: &
-  c_elem_virtual, t_elem_virtual_p
-  
 use mod_doublet, only: &
   initialize_doublet
 

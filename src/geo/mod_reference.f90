@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -1230,7 +1230,7 @@ subroutine build_references(refs, reference_file)
 
                 refs(iref)%axis  = rot_axis
                 refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
-                refs(iref)%Omega = rot_rate !> rad/s
+                refs(iref)%Omega = rot_rate
                 refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_blades-1,wp) &
                                               /real(n_mult_blades,wp)
                 !TODO: check the norm vector to define an origin of the psi angle
@@ -1853,7 +1853,7 @@ subroutine check_input_from_file( ref_tag_str , pol_rot_str , time_from_file , s
         &from  file in reference frame with Reference_Tag'//trim(ref_tag_str)//&
         &'. Initial time value of the motion greater than initial simulation time.')
   end if
-  if ( time_from_file(size(time_from_file)) .lt. sim_param_time(size(sim_param_time)) ) then
+  if ( time_from_file(size(time_from_file)) .gt. sim_param_time(size(sim_param_time)) ) then
       write(*,*) ' end of the time in motion specification' , time_from_file(size(time_from_file))
       write(*,*) ' end of the time in simulation time : ' , sim_param_time(size(sim_param_time))
       call error(this_sub_name, this_mod_name, 'Error in motion specification &

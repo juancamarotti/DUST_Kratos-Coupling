@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -68,7 +68,7 @@ use mod_sim_param, only: &
   sim_param
 
 use mod_param, only: &
-  wp, pi, one_4pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
+  wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_math, only: &
   cross, dot, linear_interp 
@@ -363,7 +363,7 @@ subroutine compute_linear_pot_vortlatt(this, TL, TR, pos,i,j)
   real(wp), intent(in) :: pos(:)
   integer , intent(in) :: i,j
 
-  call linear_potential_calc_doublet(this, TL, TR, pos) 
+    call linear_potential_calc_doublet(this, TL, TR, pos) 
 
 end subroutine compute_linear_pot_vortlatt
 
@@ -699,7 +699,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems)
   do iv=1,size(vort_elems)
 
     call vort_elems(iv)%p%compute_vel(this%cen, vel)
-    this%uvort = this%uvort + vel*one_4pi
+    this%uvort = this%uvort + vel/(4*pi)
 
   enddo
 

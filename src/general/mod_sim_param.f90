@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -55,9 +55,6 @@ use mod_param, only: &
 
 use mod_handling, only: &
   error, warning, printout
-
-use mod_basic_io, only: &
-  read_real_array_from_file  
   
 use mod_hdf5_io, only: &
   h5loc, write_hdf5_attr, open_hdf5_file, close_hdf5_file, read_hdf5
@@ -71,8 +68,7 @@ use mod_parse, only: &
 implicit none
 
 public :: t_sim_param, sim_param, create_param_main, create_param_pre, &
-          create_param_post, create_param_test_particle, &  
-          init_sim_param, init_sim_param_particle
+          create_param_post, init_sim_param
 
 private
 
@@ -92,24 +88,17 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
-  character(len=max_char_len) :: integrator 
   !> Actual time
   real(wp) :: time
   !> Previous time
   real(wp) :: time_old
   !> ndt between 2 wake updates
   integer :: ndt_update_wake
-  !> file particles
-  character(len=max_char_len) :: particles_file 
 
   !> Output detailed geometry each timestep
   logical :: output_detailed_geo
 
   !Physical parameters:
-  !> Altitude
-  real(wp) :: altitude 
-  !> Units of the input data
-  character(len=max_char_len) :: units 
   !> Free stream pressure
   real(wp) :: P_inf
   !> Free stream density
@@ -141,16 +130,6 @@ type t_sim_param
   !> Minimum and maximum of the particles box
   real(wp) :: particles_box_min(3)
   real(wp) :: particles_box_max(3)
-  !> Minimun particle magnitude allowed (suppress if lower)
-  real(wp) :: mag_threshold
-
-    !> Wake initial condition
-  integer  :: part_n0 
-  real(wp), allocatable :: part_pos0(:,:)
-  real(wp), allocatable :: part_vort0_dir(:,:)
-  real(wp), allocatable :: part_vort0_mag(:)
-  real(wp), allocatable :: part_vol(:) 
-  
   !> Join close trailing edges
   logical :: join_te
   !> All trailing edges closer than join_te_factor will be joined
@@ -166,7 +145,7 @@ type t_sim_param
   !> Trailing edge autoscaling
   logical :: autoscale_te
 
-  !Method parameters:  
+  !Method parameters
   !> Multiplier for far field threshold computation on doublet
   real(wp) :: FarFieldRatioDoublet
   !> Multiplier for far field threshold computation on sources
@@ -175,15 +154,11 @@ type t_sim_param
   real(wp) :: DoubletThreshold
   !> Rankine Radius for vortices
   real(wp) :: RankineRad
-  !> Octree vortex particle size core
-  real(wp) :: octree_vortex_rad
   !> Vortex Radius for vortex particles
   real(wp) :: VortexRad
   !> Vortex Radius coefficient for vortex particles
   !> if too low or negative reverts to original behaviour (VortexRad)
   real(wp) :: KVortexRad  
-  !> Particle volume computation coefficient (applies to rVol)
-  real(wp) :: KVol 
   !> Complete cutoff radius
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
@@ -192,8 +167,8 @@ type t_sim_param
   logical :: vs_elems
   !> use the divergence filtering
   logical :: use_divfilt
-  !> Pedrizzetti relaxation coefficient for divergence filtering
-  real(wp):: alpha_divfilt
+  !> time scale of the divergence filter
+  real(wp) :: filt_eta
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not
@@ -206,15 +181,6 @@ type t_sim_param
   real(wp) :: pa_elrad_mult
   !> simulate viscosity effects or not
   logical :: use_ve
-  !> use reformulated formulation rVPM (Alvarez 2023)
-  logical   :: use_reformulated
-    !> rVPM coefficients
-    real(wp)  :: f                   
-    real(wp)  :: g
-  !> suppress the initial wake
-  logical :: suppress_wake
-  !> suppress the initial wake after n timesteps
-  integer :: suppress_wake_nsteps 
 
   !Lifting Lines
   character(len=max_char_len) :: llSolver
@@ -225,7 +191,7 @@ type t_sim_param
   !> Maximum number of iteration in LL algorithm
   integer  :: llMaxIter
   !> Tolerance for the relative error in fixed point iteration for LL
-  real(wp) :: llTol 
+  real(wp) :: llTol
   !> Damping param in fixed point iteration for LL used to avoid oscillations
   real(wp) :: llDamp
   !> Avoid "unphysical" separations in inner sections of LL? :: llTol
@@ -306,19 +272,6 @@ type t_sim_param
   logical :: reset_time
 
   !Variable wind
-  !> Use time-varying free stream velocity
-  logical  :: time_varying_u_inf
-  !> Use non-uniform free stream velocity (along one direction)
-  logical  :: non_uniform_u_inf
-    !> Filename for time-varying or non-uniform free stream velocity
-    character(len=max_char_len) :: u_inf_filen
-    real(wp), allocatable       :: u_inf_mat(:,:)
-    real(wp), allocatable       :: u_inf_comps(:,:)
-    real(wp), allocatable       :: u_inf_time(:)
-    real(wp), allocatable       :: u_inf_coord(:)
-    integer                     :: non_uniform_u_inf_dir
-    integer                     :: nt_u_inf
-    integer                     :: nc_u_inf
   !> Gust
   logical :: use_gust
   !> Gust type
@@ -361,9 +314,6 @@ contains
 end type t_sim_param
 
 type(t_sim_param) :: sim_param
-character(len=*), parameter     :: this_mod_name = 'mod_sim_param' 
-
-real(wp), allocatable :: particlesMat(:,:)
 
 !----------------------------------------------------------------------
 contains
@@ -377,25 +327,14 @@ subroutine create_param_main(prms)
   
   !> Define the parameters to be read
   !> Time
-  call prms%CreateRealOption('tstart', 'Starting time')
-  call prms%CreateRealOption('tend',   'Ending time')
-  call prms%CreateRealOption('dt',     'time step')
-  call prms%CreateIntOption ('timesteps', 'number of timesteps')
-  call prms%CreateRealOption('dt_out', 'output time interval')
-  call prms%CreateRealOption('dt_debug_out', 'debug output time interval')
+  call prms%CreateRealOption('tstart', "Starting time")
+  call prms%CreateRealOption('tend',   "Ending time")
+  call prms%CreateRealOption('dt',     "time step")
+  call prms%CreateIntOption ('timesteps', "number of timesteps")
+  call prms%CreateRealOption('dt_out', "output time interval")
+  call prms%CreateRealOption('dt_debug_out', "debug output time interval")
   call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
   
-  !> Reformulated formulation                                         
-  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','T')
-  call prms%CreateRealOption('f','rVPM coefficient f','0.0')
-  call prms%CreateRealOption('g','rVPM coefficient g','0.2')
-  !> treatment of the initial wake 
-  call prms%CreateLogicalOption('suppress_wake','Suppress the initial wake','F') 
-  call prms%CreateIntOption('suppress_wake_nsteps','Suppress the initial wake after n timesteps', '100') 
-
-  !> Integration 
-  call prms%CreateStringOption('integrator', &
-                            &'integrator solver: Euler or low storage RK','euler')  
   !> Input
   call prms%CreateStringOption('geometry_file','Main geometry definition file')
   call prms%CreateStringOption('reference_file','Reference frames file','no_set')
@@ -415,15 +354,13 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('reset_time','reset the time from previous execution?','F')
   
   !> Parameters: reference conditions 
-  call prms%CreateRealOption('altitude', "Altitude in meters", '0.0') 
-  call prms%CreateStringOption('units', "units of the input data", 'SI')  
   call prms%CreateRealArrayOption('u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
   call prms%CreateRealOption('u_ref', "reference velocity")             
   call prms%CreateRealOption('P_inf', "free stream pressure", '101325')    
   call prms%CreateRealOption('rho_inf', "free stream density", '1.225')   
   call prms%CreateRealOption('a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
   call prms%CreateRealOption('mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
-
+  
   !> Wake 
   call prms%CreateIntOption('n_wake_panels', 'number of wake panels','1')
   call prms%CreateIntOption('n_wake_particles', 'number of wake particles', '10000')
@@ -431,8 +368,6 @@ subroutine create_param_main(prms)
                                   &particles bounding box', '(/-10.0, -10.0, -10.0/)')
   call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
                                   &particles bounding box', '(/10.0, 10.0, 10.0/)')
-  call prms%CreateRealOption('mag_threshold', "Minimum particle magnitude allowed", '1.0e-9')
-  
   call prms%CreateRealOption('implicit_panel_scale', "Scaling of the first implicit wake panel", '0.3')
   call prms%CreateRealOption('implicit_panel_min_vel', "Minimum velocity at the trailing edge", '1.0e-8')
   call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
@@ -448,7 +383,6 @@ subroutine create_param_main(prms)
                                 norm2(Vinf-vte)','F') 
 
   !> Regularisation 
-  call prms%CreateStringOption('particles_file', 'file with particles initial condition', 'particles.dat') 
   call prms%CreateRealOption('far_field_ratio_doublet', &
         "Multiplier for far field threshold computation on doublet", '10.0')
   call prms%CreateRealOption('far_field_ratio_source', &
@@ -457,14 +391,10 @@ subroutine create_param_main(prms)
         "Thresold for considering the point in plane in doublets", '1.0e-6')
   call prms%CreateRealOption('rankine_rad', &
         "Radius of Rankine correction for vortex induction near core", '0.1')
-  call prms%CreateRealOption('octree_vortex_rad', &
-        "Vortex particle core size for octree initialization", '0.1')
   call prms%CreateRealOption('vortex_rad', &
         "Radius of vortex core, for particles", '0.1')
   call prms%CreateRealOption('k_vortex_rad', &
         "Radius coefficient of vortex core, for particles", '1.0') ! default is ON
-  call prms%CreateRealOption('k_vol', &
-        "Radius coefficient of volume, for particles", '1.0') 
   call prms%CreateRealOption('cutoff_rad', &
         "Radius of complete cutoff  for vortex induction near core", '0.001')
   
@@ -541,8 +471,8 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('vortstretch','Employ vortex stretching','T')
   call prms%CreateLogicalOption('vortstretch_from_elems','Employ vortex stretching&
                                 & from geometry elements','F')
-  call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering', 'T')
-  call prms%CreateRealOption('alpha_divfilt','Pedrizzetti relaxation coefficient', '0.3')
+  call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering','T')
+  call prms%CreateRealOption('filter_time_scale','Filter timescale','40.0')
   call prms%CreateLogicalOption('diffusion','Employ vorticity diffusion','T')
   call prms%CreateLogicalOption('turbulent_viscosity','Employ turbulent &
                                 &viscosity','F')
@@ -567,12 +497,8 @@ subroutine create_param_main(prms)
   call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
   
   !> Variable wind
-  call prms%CreateLogicalOption('time_varying_u_inf', "Use time-varying free stream velocity", 'F')
-  call prms%CreateLogicalOption('non_uniform_u_inf', "Use non-uniform free stream velocity", 'F')
-  call prms%CreateIntOption('non_uniform_u_inf_dir','Direction of variation of non-uniform u_inf')
-  call prms%CreateStringOption('u_inf_file', "file .dat containing time/coordinates + variable Ux, Uy, Uz")
   call prms%CreateLogicalOption('gust','Gust perturbation','F')
-  call prms%CreateStringOption('gust_type','Gust model','AMC')
+  call prms%CreateStringOption('gust_type','Gust model','ACM')
   call prms%CreateRealArrayOption('gust_origin','Gust origin point')
   call prms%CreateRealArrayOption('gust_front_direction','Gust front direction vector')
   call prms%CreateRealOption('gust_front_speed','Gust front speed')
@@ -619,8 +545,6 @@ subroutine create_param_post(prms, sbprms, bxprms)
         "Thresold for considering the point in plane in doublets", '1.0e-6')
   call prms%CreateRealOption( 'rankine_rad', &
         "Radius of Rankine correction for vortex induction near core", '0.1')
-  call prms%CreateRealOption('octree_vortex_rad', &
-        "Vortex particle core size for octree initialization", '0.1')
   call prms%CreateRealOption( 'vortex_rad', &
         "Radius of vortex core, for particles", '0.1')
   call prms%CreateRealOption( 'cutoff_rad', &
@@ -701,167 +625,52 @@ subroutine create_param_post(prms, sbprms, bxprms)
 
 end subroutine create_param_post
 
-!> Subroutines for main dust, dust_pre and dust_post prms creation 
-!  to avoid clutter in source files
-!> Create parameter object for dust main parameters
-subroutine create_param_test_particle(prms)
-  type(t_parse), intent(inout) :: prms
-  
-  !> Define the parameters to be read
-  !> Time
-  call prms%CreateRealOption('tstart', "Starting time")
-  call prms%CreateRealOption('tend',   "Ending time")
-  call prms%CreateRealOption('dt',     "time step")
-  call prms%CreateIntOption ('timesteps', "number of timesteps")
-  call prms%CreateRealOption('dt_out', "output time interval")
-  call prms%CreateRealOption('dt_debug_out', "debug output time interval")
-  call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
-
-  call prms%CreateStringOption('basename','output basename','./')
-  call prms%CreateStringOption('basename_debug','output basename for debug','./')
-  call prms%CreateLogicalOption('output_start', "output values at starting &
-                                                            & iteration", 'F')
-  call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', '1') 
-  call prms%CreateStringOption('particles_file', 'file with particles initial condition', 'particles.dat') 
-  
-  !> Restart
-  call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
-  call prms%CreateStringOption('restart_file','restart file name')
-  call prms%CreateLogicalOption('reset_time','reset the time from previous execution?','F')
-
-  !> Parameters: reference conditions 
-  call prms%CreateRealArrayOption('u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
-  call prms%CreateRealOption('u_ref', "reference velocity")             
-  call prms%CreateRealOption('P_inf', "free stream pressure", '101325')    
-  call prms%CreateRealOption('rho_inf', "free stream density", '1.225')   
-  call prms%CreateRealOption('a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
-  call prms%CreateRealOption('mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
-
-  call prms%CreateIntOption('n_wake_particles', 'number of wake particles', '100000')
-  call prms%CreateRealArrayOption('particles_box_min', 'min coordinates of the &
-                                  &particles bounding box', '(/-10.0, -10.0, -10.0/)')
-  call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
-                                  &particles bounding box', '(/10.0, 10.0, 10.0/)')
-  call prms%CreateRealOption('mag_threshold', "Minimum particle magnitude allowed", '1.0e-9')
-
-  !> Regularisation 
-  call prms%CreateRealOption('rankine_rad', &
-        "Radius of Rankine correction for vortex induction near core", '0.1')
-  call prms%CreateRealOption('octree_vortex_rad', &
-        "Vortex particle core size for octree initialization", '0.1')
-  call prms%CreateRealOption('vortex_rad', &
-        "Radius of vortex core, for particles", '0.1')
-  call prms%CreateRealOption('k_vortex_rad', &
-        "Radius coefficient of vortex core, for particles", '1.0') ! default is ON
-  call prms%CreateRealOption('cutoff_rad', &
-        "Radius of complete cutoff  for vortex induction near core", '0.001')
-
-  !> Octree and multipole data 
-  call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
-  call prms%CreateLogicalOption('fmm_panels','Employ fast multipole method &
-                                &also for panels?','F')
-  call prms%CreateRealOption('box_length','length of the octree box')
-  call prms%CreateIntArrayOption('n_box','number of boxes in each direction')
-  call prms%CreateRealArrayOption( 'octree_origin', "rigid wake velocity" )
-  call prms%CreateIntOption('n_octree_levels','number of octree levels')
-  call prms%CreateIntOption('min_octree_part','minimum number of octree particles')
-  call prms%CreateIntOption('multipole_degree','multipole expansion degree')
-  call prms%CreateLogicalOption('dyn_layers','Use dynamic layers','F')
-  call prms%CreateIntOption('nmax_octree_levels','maximum number of octree levels')
-  call prms%CreateRealOption('leaves_time_ratio','Ratio that triggers the &
-                                            &increase of the number of levels')
-
-    !> Models options
-  call prms%CreateLogicalOption('vortstretch','Employ vortex stretching','T')
-  call prms%CreateLogicalOption('vortstretch_from_elems','Employ vortex stretching&
-                                & from geometry elements','F')
-  call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering','T')
-  call prms%CreateRealOption('alpha_divfilt','Pedrizzetti relaxation coefficient','0.3')
-  call prms%CreateLogicalOption('diffusion','Employ vorticity diffusion','T')
-  call prms%CreateLogicalOption('turbulent_viscosity','Employ turbulent &
-                                &viscosity','F') 
-  call prms%CreateLogicalOption('viscosity_effects','Simulate viscosity &
-                                                                & effects','F')
-  call prms%CreateLogicalOption('particles_redistribution','Employ particles &
-                                                          &redistribution','F')
-  call prms%CreateIntOption('octree_level_solid','Level at which the panels &
-                            & are considered for particles redistribution')
-  call prms%CreateRealOption('particles_redistribution_ratio','How many times &
-            &a particle need to be smaller than the average of the cell to be&
-            & eliminated','3.0')
-
-  !> Reformulated formulation                                         
-  call prms%CreateLogicalOption('reformulated','Employ rVPM by Alvarez','T')
-  call prms%CreateRealOption('f','rVPM coefficient f','0.0')
-  call prms%CreateRealOption('g','rVPM coefficient g','0.2')
-
-  !> Integrators
-  call prms%CreateStringOption('integrator', 'integrator solver: Euler or low storage RK', &
-                              'euler') 
-
-
-end subroutine create_param_test_particle   
-
-
 !> Initialize all the parameters reading them from the the input file
 subroutine init_sim_param(sim_param, prms, nout, output_start)
-  class(t_sim_param)          :: sim_param
-  type(t_parse)               :: prms
-  integer, intent(inout)      :: nout
-  logical, intent(inout)      :: output_start
-
-  character(len=*), parameter :: this_sub_name = 'init_sim_param'
+  class(t_sim_param)      :: sim_param
+  type(t_parse)           :: prms
+  integer, intent(inout)  :: nout
+  logical, intent(inout)  :: output_start
   
   !> Timing
-  sim_param%t0                  = getreal(prms,     'tstart')
-  sim_param%tend                = getreal(prms,     'tend')
-  sim_param%dt_out              = getreal(prms,     'dt_out')
-  sim_param%debug_level         = getint(prms,      'debug_level')
-  sim_param%output_detailed_geo = getlogical(prms,  'output_detailed_geo')
-  sim_param%ndt_update_wake     = getint(prms,      'ndt_update_wake')
+  sim_param%t0                  = getreal(prms, 'tstart')
+  sim_param%tend                = getreal(prms, 'tend')
+  sim_param%dt_out              = getreal(prms,'dt_out')
+  sim_param%debug_level         = getint(prms, 'debug_level')
+  sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
+  sim_param%ndt_update_wake     = getint(prms, 'ndt_update_wake')
   
-  !> Integration
-  sim_param%integrator          = getstr(prms,  'integrator') 
-  !> Reference environment values 
-  sim_param%altitude            = getreal(prms, 'altitude') 
-  sim_param%units               = getstr(prms,  'units')
-  if (sim_param%altitude .ne. 0.0_wp) then
-    call standard_atmosphere(sim_param) 
-  else
-    sim_param%P_inf               = getreal(prms, 'P_inf')
-    sim_param%rho_inf             = getreal(prms, 'rho_inf')
-    sim_param%a_inf               = getreal(prms, 'a_inf')
-    sim_param%mu_inf              = getreal(prms, 'mu_inf')
-  endif 
-
+  !> Reference environment values
+  sim_param%P_inf               = getreal(prms,'P_inf')
+  sim_param%rho_inf             = getreal(prms,'rho_inf')
+  sim_param%a_inf               = getreal(prms,'a_inf')
+  sim_param%mu_inf              = getreal(prms,'mu_inf')
   sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
   sim_param%u_inf               = getrealarray(prms, 'u_inf', 3)
-  
   !> Check on reference velocity
   if ( countoption(prms,'u_ref') .gt. 0 ) then
     sim_param%u_ref = getreal(prms, 'u_ref')
   else
     sim_param%u_ref = norm2(sim_param%u_inf)
     if (sim_param%u_ref .le. 0.0_wp) then
-      call error(this_mod_name, this_sub_name,'No reference velocity u_ref provided but &
+      call error('dust','dust','No reference velocity u_ref provided but &
       &zero free stream velocity. Provide a non-zero reference velocity. &
       &Stopping now before producing invalid results')
     endif
   end if
   
   !> Wake parameters
-  sim_param%n_wake_panels         = getint(prms,      'n_wake_panels')
-  sim_param%n_wake_particles      = getint(prms,      'n_wake_particles')
-  sim_param%particles_box_min     = getrealarray(prms,'particles_box_min',3)
-  sim_param%particles_box_max     = getrealarray(prms,'particles_box_max',3)
-  sim_param%mag_threshold         = getreal(prms,     'mag_threshold')
-  sim_param%rigid_wake            = getlogical(prms,  'rigid_wake')
+  sim_param%n_wake_panels         = getint(prms, 'n_wake_panels')
+  sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
+  sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
+  sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
+  sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
   sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
   sim_param%refine_wake           = getlogical(prms,  'refine_wake')
   sim_param%k_refine              = getint(prms,      'k_refine')
-  sim_param%tol_refine            = getreal(prms,     'tol_refine')
+  sim_param%tol_refine            = getreal(prms,      'tol_refine')
   sim_param%interpolate_wake      = getlogical(prms,  'interpolate_wake')
-  sim_param%autoscale_te          = getlogical(prms,  'autoscale_te') 
+  sim_param%autoscale_te          = getlogical(prms,  'autoscale_te')
   !> Check on wake refinement
   if (sim_param%interpolate_wake .and. .not. sim_param%refine_wake) then
         !call warning('dust', 'dust', 'Wake interpolation is selected, but wake refinement &
@@ -872,7 +681,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !> Check on wake panels
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
-    call warning(this_mod_name, this_sub_name,'imposed a number of wake panels rows &
+    call warning('dust','dust','imposed a number of wake panels rows &
                 &LOWER THAN 1. At least one row of panels is mandatory, &
                 &the simulation will proceed with "n_wake_panels = 1"')
   endif
@@ -880,7 +689,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
       sim_param%rigid_wake_vel    = getrealarray(prms, 'rigid_wake_vel',3)
     else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
-      call warning(this_mod_name, this_sub_name,'no rigid_wake_vel parameter set, &
+      call warning('dust','dust','no rigid_wake_vel parameter set, &
             &with rigid_wake = T; rigid_wake_vel = u_inf')
       sim_param%rigid_wake_vel    = sim_param%u_inf
     end if
@@ -896,22 +705,18 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%ReferenceFile         = getstr(prms, 'reference_file')
 
   !> Method parameters
-  sim_param%FarFieldRatioDoublet  = getreal(prms,    'far_field_ratio_doublet')
-  sim_param%FarFieldRatioSource   = getreal(prms,    'far_field_ratio_source')
-  sim_param%DoubletThreshold      = getreal(prms,    'doublet_threshold')
-  sim_param%RankineRad            = getreal(prms,    'rankine_rad')
-  sim_param%octree_vortex_rad     = getreal(prms,    'octree_vortex_rad')
-  sim_param%VortexRad             = getreal(prms,    'vortex_rad')
-  sim_param%KVortexRad            = getreal(prms,    'k_vortex_rad')
-  sim_param%KVol                  = getreal(prms,    'k_vol')
-  sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
-  sim_param%first_panel_scaling   = getreal(prms,    'implicit_panel_scale')
-  sim_param%min_vel_at_te         = getreal(prms,    'implicit_panel_min_vel')
-  sim_param%alpha_divfilt         = getreal(prms,    'alpha_divfilt')
+  sim_param%FarFieldRatioDoublet  = getreal(prms, 'far_field_ratio_doublet')
+  sim_param%FarFieldRatioSource   = getreal(prms, 'far_field_ratio_source')
+  sim_param%DoubletThreshold      = getreal(prms, 'doublet_threshold')
+  sim_param%RankineRad            = getreal(prms, 'rankine_rad')
+  sim_param%VortexRad             = getreal(prms, 'vortex_rad')
+  sim_param%KVortexRad             = getreal(prms, 'k_vortex_rad')
+  sim_param%CutoffRad             = getreal(prms, 'cutoff_rad')
+  sim_param%first_panel_scaling   = getreal(prms, 'implicit_panel_scale')
+  sim_param%min_vel_at_te         = getreal(prms, 'implicit_panel_min_vel')
   sim_param%use_vs                = getlogical(prms, 'vortstretch')
   sim_param%vs_elems              = getlogical(prms, 'vortstretch_from_elems')
   sim_param%use_vd                = getlogical(prms, 'diffusion')
-  sim_param%use_divfilt           = getlogical(prms, 'divergence_filtering')
   sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
   sim_param%use_ve                = getlogical(prms, 'viscosity_effects')
   sim_param%use_pa                = getlogical(prms, 'penetration_avoidance')
@@ -920,18 +725,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%pa_rad_mult = getreal(prms, 'penetration_avoidance_check_radius')
     sim_param%pa_elrad_mult = getreal(prms,'penetration_avoidance_element_radius')
   endif
-    
-  !> Reformulated formulation (Alvarez rVPM 2023)
-  sim_param%use_reformulated      = getlogical(prms, 'reformulated')
-
-  if(sim_param%use_reformulated) then
-    sim_param%f                   = getreal(prms, 'f')
-    sim_param%g                   = getreal(prms, 'g')
-  endif
-  !> suppress wake 
-  sim_param%suppress_wake         = getlogical(prms, 'suppress_wake') 
-  !> n time steps for wake suppression
-  sim_param%suppress_wake_nsteps  = getint(prms, 'suppress_wake_nsteps') 
 
   !> Lifting line elements
   sim_param%llSolver                        = getstr(    prms, 'll_solver')
@@ -948,9 +741,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'll_artificial_viscosity_adaptive')
   sim_param%llLoadsAVL                      = getlogical(prms, 'll_loads_avl')
   !> check LL inputs
-  if (trim(sim_param%llSolver) .ne. 'GammaMethod') then
+  if ((trim(sim_param%llSolver) .ne. 'GammaMethod') .and. &
+      (trim(sim_param%llSolver) .ne. 'AlphaMethod')) then
     write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
-    call warning(this_mod_name, this_sub_name,' Wrong string for LLsolver. &
+    call warning('dust','init_sim_param',' Wrong string for LLsolver. &
                 &This parameter is set equal to "GammaMethod" (default) &
                 &in init_sim_param() routine.')
     sim_param%llSolver = 'GammaMethod'
@@ -958,7 +752,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 
   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then
     if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
-      call warning(this_mod_name, this_sub_name,'LLartificialViscoisty set as an input, &
+      call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
           & different from zero, but ll regularisation available only if&
           & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
       sim_param%llArtificialViscosity = 0.0_wp
@@ -967,7 +761,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
     end if
     if ( sim_param%llArtificialViscosityAdaptive ) then
-      call warning(this_mod_name, this_sub_name,'LLartificialViscosityAdaptive set&
+      call warning('dust','init_sim_param','LLartificialViscosityAdaptive set&
           & as an input, but ll adaptive regularisation available only if&
           & LLsolver = AlphaMethod')
     end if
@@ -978,7 +772,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     if (sim_param%llArtificialViscosityAdaptive) then
       if ((countoption(prms,'ll_artificial_viscosity_adaptive_alpha')  .eq. 0) .or. &
           (countoption(prms,'ll_artificial_viscosity_adaptive_dalpha') .eq. 0)) then
-        call error(this_mod_name, this_sub_name,'LLartificialViscosityAdaptive_Alpha or&
+        call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
           & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
           & is set equal to T. Set these parameters [deg].')
       else
@@ -1048,62 +842,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   endif
 
   !> Variable_wind
-  sim_param%time_varying_u_inf      = getlogical(prms,'time_varying_u_inf')
-  sim_param%non_uniform_u_inf       = getlogical(prms,'non_uniform_u_inf')
-  
-  if ( sim_param%time_varying_u_inf .and. sim_param%non_uniform_u_inf ) then
-    call error(this_mod_name, this_sub_name,'u_inf can not be both non-uniform and time-varying')
-  end if
-
-  if ( sim_param%time_varying_u_inf) then
-    if ( countoption(prms,'u_inf_file') .eq. 0 ) then
-      call error(this_mod_name, this_sub_name,'Time-varying u_inf file .dat not defined')
-    end if
-    sim_param%u_inf_filen = trim(getstr(prms,'u_inf_file'))
-    !>  Read time and u_inf components
-    call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
-    sim_param%nt_u_inf = size(sim_param%u_inf_mat,1)
-    allocate(sim_param%u_inf_comps(3,sim_param%nt_u_inf))
-    allocate(sim_param%u_inf_time(sim_param%nt_u_inf)) 
-    
-    sim_param%u_inf_time  = sim_param%u_inf_mat(:,1)
-    sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
-
-  elseif (sim_param%non_uniform_u_inf) then
-    if ( countoption(prms,'u_inf_file') .eq. 0 ) then
-      call error(this_mod_name, this_sub_name, 'Non-uniform u_inf file .dat not defined')
-    end if 
-    sim_param%u_inf_filen = trim(getstr(prms,'u_inf_file'))
-    if ( countoption(prms,'non_uniform_u_inf_dir') .eq. 0 ) then
-      call error(this_mod_name, this_sub_name, 'Non uniform u_inf direction of variation not provided in dust.in')
-    end if
-    sim_param%non_uniform_u_inf_dir = getint(prms, 'non_uniform_u_inf_dir')
-    if (sim_param%non_uniform_u_inf_dir .ne. 1 .and. &
-        sim_param%non_uniform_u_inf_dir .ne. 2 .and. &
-        sim_param%non_uniform_u_inf_dir .ne. 3 ) then
-      call error(this_mod_name, this_sub_name, 'Non uniform u_inf direction of variation provided is neither 1, 2 or 3')
-    end if
-    call read_real_array_from_file ( 4 , trim(sim_param%u_inf_filen) , sim_param%u_inf_mat )
-    sim_param%nc_u_inf = size(sim_param%u_inf_mat,1)
-    allocate(sim_param%u_inf_comps(3,sim_param%nc_u_inf))
-    allocate(sim_param%u_inf_coord(sim_param%nc_u_inf)) 
-    ! Read coordinates and u_inf components
-    sim_param%u_inf_coord  = sim_param%u_inf_mat(:,1)
-    sim_param%u_inf_comps = transpose(sim_param%u_inf_mat(:,2:4))
-    if ( sim_param%u_inf_coord(1) .gt. sim_param%u_inf_coord(sim_param%nc_u_inf)) then
-      call error(this_mod_name, this_sub_name,'Please, provide u_inf file&
-                & with coordinate column spanning from lower to greater values')
-    end if
-    if ( sim_param%u_inf_coord(1) .gt. sim_param%particles_box_min(sim_param%non_uniform_u_inf_dir)) then
-      call error(this_mod_name, this_sub_name, 'Velocity profile coordinates list must start& 
-                & before or at the relative particle_box_min coordinate')
-    else if (sim_param%u_inf_coord(sim_param%nc_u_inf) .lt. &
-            & sim_param%particles_box_max(sim_param%non_uniform_u_inf_dir)) then
-      call error( this_mod_name, this_sub_name, 'Velocity profile coordinates list must end&
-                & after or at the relative particle_box_max coordinate')
-    end if
-  end if
-
   sim_param%use_gust                      = getlogical(prms, 'gust')
 
   if(sim_param%use_gust) then
@@ -1162,8 +900,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !> Check the number of timesteps
   if(CountOption(prms,'dt') .gt. 0) then
     if( CountOption(prms,'timesteps') .gt. 0) then
-      call error(this_mod_name, this_sub_name, 'Both number of timesteps and dt are&
-                                              & set, but only one of the two can be specified')
+      call error('init_sim_param','dust','Both number of timesteps and dt are&
+      & set, but only one of the two can be specified')
     else
       !> get dt and compute number of timesteps
       sim_param%dt     = getreal(prms, 'dt')
@@ -1178,323 +916,94 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%n_timesteps = sim_param%n_timesteps + 1
                             !add one for the first step
   endif
-  !> If use variable u_inf is active, check the .dat file time consistency with simulation time
-  if ( sim_param%time_varying_u_inf) then
-    if ( sim_param%u_inf_time(1) .gt. sim_param%t0 ) then
-      write(*,*) ' beginning of the time of variable u_inf : ' , sim_param%u_inf_time(1)
-      write(*,*) ' beginning of the simulation time : ' , sim_param%t0
-      call error(this_mod_name, this_sub_name,'Error in variable u_inf. &
-        & Initial time value of the .dat file greater than initial simulation time.')
-    end if
-    if ( sim_param%u_inf_time(size(sim_param%u_inf_time)) .lt. sim_param%tend ) then
-        write(*,*) ' end of the time of variable u_inf' , sim_param%u_inf_time(size(sim_param%u_inf_time))
-        write(*,*) ' end of the time in simulation time : ' , sim_param%tend
-        call error(this_mod_name, this_sub_name, 'Error in variable u_inf. &
-          & Final time value of the .dat file lower than final simulation time.')
-    end if
-  end if
 
 end subroutine init_sim_param
 
-!> Initialize all the parameters reading them from the the input file
-subroutine init_sim_param_particle(sim_param, prms, nout, output_start)
-  class(t_sim_param)          :: sim_param
-  type(t_parse)               :: prms
-  integer, intent(inout)      :: nout
-  logical, intent(inout)      :: output_start
-  
-  character(len=*), parameter :: this_sub_name = 'init_sim_param'
-  !> Timing
-  sim_param%t0                  = getreal(prms, 'tstart')
-  sim_param%tend                = getreal(prms, 'tend')
-  if(CountOption(prms,'dt') .gt. 0) then
-    if( CountOption(prms,'timesteps') .gt. 0) then
-      call error(this_mod_name, this_sub_name, 'Both number of timesteps and dt are&
-                                              & set, but only one of the two can be specified')
-    else
-      !> get dt and compute number of timesteps
-      sim_param%dt     = getreal(prms, 'dt')
-      sim_param%n_timesteps = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
-                              !(+1 for the zero time step)
-    endif
-  else
-    !> get number of steps, compute dt
-    sim_param%n_timesteps = getint(prms, 'timesteps')
-    sim_param%dt =  (sim_param%tend-sim_param%t0)/&
-                      real(sim_param%n_timesteps,wp)
-    sim_param%n_timesteps = sim_param%n_timesteps + 1
-                            !add one for the first step
-  endif 
-
-  sim_param%dt_out              = getreal(prms,'dt_out')
-  sim_param%n_timesteps         = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
-  sim_param%debug_level         = 1
-  sim_param%debug_level         = getint(prms, 'debug_level')  
-  
-  !> file dat 
-  sim_param%particles_file      = getstr(prms, 'particles_file') 
-  !> Reference environment values
-  sim_param%P_inf               = getreal(prms,'P_inf')
-  sim_param%rho_inf             = getreal(prms,'rho_inf')
-  sim_param%a_inf               = getreal(prms,'a_inf')
-  sim_param%mu_inf              = getreal(prms,'mu_inf')
-  sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
-  sim_param%u_inf               = getrealarray(prms, 'u_inf', 3)
-  
-  !> Check on reference velocity
-  if ( countoption(prms,'u_ref') .gt. 0 ) then
-    sim_param%u_ref = getreal(prms, 'u_ref')
-  else
-    sim_param%u_ref = norm2(sim_param%u_inf)
-    if (sim_param%u_ref .le. 0.0_wp) then
-      call error(this_mod_name, this_sub_name,'No reference velocity u_ref provided but &
-      &zero free stream velocity. Provide a non-zero reference velocity. &
-      &Stopping now before producing invalid results')
-    endif
-  end if
-  
-  !> Wake parameters
-  sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
-  sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
-  sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
-  sim_param%mag_threshold         = getreal(prms, 'mag_threshold')
-
-  sim_param%basename              = getstr(prms, 'basename')
-  !Integrators 
-  sim_param%integrator            = getstr(prms, 'integrator')
-  !> Manage restart
-  sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
-  if (sim_param%restart_from_file) then
-
-    sim_param%reset_time                  = getlogical(prms,'reset_time')
-    sim_param%restart_file                = getstr(prms,'restart_file')
-    
-    !> Removing leading "./" if present to avoid issues when restarting
-    if(sim_param%basename(1:2) .eq. './') sim_param%basename = sim_param%basename(3:)
-    
-    if(sim_param%restart_file(1:2) .eq. './') sim_param%restart_file = sim_param%restart_file(3:)
-    
-    !call printout('RESTART: restarting from file: '//trim(sim_param%restart_file))
-    !sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11) //'geo.h5'
-
-    !restarting the same simulation, advance the numbers
-    if(sim_param%restart_file(1:len(trim(sim_param%restart_file))-12).eq. &
-                                                trim(sim_param%basename)) then
-    read(sim_param%restart_file(len(trim(sim_param%restart_file))-6:len(trim(sim_param%restart_file))-3),*) nout
-      call printout('Identified restart from the same simulation, keeping the&
-                    & previous output numbering')
-      !> avoid rewriting the same timestep
-      output_start = .false.
-    endif
-    if(.not. sim_param%reset_time) call load_time(sim_param%restart_file, sim_param%t0)
-  endif
-
-  !> Method parameters
-  sim_param%RankineRad            = getreal(prms,    'rankine_rad')
-  sim_param%octree_vortex_rad     = getreal(prms,    'octree_vortex_rad')
-  sim_param%VortexRad             = getreal(prms,    'vortex_rad')
-  sim_param%CutoffRad             = getreal(prms,    'cutoff_rad')
-  sim_param%use_vs                = getlogical(prms, 'vortstretch')
-  sim_param%use_vd                = getlogical(prms, 'diffusion')
-  sim_param%use_divfilt           = getlogical(prms, 'divergence_filtering')
-  sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
-  sim_param%alpha_divfilt         = getreal(prms,    'alpha_divfilt')
-
-  !> Reformulated formulation (Alvarez rVPM 2023)
-  sim_param%use_reformulated      = getlogical(prms, 'reformulated')
-
-  if(sim_param%use_reformulated) then
-    sim_param%f                   = getreal(prms, 'f')
-    sim_param%g                   = getreal(prms, 'g')
-  endif
-
-  !> Octree and FMM parameters
-  sim_param%use_fmm                       = getlogical(prms, 'fmm')
-
-  if(sim_param%use_fmm) then
-    sim_param%use_fmm_pan                 = getlogical(prms, 'fmm_panels')
-    sim_param%BoxLength                   = getreal(prms, 'box_length')
-    sim_param%NBox                        = getintarray(prms, 'n_box',3)
-    sim_param%OctreeOrigin                = getrealarray(prms, 'octree_origin',3)
-    sim_param%NOctreeLevels               = getint(prms, 'n_octree_levels')
-    sim_param%MinOctreePart               = getint(prms, 'min_octree_part')
-    sim_param%MultipoleDegree             = getint(prms,'multipole_degree')
-    sim_param%use_dyn_layers              = getlogical(prms,'dyn_layers')
-
-    if(sim_param%use_dyn_layers) then
-      sim_param%NMaxOctreeLevels          = getint(prms, 'nmax_octree_levels')
-      sim_param%LeavesTimeRatio           = getreal(prms, 'leaves_time_ratio')
-    else
-      sim_param%NMaxOctreeLevels          = sim_param%NOctreeLevels
-    endif
-
-    sim_param%use_pr                      = getlogical(prms, 'particles_redistribution')
-
-    if(sim_param%use_pr) then
-      sim_param%part_redist_ratio         = getreal(prms,'particles_redistribution_ratio')
-      if ( countoption(prms,'octree_level_solid') .gt. 0 ) then
-        sim_param%lvl_solid               = getint(prms, 'octree_level_solid')
-      else
-        sim_param%lvl_solid               = max(sim_param%NOctreeLevels-2,1)
-      endif
-    endif
-  else
-    sim_param%use_fmm_pan = .false.
-  endif
-
-  sim_param%ndt_update_wake       = 1
-
-end subroutine init_sim_param_particle 
-
-subroutine standard_atmosphere(sim_param)
-  class(t_sim_param), intent(inout) :: sim_param 
-
-  real(wp) :: P0    ! Sea-level standard atmospheric pressure (Pa) or (lbf/ft^2)
-  real(wp) :: L     ! Temperature lapse rate (K/m) or (R/ft)
-  real(wp) :: T0    ! Sea-level standard temperature (Kelvin) or (Rankine)
-  real(wp) :: g     ! Acceleration due to gravity (m/s^2) or (ft/s^2)
-  real(wp) :: M     ! Molar mass of Earth's air (kg/mol) or (lb/mol)
-  real(wp) :: R     ! Universal gas constant (J/(mol·K)) or (ft·lbf/(lb·mol·R))
-  real(wp) :: gamma ! Adiabatic index for air
-  real(wp) :: T, h
-
-  select case(sim_param%units)
-    case('SI')
-      P0    = 101325.0_wp 
-      L     = 6.5e-3_wp 
-      T0    = 288.15_wp   
-      g     = 9.80665_wp  
-      M     = 0.0289644_wp
-      R     = 8.31447_wp  
-    case('imperial')
-      P0    = 2116.22_wp  
-      L     = 3.6e-3_wp 
-      T0    = 518.67_wp   
-      g     = 32.1740_wp  
-      M     = 0.0289644_wp
-      R     = 1545.35_wp  
-  end select
-
-  gamma = 1.4_wp      ! Adiabatic index for air
-
-  !> altitude (m) or (ft)
-  h = sim_param%altitude
-
-  ! Calculate temperature at altitude h (K) or (R)
-  T = T0 - L * h
-
-  ! Calculate pressure using the standard atmosphere model equation (Pa) or (lbf/ft^2)
-  sim_param%P_inf = P0 * (1.0_wp - (L * h) / T0)**(g * M / (R * L))
-
-  ! Calculate density using the ideal gas law (kg/m^3) or (slug/ft^3)
-  sim_param%rho_inf = sim_param%P_inf * M / (R * T)
-
-  ! Calculate sound speed (m/s) or (ft/s)
-  sim_param%a_inf = sqrt(gamma * R * T)
-
-  ! Calculate viscosity (approximately proportional to temperature)
-  select case (sim_param%units)
-    case('SI')
-      sim_param%mu_inf = T / T0 * 1.7894e-5_wp ! Viscosity at sea level (Pa·s)
-    case('imperial')
-      sim_param%mu_inf = T / T0 * 3.737e-7_wp ! Viscosity at sea level (lb/(ft·s))
-  end select
-
-end subroutine standard_atmosphere
 
 subroutine save_sim_param(this, loc)
   class(t_sim_param) :: this
   integer(h5loc), intent(in) :: loc
 
-  call write_hdf5_attr(this%t0,                  't0'                 , loc)
-  call write_hdf5_attr(this%dt,                  'dt'                 , loc)
-  call write_hdf5_attr(this%tend,                'tend'               , loc)
+  call write_hdf5_attr(this%t0, 't0', loc)
+  call write_hdf5_attr(this%dt, 'dt', loc)
+  call write_hdf5_attr(this%tend, 'tend', loc)
   call write_hdf5_attr(this%output_detailed_geo, 'output_detailed_geo', loc)
-  call write_hdf5_attr(this%P_inf,               'P_inf'              , loc)
-  call write_hdf5_attr(this%rho_inf,             'rho_inf'            , loc)
-  call write_hdf5_attr(this%u_inf,               'u_inf'              , loc)
-  call write_hdf5_attr(this%u_ref,               'u_ref'              , loc)
-  call write_hdf5_attr(this%a_inf,               'a_inf'              , loc)
-  call write_hdf5_attr(this%mu_inf,              'mu_inf'             , loc)
+  call write_hdf5_attr(this%P_inf, 'P_inf', loc)
+  call write_hdf5_attr(this%rho_inf, 'rho_inf', loc)
+  call write_hdf5_attr(this%u_inf, 'u_inf', loc)
+  call write_hdf5_attr(this%u_ref, 'u_ref', loc)
+  call write_hdf5_attr(this%a_inf, 'a_inf', loc)
+  call write_hdf5_attr(this%mu_inf, 'mu_inf', loc)
   call write_hdf5_attr(this%first_panel_scaling, 'first_panel_scaling', loc)
-  call write_hdf5_attr(this%min_vel_at_te,       'min_vel_at_te'      , loc)
-  call write_hdf5_attr(this%rigid_wake,          'rigid_wake'         , loc)
+  call write_hdf5_attr(this%min_vel_at_te, 'min_vel_at_te', loc)
+  call write_hdf5_attr(this%rigid_wake, 'rigid_wake', loc)
   if(this%rigid_wake) &
-    call write_hdf5_attr(this%rigid_wake_vel,    'rigid_wake_vel'     , loc)
-  call write_hdf5_attr(this%n_wake_panels,       'n_wake_panels'      , loc)
-  call write_hdf5_attr(this%n_wake_particles,    'n_wake_particles'   , loc)
-  call write_hdf5_attr(this%particles_box_min,   'particles_box_min'  , loc)
-  call write_hdf5_attr(this%particles_box_max,   'particles_box_max'  , loc)
-  call write_hdf5_attr(this%mag_threshold,       'mag_threshold'      , loc)
-
-  call write_hdf5_attr(this%join_te,             'join_te'            , loc)
+    call write_hdf5_attr(this%rigid_wake_vel, 'rigid_wake_vel', loc)
+  call write_hdf5_attr(this%n_wake_panels, 'n_wake_panels', loc)
+  call write_hdf5_attr(this%n_wake_particles, 'n_wake_particles', loc)
+  call write_hdf5_attr(this%particles_box_min, 'particles_box_min', loc)
+  call write_hdf5_attr(this%particles_box_max, 'particles_box_max', loc)
+  call write_hdf5_attr(this%join_te, 'join_te', loc)
   if(this%join_te) &
-    call write_hdf5_attr(this%join_te_factor,    'join_te_factor'     , loc)
+    call write_hdf5_attr(this%join_te_factor, 'join_te_factor', loc)
 
 
   call write_hdf5_attr(this%FarFieldRatioDoublet, 'FarFieldRatioDoublet', loc)
-  call write_hdf5_attr(this%FarFieldRatioSource,  'FarFieldRatioSource' , loc)
-  call write_hdf5_attr(this%DoubletThreshold,     'DoubletThreshold'    , loc)
-  call write_hdf5_attr(this%RankineRad,           'RankineRad'          , loc)
-  call write_hdf5_attr(this%VortexRad,            'VortexRad'           , loc)
-  call write_hdf5_attr(this%KVortexRad,           'KVortexRad'          , loc)
-  call write_hdf5_attr(this%CutoffRad,            'CutoffRad'           , loc)
-  call write_hdf5_attr(this%use_vs,               'Vortstretch'         , loc)
+  call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
+  call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
+  call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
+  call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
+  call write_hdf5_attr(this%KVortexRad, 'KVortexRad', loc)
+  call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
+  call write_hdf5_attr(this%use_vs, 'Vortstretch', loc)
   if(this%use_vs) then
-    call write_hdf5_attr(this%vs_elems,           'VortstretchFromElems', loc)
-    call write_hdf5_attr(this%use_divfilt,        'DivergenceFiltering' , loc)
-    call write_hdf5_attr(this%alpha_divfilt,      'AlphaDivFilt'        , loc)
+    call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
+    call write_hdf5_attr(this%use_divfilt, 'DivergenceFiltering', loc)
+    call write_hdf5_attr(1.0_wp/this%filt_eta*this%dt, 'FilterTimescale', loc)
   endif
-  call write_hdf5_attr(this%use_vd,               'vortdiff'            , loc)
-  call write_hdf5_attr(this%use_tv,               'turbvort'            , loc)
-  call write_hdf5_attr(this%use_pa,               'PenetrationAvoidance', loc)
+  call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_tv, 'turbvort', loc)
+  call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
   if(this%use_pa) then
-    call write_hdf5_attr(this%pa_rad_mult,        'PenetrationAvoidanceCheckRadius', loc)
-    call write_hdf5_attr(this%pa_elrad_mult,      'PenetrationAvoidanceElementRadius', loc)
+    call write_hdf5_attr(this%pa_rad_mult, 'PenetrationAvoidanceCheckRadius', loc)
+    call write_hdf5_attr(this%pa_elrad_mult, 'PenetrationAvoidanceElementRadius', loc)
   endif
-  call write_hdf5_attr(this%use_ve,               'ViscosityEffects', loc)
-  call write_hdf5_attr(this%use_fmm,              'use_fmm', loc)
+  call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
+  call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then
-    call write_hdf5_attr(this%use_fmm_pan,         'use_fmm_panels', loc)
-    call write_hdf5_attr(this%BoxLength,           'BoxLength', loc)
-    call write_hdf5_attr(this%Nbox,                'Nbox', loc)
-    call write_hdf5_attr(this%OctreeOrigin,        'OctreeOrigin', loc)
-    call write_hdf5_attr(this%NOctreeLevels,       'NOctreeLevels', loc)
-    call write_hdf5_attr(this%MinOctreePart,       'MinOctreePart', loc)
-    call write_hdf5_attr(this%MultipoleDegree,     'MultipoleDegree', loc)
-    call write_hdf5_attr(this%use_dyn_layers,      'use_dyn_layers', loc)
+    call write_hdf5_attr(this%use_fmm_pan, 'use_fmm_panels', loc)
+    call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)
+    call write_hdf5_attr(this%Nbox, 'Nbox', loc)
+    call write_hdf5_attr(this%OctreeOrigin, 'OctreeOrigin', loc)
+    call write_hdf5_attr(this%NOctreeLevels, 'NOctreeLevels', loc)
+    call write_hdf5_attr(this%MinOctreePart, 'MinOctreePart', loc)
+    call write_hdf5_attr(this%MultipoleDegree, 'MultipoleDegree', loc)
+    call write_hdf5_attr(this%use_dyn_layers, 'use_dyn_layers', loc)
     if(this%use_dyn_layers) then
-      call write_hdf5_attr(this%NMaxOctreeLevels,  'NMaxOctreeLevels', loc)
-      call write_hdf5_attr(this%LeavesTimeRatio,   'LeavesTimeRatio', loc)
+      call write_hdf5_attr(this%NMaxOctreeLevels, 'NMaxOctreeLevels', loc)
+      call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
     endif
-    call write_hdf5_attr(this%use_pr,              'ParticlesRedistribution', loc)
+    call write_hdf5_attr(this%use_pr, 'ParticlesRedistribution', loc)
     if(this%use_pr) then
-      call write_hdf5_attr(this%lvl_solid,         'OctreeLevelSolid', loc)
+      call write_hdf5_attr(this%lvl_solid, 'OctreeLevelSolid', loc)
       call write_hdf5_attr(this%part_redist_ratio, &
-                                                  'ParticlesRedistributionRatio', loc)
+                                          'ParticlesRedistributionRatio', loc)
     endif
   endif
-
-  call write_hdf5_attr(this%use_reformulated,     'use_reformulated', loc)
-  if(this%use_reformulated) then
-    call write_hdf5_attr(this%f, 'f', loc)
-    call write_hdf5_attr(this%g, 'g', loc)
-  endif
-
-  call write_hdf5_attr(this%debug_level,          'debug_level', loc)
-  call write_hdf5_attr(this%dt_out,               'dt_out', loc)
-  call write_hdf5_attr(this%basename,             'basename', loc)
-  call write_hdf5_attr(this%GeometryFile,         'GeometryFile', loc)
-  call write_hdf5_attr(this%ReferenceFile,        'ReferenceFile', loc)
-  call write_hdf5_attr(this%restart_from_file,    'restart_from_file', loc)
+  call write_hdf5_attr(this%debug_level, 'debug_level', loc)
+  call write_hdf5_attr(this%dt_out, 'dt_out', loc)
+  call write_hdf5_attr(this%basename, 'basename', loc)
+  call write_hdf5_attr(this%GeometryFile, 'GeometryFile', loc)
+  call write_hdf5_attr(this%ReferenceFile, 'ReferenceFile', loc)
+  call write_hdf5_attr(this%restart_from_file, 'restart_from_file', loc)
   if(this%restart_from_file) then
-    call write_hdf5_attr(this%restart_file,       'restart_file', loc)
-    call write_hdf5_attr(this%reset_time,         'reset_time', loc)
+    call write_hdf5_attr(this%restart_file, 'restart_file', loc)
+    call write_hdf5_attr(this%reset_time, 'reset_time', loc)
   endif
-  call write_hdf5_attr(this%hcas,                 'HCAS', loc)
+  call write_hdf5_attr(this%hcas, 'HCAS', loc)
   if(this%hcas) then
-    call write_hdf5_attr(this%hcas_time,          'HCAS_time', loc)
-    call write_hdf5_attr(this%hcas_vel,           'HCAS_velocity', loc)
+    call write_hdf5_attr(this%hcas_time, 'HCAS_time', loc)
+    call write_hdf5_attr(this%hcas_vel, 'HCAS_velocity', loc)
   endif
 
 end subroutine save_sim_param

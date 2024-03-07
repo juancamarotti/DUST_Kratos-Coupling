@@ -7,7 +7,6 @@ reference_chord_fraction = 0.0
 ! First section: root
 chord = 0.0686
 twist =  6.0
-airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
 
 ! First region
@@ -20,7 +19,6 @@ type_span = uniform
 ! Second section: approx 7/8
 chord = 0.0686
 twist = 0.0
-airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
 
 ! Second region
@@ -33,6 +31,5 @@ type_span = uniform
 ! Third section : tip
 chord = 0.0686
 twist = -2.0
-airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
 

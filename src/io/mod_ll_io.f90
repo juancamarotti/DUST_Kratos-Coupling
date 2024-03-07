@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -59,7 +59,7 @@ use mod_handling, only: &
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
-use mod_math, only: &
+use mod_parametric_io, only: &
   geoseries, geoseries_both
 !----------------------------------------------------------------------
 
@@ -593,14 +593,12 @@ function spacing_weights ( itype, i, n, r_ib, r_ob, y_refinement ) result(w)
     call geoseries_both(0.0_wp, 1.0_wp, n, y_refinement, r_ib, r_ob, division)
     w = division(i + 1)
 
-  case(6) ! geoseries_ob
+  case(6) 
     call geoseries(0.0_wp, 1.0_wp, n, r_ob, divisionIB, divisionOB) 
     w = divisionOB(i + 1)
-
-  case(7) ! geoseries_ib
+  case(7) 
     call geoseries(0.0_wp, 1.0_wp, n, r_ib, divisionIB, divisionOB) 
-    w = divisionIB(i + 1)
-
+    w = divisionIB(i)
   case default ! uniform
     w = real(i,wp) / real(n,wp)
   end select

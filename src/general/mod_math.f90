@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -59,8 +59,7 @@ implicit none
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
           unique, unique_row, infinite_plate_spline, tessellate, & 
-          vec2mat, mat2vec, invmat, invmat_banded, linspace, &
-          geoseries, geoseries_both, geoseries_hinge
+          vec2mat, mat2vec, invmat, invmat_banded, linspace
 
 private
 
@@ -910,114 +909,6 @@ subroutine linspace(from, to, array)
 
 end subroutine
 ! ----------------------------------------------------------------------
-
-subroutine geoseries(start_x, end_x, n_elem, r, dcsi_le, dcsi_te) 
-  real(wp), intent(in)               :: start_x, end_x
-  integer, intent(in)                :: n_elem
-  real(wp), intent(in)               :: r
-  real(wp), allocatable, intent(out) :: dcsi_le(:), dcsi_te(:) 
-
-  real(wp), allocatable              :: dl(:)
-  real(wp)                           :: r_d
-  integer :: i
-  character(len=*), parameter :: this_sub_name = 'geoseries' 
-
-  allocate(dl(n_elem)); dl = 0.0_wp
-  if (.not. allocated(dcsi_te)) allocate(dcsi_te(n_elem + 1)); dcsi_te = 0.0_wp 
-  if (.not. allocated(dcsi_le)) allocate(dcsi_le(n_elem + 1)); dcsi_le = 0.0_wp
-  
-  !> check series convergence 
-  if ((r .ge. 1.0_wp) .or. (r .le. 0.0_wp)) then 
-    call error(this_mod_name, this_sub_name, 'insert a growth value between 0. and 1.') 
-  end if
-  
-  r_d = 1-r ! growth ratio (intended as decreasing ratio) 
-  ! get size of the first element knowing the sum of the geometric series
-  dl(1) = (1.0_wp-r_d)/(1.0_wp - r_d**real(n_elem,wp));
-  do i = 2, n_elem
-    dl(i) = r_d*dl(i-1) ! geometric series-> get length of element  
-  end do 
-  do i = 1, n_elem
-    dcsi_te(i + 1) = dcsi_te(i) + dl(i); !-> position  
-  end do
-
-  dcsi_le = (1-dcsi_te)
-  !> flip dcsi_le
-  dcsi_le = dcsi_le(size(dcsi_le):1:-1)  
-  !> rescale in the interval 
-  dcsi_te = dcsi_te*(end_x - start_x) + start_x 
-  dcsi_le = dcsi_le*(end_x - start_x) + start_x
-  !> cleanup 
-  if (allocated(dl)) deallocate(dl)
-
-end subroutine geoseries 
-
-subroutine geoseries_both(start_x, end_x, n_elem, xh, r_le, r_te, dcsi)
-  real(wp),               intent(in)    :: start_x, end_x
-  integer,                intent(in)    :: n_elem
-  real(wp),               intent(in)    :: xh
-  real(wp),               intent(in)    :: r_le, r_te
-  real(wp), allocatable,  intent(out)   :: dcsi(:) 
-
-  real(wp), allocatable                 :: dcsi_le(:), dcsi_te(:) 
-  real(wp), allocatable                 :: dcsi_le_(:), dcsi_te_(:) !> dummy
-  real(wp)                              :: mid_point, start_x_le, end_x_le, start_x_te, end_x_te 
-  integer                               :: n_elem_le, n_elem_te
-  character(len=*), parameter           :: this_sub_name = 'geoseries_both' 
-  
-  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
-
-  n_elem_le = ceiling(real(n_elem,wp)*(1.0_wp - xh)) 
-  n_elem_te = n_elem - n_elem_le
-  mid_point = (start_x + end_x)*xh
-  start_x_le = start_x
-  end_x_le = mid_point
-  start_x_te = mid_point
-  end_x_te = end_x
-  call geoseries(start_x_le, end_x_le, n_elem_le, r_le, dcsi_le, dcsi_te_)
-  call geoseries(start_x_te, end_x_te, n_elem_te, r_te, dcsi_le_, dcsi_te)
-  dcsi = (/dcsi_le(1:(size(dcsi_le)-1)), dcsi_te/) 
-  !> cleanup
-  if (allocated(dcsi_le))  deallocate(dcsi_le)
-  if (allocated(dcsi_te))  deallocate(dcsi_te)
-  if (allocated(dcsi_le_)) deallocate(dcsi_le_)
-  if (allocated(dcsi_te_)) deallocate(dcsi_te_)
-
-end subroutine geoseries_both
-
-subroutine geoseries_hinge(start_x, end_x, n_elem, xh, &
-                          r_le_aft, r_te_aft, r_le_fore, r_te_fore, dcsi)
-  real(wp),               intent(in)     :: start_x, end_x
-  integer,                intent(in)     :: n_elem
-  real(wp),               intent(in)     :: xh
-  real(wp),               intent(in)     :: r_le_aft, r_te_aft, r_le_fore, r_te_fore
-  real(wp), allocatable,  intent(out)    :: dcsi(:)
-
-  real(wp), parameter                 :: x_mid = 0.5_wp !> put as input? 
-  real(wp)                            :: start_x_aft, end_x_aft, start_x_fore, end_x_fore
-  real(wp), allocatable               :: dcsi_aft(:), dcsi_fore(:) 
-  integer                             :: n_elem_aft, n_elem_fore 
-  character(len=*), parameter         :: this_sub_name = 'geoseries_hinge' 
-  
-  allocate(dcsi(n_elem+1)); dcsi = 0.0_wp 
-  n_elem_aft = ceiling(real(n_elem,wp)*xh) 
-  n_elem_fore = n_elem - n_elem_aft
-  start_x_aft = start_x
-  end_x_aft = xh
-  start_x_fore = xh
-  end_x_fore = end_x
-  call geoseries_both(start_x_aft, end_x_aft, n_elem_aft, x_mid, r_le_aft, r_te_aft, dcsi_aft);
-  call geoseries_both(start_x_fore, end_x_fore, n_elem_fore, x_mid, r_le_fore, r_te_fore, dcsi_fore);
-
-  dcsi = (/dcsi_aft(1:(size(dcsi_aft)-1)), dcsi_fore/)
-
-  !> cleanup
-  if (allocated(dcsi_aft))  deallocate(dcsi_aft)
-  if (allocated(dcsi_fore)) deallocate(dcsi_fore)  
-
-end subroutine geoseries_hinge
-
-
 ! Modified modulo function to cycle arrays 
 ! Substitutes 0 with last element
 ! Eg (1,2,3) +1 mod 3  -> (2,0,1)

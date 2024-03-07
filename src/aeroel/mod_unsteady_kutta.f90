@@ -1,4 +1,3 @@
-
 !./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
@@ -41,80 +40,56 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Andrea Colli
+!!          Alessandro Cocco
+!!          Hussien Hussien 
 !!=========================================================================
 
-module mod_wind
+module mod_unsteady_kutta
 
 use mod_param, only: &
-  wp, pi
+  wp , nl, &
+  prev_tri , next_tri , &
+  prev_qua , next_qua , &
+  pi, max_char_len
+
+use mod_handling, only: &
+  error, warning, printout
+
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
+use mod_doublet, only: &
+  potential_calc_doublet , &
+  velocity_calc_doublet  , &
+  gradient_calc_doublet  , & 
+  linear_potential_calc_doublet
+
+use mod_linsys_vars, only: &
+  t_linsys
 
 use mod_sim_param, only: &
-  sim_param
-!----------------------------------------------------------------------
+  t_sim_param, sim_param
+
+use mod_math, only: &
+  cross , compute_qr
+
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
-public :: variable_wind
+public :: initialize_unsteady_kutta
 
 private
 
-!----------------------------------------------------------------------
-contains
-!----------------------------------------------------------------------
+contains 
 
-function variable_wind(pos, time) result(wind)
+subroutine initialize_unsteady_kutta
 
-  real(wp), intent(in) :: pos(3)
-  real(wp), intent(in) :: time
-
-  real(wp) :: wind(3)
-
-  real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
-              gust_u_des, gust_perturb_direction(3), gust_gradient, &
-              gust_time, gust_perturbation(3)
-
-  real(wp) :: s
-
-  wind = sim_param%u_inf
-
-  if (sim_param%use_gust) then
-    gust_origin = sim_param%gust_origin
-    gust_front_direction = sim_param%gust_front_direction/ &
-                                        norm2(sim_param%gust_front_direction)
-    gust_front_speed = sim_param%gust_front_speed
-    gust_u_des = sim_param%gust_u_des
-    gust_perturb_direction = sim_param%gust_perturb_direction/&
-                                        norm2(sim_param%gust_perturb_direction)
-    gust_perturbation = gust_perturb_direction * gust_u_des
-    gust_gradient = sim_param%gust_gradient
-    gust_time = sim_param%gust_time
-
-    select case(trim(sim_param%GustType))
-      case('ACM')
-        ! penetration distance
-        ! distance from the gust front, negative for the gust approaching
-        s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*&
-                      (time-gust_time)))*gust_front_direction)
-
-        if (s .ge. 0.0_wp .and. s .lt. 2.0_wp*gust_gradient) then
-          wind = wind + gust_perturbation/2*(1.0_wp-cos(pi*s/gust_gradient))
-        end if
-
-      case('linear') ! for testing
-        s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/&
-                                                            norm2(sim_param%u_inf)
-
-        wind = wind + real(pos(1),wp)*(/0.0_wp, 0.0_wp, 0.1_wp/) !s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
-      case default
-    end select
-  end if
-
-end function variable_wind
-
-!----------------------------------------------------------------------
+end subroutine initialize_unsteady_kutta
 
 
-!----------------------------------------------------------------------
 
-end module mod_wind
+end module mod_unsteady_kutta 
+

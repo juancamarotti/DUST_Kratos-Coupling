@@ -43,15 +43,6 @@ ELSE()
   MESSAGE(ERROR "Unknown choice for WITH_PRECICE")
 ENDIF()
 
-SET(KERNEL "ROSENHEAD" CACHE STRING "Kernel to be used for the FMM")
-SET_PROPERTY(CACHE KERNEL PROPERTY STRINGS "ROSENHEAD" "HOA")
-IF(KERNEL STREQUAL "ROSENHEAD")
-  ADD_DEFINITIONS(-DDUST_KERNEL=1)
-ELSEIF(KERNEL STREQUAL "HOA")
-  ADD_DEFINITIONS(-DDUST_KERNEL=2)
-ELSE()
-  MESSAGE(ERROR "Unknown computational precision")
-ENDIF()
 
 # =========== COMPILER ========================
 OPTION (USE_OpenMP "Use OpenMP to enamble <omp.h>" ON)
@@ -211,15 +202,7 @@ add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
 
-add_executable(dust_test  ${PROJECT_SOURCE_DIR}/src/dust_test.f90)
-add_dependencies(dust_test dustlib)
-target_link_libraries(dust_test dustlib ${linkedlibs})
-
-add_executable(dust_post_test  ${PROJECT_SOURCE_DIR}/src/dust_post_test.f90)
-add_dependencies(dust_post_test dustlib)
-target_link_libraries(dust_post_test dustlib ${linkedlibs})
-
 # only for testing pipline! 
-install(TARGETS dust dust_pre dust_post dust_test dust_post_test DESTINATION bin)
+install(TARGETS dust dust_pre dust_post DESTINATION bin)
 
 

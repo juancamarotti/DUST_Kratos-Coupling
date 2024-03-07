@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2024 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -52,7 +52,7 @@
 module mod_wake
 
 use mod_param, only: &
-  wp, nl, pi, one_4pi, max_char_len, eps
+  wp, nl, pi, max_char_len
 
 use mod_math, only: &
   cross, infinite_plate_spline, tessellate
@@ -79,9 +79,6 @@ use mod_vortlatt, only: &
 use mod_liftlin, only: &
   t_liftlin
 
-use mod_virtual, only: &
-  t_elem_virtual_p
-
 use mod_vortline, only: &
   t_vortline
 
@@ -107,7 +104,7 @@ use mod_hdf5_io, only: &
 
 use mod_octree, only: &
   t_octree, sort_particles, calculate_multipole, apply_multipole, &
-  apply_multipole_panels, apply_multipole_optimized
+  apply_multipole_panels
 
 use mod_wind, only: &
   variable_wind
@@ -925,7 +922,6 @@ subroutine update_wake(wake, geo, elems, octree)
   integer                             :: iw, ipan, ie, ip, np, iq
   integer                             :: id, ir
   real(wp)                            :: pos_p(3), vel_p(3)
-  real(wp)                            :: x_1(3), x_2(3), q_1(3), q_2(3), q_3(3) 
   real(wp)                            :: str(3), stretch(3)
   real(wp)                            :: ru(3), rotu(3)
   real(wp)                            :: df(3), diff(3)
@@ -1002,22 +998,20 @@ subroutine update_wake(wake, geo, elems, octree)
   if(wake%full_panels) then
     if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points))
 
-    ! create another row of points
-    
+  ! create another row of points
 !$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
-      do iw = 1,wake%n_pan_points
-        pos_p = point_old(:,iw,wake%pan_wake_len+1)
-        vel_p = 0.0_wp
+    do iw = 1,wake%n_pan_points
+      pos_p = point_old(:,iw,wake%pan_wake_len+1)
+      vel_p = 0.0_wp
 
-        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
-        !update the position in time
-        points_end(:,iw) = pos_p + vel_p*sim_param%dt
-
-      enddo
+      !update the position in time
+      points_end(:,iw) = pos_p + vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
+    enddo
 !$omp end parallel do
-   
   endif
+
 
   deallocate(point_old)
 
@@ -1054,20 +1048,22 @@ subroutine update_wake(wake, geo, elems, octree)
 
   !calculate the velocities at the old positions of the points and then
   !update the positions
-  !$omp parallel do private(pos_p, vel_p, ip, ir)
-    do ip = 1,size(points,2)
-      do ir = 1,size(points,3)
-        pos_p = points(:,ip,ir)
-        vel_p = 0.0_wp
 
-        call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+!$omp parallel do private(pos_p, vel_p, ip, ir)
+  do ip = 1,size(points,2)
+    do ir = 1,size(points,3)
+      pos_p = points(:,ip,ir)
+      vel_p = 0.0_wp
 
-        !update the position in time
-        points(:,ip,ir) = points(:,ip,ir) + &
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
+
+      !update the position in time
+      points(:,ip,ir) = points(:,ip,ir) + &
                         vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
-      enddo !ir
-    enddo !ip
-  !$omp end parallel do
+    enddo !ir
+  enddo !ip
+!$omp end parallel do
+
   !if the wake is full, calculate another row of points to generate the
   !particles
   if(wake%full_rings) then
@@ -1116,12 +1112,12 @@ subroutine update_wake(wake, geo, elems, octree)
     wake%part_p(ip)%p%rotu = 0.0_wp
 
     !If not using the fast multipole, update particles position now
-    if (.not. sim_param%use_fmm) then
+    if (.not.sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
 
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
-      wake%part_p(ip)%p%vel =  vel_p  
+      wake%part_p(ip)%p%vel =  vel_p
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1132,19 +1128,19 @@ subroutine update_wake(wake, geo, elems, octree)
             call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, str)
             ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            stretch = stretch + str*one_4pi
+            stretch = stretch + str/(4.0_wp*pi)
 
             if(sim_param%use_divfilt) then
               call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
                     wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, ru)
-              rotu = rotu + ru*one_4pi
-            endif
+              rotu = rotu + ru/(4.0_wp*pi)
 
+            endif
           endif
         enddo
       
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + stretch
-        wake%part_p(ip)%p%stretch_alone = wake%part_p(ip)%p%stretch ! Used in reformulated
+        
         if(sim_param%use_divfilt) then 
           wake%part_p(ip)%p%rotu = wake%part_p(ip)%p%rotu + rotu
         endif
@@ -1157,36 +1153,26 @@ subroutine update_wake(wake, geo, elems, octree)
 
         do iq = 1, wake%n_prt
 
-          if (ip .ne. iq) then
+          if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
-                  wake%part_p(ip)%p%r_Vortex, wake%part_p(ip)%p%vol, df)
-              if ( (norm2(wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir + 2.0_wp*df*sim_param%nu_inf*sim_param%dt)) .le. &
-                  1.05_wp*max( wake%part_p(ip)%p%mag, wake%part_p(iq)%p%mag)) then
-                  diff = diff + 2.0_wp*df*sim_param%nu_inf    ! 21/12/2023 Added factor 2 (see Winckelmans)
-              else
-                  write(*,*) 'Unphysical diffusion'
-              endif
+                  wake%part_p(ip)%p%r_Vortex, df)
+            diff = diff + df*sim_param%nu_inf
           endif
 
         enddo !iq
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + diff
       endif !use_vd
 
-    end if ! not use_fmm
+    end if !use_fmm
 
   enddo
 !$omp end parallel do
 
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then
-      call apply_multipole_optimized(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                           wake%end_vorts)
-    else  
-      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                          wake%end_vorts) 
-    endif 
     if (sim_param%HCAS) then
       do ip = 1, wake%n_prt
         wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
@@ -1290,30 +1276,20 @@ end subroutine update_wake
 !! Completes the updating to the next time step begun in update_wake
 !! first and second row are updated to the next step and new particles are
 !! created if necessary; they will appear at the save_date in the next time step
-subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree, it)
+subroutine complete_wake(wake, geo, elems, te, it)
   type(t_wake), target, intent(inout)   :: wake
   type(t_geo), intent(in)               :: geo
-  type(t_pot_elem_p), intent(inout)     :: elems(:)
-  type(t_elem_virtual_p), intent(in)    :: elems_virtual(:)
+  type(t_pot_elem_p), intent(in)        :: elems(:)
   type(t_tedge), intent(inout)          :: te
-  type(t_octree), intent(inout)         :: octree 
   integer, intent(in)                   :: it
 
   integer                               :: p1, p2
   integer                               :: ip, iw, ipan, id, is, nprev
   real(wp)                              :: dist(3) , vel_te(3), pos_p(3)
   real(wp)                              :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
-  integer                               :: k, n_part, count_free
+  integer                               :: k, n_part
   real(wp)                              :: vel_in(3), vel_out(3), wind(3)
-  real(wp)                              :: q_1(3), q_2(3), q_3(3)
-  real(wp)                              :: alpha_q_1(3), alpha_q_2(3), alpha_q_3(3)
-  real(wp)                              :: alpha_p_1(3), alpha_p_2(3), alpha_p_3(3)
-  real(wp)                              :: hcas_vel(3)
-  real(wp)                              :: alpha_p_1_mag, alpha_p_2_mag, alpha_p_3_mag
-  real(wp)                              :: r_Vortex_q_1, r_Vortex_q_2, r_Vortex_q_3 
-  real(wp)                              :: r_Vortex_p_1, r_Vortex_p_2, r_Vortex_p_3
-  real(wp)                              :: alpha_p_3_dir(3)
-  real(wp)                              :: area, rVol, r_Vortex  
+  real(wp)                              :: area
   integer                               :: ic
   
   integer                               :: iwc, isp, n_sbprt, n_max_pan_comp, n_max_sbprt_comp, pan_count, sbprt_count
@@ -1322,13 +1298,9 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree, it)
   real(wp), allocatable                 :: cen_sbprt(:,:), area_sbprt(:), mag_sbprt(:), dir_sbprt(:,:), rad_sbprt(:)
   real(wp), allocatable                 :: W(:,:), w_i(:)
   real(wp)                              :: vel_part(3), vertices(3,4)
-  real(wp)                              :: filt_eta
-  real(wp)                              :: sigma_dot
-  real(wp), allocatable                 :: alpha_pedrizzetti(:,:)
-
   ! flow separation variables
   integer                               :: i_comp , i_elem , n_elem
-  
+
   character(len=max_char_len)           :: msg
   character(len=*), parameter           :: this_sub_name='prepare_wake'
 
@@ -1419,353 +1391,56 @@ subroutine complete_wake(wake, geo, elems, elems_virtual, te, octree, it)
 #endif      
   enddo
 
-  
 
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
-  filt_eta = sim_param%alpha_divfilt/sim_param%dt
-  !> suppress initial vortex 
-  if (sim_param%suppress_wake .and. it .eq. sim_param%suppress_wake_nsteps) then
-!$omp parallel do schedule(dynamic,4) private(ip)
-    do ip = 1, n_part 
-      if (wake%part_p(ip)%p%initial_layer) then
-        wake%part_p(ip)%p%free = .true. 
-!$omp atomic update
-        wake%n_prt = wake%n_prt - 1
-!$omp end atomic
-      endif
-    enddo 
-!$omp end parallel do
-    n_part = wake%n_prt
-  endif 
-
-select case (sim_param%integrator)
-  case('euler') ! Explicit Euler
-!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out, sigma_dot, r_Vortex)
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
-    
-    if(.not. wake%part_p(ip)%p%free) then 
-      if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
-        !> penetration avoidance 
-        if(sim_param%use_pa) then
-          vel_in = wake%part_p(ip)%p%vel
-          call avoid_collision(elems_virtual, wake, &
-                            wake%part_p(ip)%p, vel_in, vel_out)
-          wake%part_p(ip)%p%vel = vel_out
-        endif
-        pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
-                sim_param%dt*real(sim_param%ndt_update_wake,wp)
 
-        if(all(pos_p .ge. wake%part_box_min) .and. &
-            all(pos_p .le. wake%part_box_max)) then
-          wake%part_p(ip)%p%cen = pos_p
+    if(sim_param%use_pa) then
+      vel_in = wake%part_p(ip)%p%vel
+      call avoid_collision(elems, wake, &
+                        wake%part_p(ip)%p, vel_in, vel_out)
+      wake%part_p(ip)%p%vel = vel_out
+    endif
 
-          if(sim_param%use_vs .or. sim_param%use_vd) then
+    if(.not. wake%part_p(ip)%p%free) then
+      pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
+              sim_param%dt*real(sim_param%ndt_update_wake,wp)
 
-            ! add reformulated contribution (Alvarez rVPM 2023)
-            sigma_dot = 0.0_wp
-            if(sim_param%use_reformulated) then
-              wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                          - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                          * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
+      if(all(pos_p .ge. wake%part_box_min) .and. &
+          all(pos_p .le. wake%part_box_max)) then
+        wake%part_p(ip)%p%cen = pos_p
 
-              sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                          * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                          * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-            endif
+        if(sim_param%use_vs .or. sim_param%use_vd) then
 
-            !add divergence filtering (Pedrizzetti Relaxation)
-            if(sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then
-              wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-                filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
-                wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
-            endif
+          !add filtering
+          if(sim_param%use_divfilt) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+              sim_param%filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+              wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+          endif
 
-            !Explicit Euler
-            alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                            wake%part_p(ip)%p%stretch* &
-                            sim_param%dt*real(sim_param%ndt_update_wake,wp)
-            alpha_p_n = norm2(alpha_p)
+          !Explicit Euler
+          alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+                          wake%part_p(ip)%p%stretch* &
+                          sim_param%dt*real(sim_param%ndt_update_wake,wp)
+          alpha_p_n = norm2(alpha_p)
 
-            if(sim_param%use_reformulated) then
-              !r_Vortex update
-              r_Vortex = wake%part_p(ip)%p%r_Vortex &
-                        + sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
-            else 
-              r_Vortex = wake%part_p(ip)%p%r_Vortex
-            endif
-
-            !Magnitude check to avoid division by zero and negative magnitudes
-            if(alpha_p_n .ge. sim_param%mag_threshold .and. r_Vortex .ge. sim_param%mag_threshold) then
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+          if(alpha_p_n .ne. 0.0_wp) &
               wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
-              wake%part_p(ip)%p%mag = alpha_p_n 
-              if(sim_param%use_reformulated) then
-                wake%part_p(ip)%p%r_Vortex = r_Vortex
-              endif
-            else
-              wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-              wake%n_prt = wake%n_prt - 1
-!$omp end atomic
-            endif !magnitude check
-          endif !use_vs 
-        else !part_box
-          wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-          wake%n_prt = wake%n_prt - 1
-!$omp end atomic
-        endif !part box  
-      else !magnitude
+        endif
+      else
         wake%part_p(ip)%p%free = .true.
 !$omp atomic update
-        wake%n_prt = wake%n_prt - 1
-!$omp end atomic       
-      endif !magnitude
-    endif ! not free
+        wake%n_prt = wake%n_prt -1
+!$omp end atomic
+      endif
+    endif
   enddo
 !$omp end parallel do
-
-  case('low_storage') ! Low storage Runge-Kutta 
-    !> 1st stage
-    count_free = 0
-    if(sim_param%use_divfilt) then 
-      allocate(alpha_pedrizzetti(n_part,3)); alpha_pedrizzetti = 0.0_wp
-    endif 
-!$omp parallel do schedule(dynamic,4) private(ip, q_1, alpha_q_1, alpha_p_1, sigma_dot, r_Vortex_q_1, r_Vortex_p_1)
-    do ip = 1, n_part
-      if ( .not. wake%part_p(ip)%p%free) then
-        if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small)
-
-          if(sim_param%use_divfilt .and. norm2(wake%part_p(ip)%p%rotu) .ge. 1.0e-9_wp) then 
-            ! In this case (low_storage) the contribution to alpha is calculated
-            ! directly, instead of acting on stretch. Added to alpha_p_3 after 3rd stage
-            alpha_pedrizzetti(ip,:) = (1.0_wp-sim_param%alpha_divfilt)*wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir &
-                                    + sim_param%alpha_divfilt*wake%part_p(ip)%p%mag &
-                                    * wake%part_p(ip)%p%rotu/norm2(wake%part_p(ip)%p%rotu) &
-                                    - wake%part_p(ip)%p%mag*wake%part_p(ip)%p%dir ! Only the increment is considered
-          endif
-
-          q_1 = wake%part_p(ip)%p%vel*sim_param%dt*real(sim_param%ndt_update_wake,wp) 
-          wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen + 1.0_wp/3.0_wp*q_1 
-
-          sigma_dot = 0.0_wp
-          if(sim_param%use_reformulated) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                        - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
-            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                        * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-          endif
-
-          alpha_q_1 = wake%part_p(ip)%p%stretch*sim_param%dt*real(sim_param%ndt_update_wake,wp) 
-          alpha_p_1 = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + 1.0_wp/3.0_wp*alpha_q_1  
-          if(sim_param%use_reformulated) then
-            !> r_Vortex update
-            r_Vortex_q_1 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp)
-            r_Vortex_p_1 = wake%part_p(ip)%p%r_Vortex & 
-                                        + 1.0_wp/3.0_wp*r_Vortex_q_1
-          else 
-            r_Vortex_p_1 = wake%part_p(ip)%p%r_Vortex
-          endif
-          if(norm2(alpha_p_1) .ge. sim_param%mag_threshold .and. r_Vortex_p_1 .ge. sim_param%mag_threshold) then 
-            wake%part_p(ip)%p%mag = norm2(alpha_p_1) !> mag
-            wake%part_p(ip)%p%dir = alpha_p_1/(wake%part_p(ip)%p%mag) !> direction 
-            
-            if(sim_param%use_reformulated) then
-              wake%part_p(ip)%p%r_Vortex = r_Vortex_p_1 
-            endif
-            !> assign old values
-            wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
-            wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
-            wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-            wake%part_p(ip)%p%vel_prev = q_1 !> velocity*dt
-            wake%part_p(ip)%p%stretch_prev = alpha_q_1 !> stretch*dt
-            wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_1 !> sigma_dot*dt
-          else !mag check
-            wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-            count_free = count_free + 1
-!$omp end atomic                 
-          endif !mag check
-        else !magnitude
-          wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-          count_free = count_free + 1
-!$omp end atomic     
-        endif !magnitude
-      endif !not free
-    enddo
-!$omp end parallel do
-
-    !> 2nd stage 
-    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then
-      call apply_multipole_optimized(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                          wake%end_vorts)
-    else  
-      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                          wake%end_vorts) 
-    endif 
-    !> HCAS 
-    if (sim_param%HCAS) then
-      hcas_vel = get_vel_hcas()
-      do ip = 1, n_part
-        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
-      enddo
-    endif
-!$omp parallel do schedule(dynamic,4) private(ip, q_2, alpha_q_2, alpha_p_2, sigma_dot, r_Vortex_q_2, r_Vortex_p_2)                        
-    do ip = 1, n_part
-      if ( .not. wake%part_p(ip)%p%free) then 
-        if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small) 
-          q_2 = wake%part_p(ip)%p%vel*sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
-                5.0_wp/9.0_wp*wake%part_p(ip)%p%vel_prev  
-          wake%part_p(ip)%p%cen = wake%part_p(ip)%p%cen_prev + 15.0_wp/16.0_wp*q_2 
-
-          sigma_dot = 0.0_wp
-          if(sim_param%use_reformulated) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                        - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
-
-            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                        * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                        * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-          endif
-          alpha_q_2 = wake%part_p(ip)%p%stretch*sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
-                      5.0_wp/9.0_wp*wake%part_p(ip)%p%stretch_prev  
-          alpha_p_2 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 15.0_wp/16.0_wp*alpha_q_2 
-          !> r_Vortex update
-          if(sim_param%use_reformulated) then
-            r_Vortex_q_2 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
-                            5.0_wp/9.0_wp*wake%part_p(ip)%p%r_Vortex_prev
-            r_Vortex_p_2 = wake%part_p(ip)%p%r_Vortex + 15.0_wp/16.0_wp*r_Vortex_q_2
-          else
-            r_Vortex_p_2 = wake%part_p(ip)%p%r_Vortex
-          endif
-          if(norm2(alpha_p_2) .ge. sim_param%mag_threshold .and. r_Vortex_p_2 .ge. sim_param%mag_threshold) then 
-            wake%part_p(ip)%p%mag = norm2(alpha_p_2)
-            wake%part_p(ip)%p%dir = alpha_p_2/(wake%part_p(ip)%p%mag)  
-
-            if(sim_param%use_reformulated) then
-              wake%part_p(ip)%p%r_Vortex = r_Vortex_p_2
-            endif
-            !> assign old values
-            wake%part_p(ip)%p%cen_prev = wake%part_p(ip)%p%cen
-            wake%part_p(ip)%p%dir_prev = wake%part_p(ip)%p%dir
-            wake%part_p(ip)%p%mag_prev = wake%part_p(ip)%p%mag
-            wake%part_p(ip)%p%vel_prev = q_2 !> velocity*dt
-            wake%part_p(ip)%p%stretch_prev = alpha_q_2 !> stretch*dt
-            wake%part_p(ip)%p%r_Vortex_prev = r_Vortex_q_2 !> sigma_dot*dt
-          else !mag check
-            wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-            count_free = count_free + 1
-!$omp end atomic    
-          endif !mag check
-        else !magnitude
-          wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-          count_free = count_free + 1
-!$omp end atomic    
-        endif !magnitude
-      endif !not free
-    enddo
-!$omp end parallel do
-
-    !> 3rd stage 
-    if (sim_param%use_vs .and. sim_param%use_divfilt .and. sim_param%use_vd) then
-      call apply_multipole_optimized(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                          wake%end_vorts)
-    else  
-      call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                          wake%end_vorts) 
-    endif  
-    !> HCAS
-    if (sim_param%HCAS) then
-      do ip = 1, n_part
-        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
-      enddo
-    endif
-!$omp parallel do schedule(dynamic,4) private(ip, pos_p, vel_in,vel_out, q_3, &
-!$omp& alpha_q_3, alpha_p_3_mag, alpha_p_3_dir, alpha_p_3, sigma_dot, r_Vortex_q_3, r_Vortex_p_3)         
-    do ip = 1, n_part 
-
-      if ( .not. wake%part_p(ip)%p%free) then
-        if( wake%part_p(ip)%p%mag .ge. sim_param%mag_threshold) then ! to avoid negative magnitudes (and too small) 
-          if(sim_param%use_pa) then
-            vel_in = wake%part_p(ip)%p%vel
-            call avoid_collision(elems_virtual, wake, &
-                              wake%part_p(ip)%p, vel_in, vel_out)
-            wake%part_p(ip)%p%vel = vel_out
-          endif
-          q_3 = wake%part_p(ip)%p%vel*sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
-                153.0_wp/128.0_wp*wake%part_p(ip)%p%vel_prev 
-          pos_p = wake%part_p(ip)%p%cen_prev + 8.0_wp/15.0_wp*q_3 
-          sigma_dot = 0.0_wp
-          if(sim_param%use_reformulated) then
-            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch & 
-                                      - (sim_param%g + sim_param%f)/(1.0_wp/3.0_wp + sim_param%f) & 
-                                      * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir) * wake%part_p(ip)%p%dir
-
-            sigma_dot = - (sim_param%g + sim_param%f)/(1.0_wp + 3.0_wp*sim_param%f) &
-                      * wake%part_p(ip)%p%r_Vortex/wake%part_p(ip)%p%mag & 
-                      * sum(wake%part_p(ip)%p%stretch_alone*wake%part_p(ip)%p%dir)
-          endif
-          alpha_q_3 = wake%part_p(ip)%p%stretch*sim_param%dt - 153.0_wp/128.0_wp*wake%part_p(ip)%p%stretch_prev  
-          alpha_p_3 = wake%part_p(ip)%p%dir_prev*wake%part_p(ip)%p%mag_prev + 8.0_wp/15.0_wp*alpha_q_3 
-
-          !add Pedrizzetti contribution
-          if(sim_param%use_divfilt) then 
-            alpha_p_3 = alpha_p_3 + alpha_pedrizzetti(ip,:)
-          endif
-          if (sim_param%use_reformulated) then
-            !r_Vortex update
-            r_Vortex_q_3 = sigma_dot * sim_param%dt*real(sim_param%ndt_update_wake,wp) - &
-                            153.0_wp/128.0_wp*wake%part_p(ip)%p%r_Vortex_prev
-            r_Vortex_p_3 = wake%part_p(ip)%p%r_Vortex + 8.0_wp/15.0_wp*r_Vortex_q_3
-          else 
-            r_Vortex_p_3 = wake%part_p(ip)%p%r_Vortex
-          endif
-          if(norm2(alpha_p_3) .ge. sim_param%mag_threshold .and. r_Vortex_p_3 .ge. sim_param%mag_threshold) then
-            alpha_p_3_mag = norm2(alpha_p_3)
-            alpha_p_3_dir = alpha_p_3/(alpha_p_3_mag)
-
-            if(all(pos_p .ge. wake%part_box_min) .and. &
-                all(pos_p .le. wake%part_box_max)) then
-              wake%part_p(ip)%p%cen = pos_p
-              wake%part_p(ip)%p%dir = alpha_p_3_dir
-              wake%part_p(ip)%p%mag = alpha_p_3_mag
-              if (sim_param%use_reformulated) then
-                wake%part_p(ip)%p%r_Vortex = r_Vortex_p_3
-              endif
-            else !part_box
-              wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-              count_free = count_free + 1
-!$omp end atomic
-            endif !part_box
-          else !mag check
-            wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-            count_free = count_free + 1
-!$omp end atomic
-          endif !mag check
-        else !magnitude
-          wake%part_p(ip)%p%free = .true.
-!$omp atomic update
-          count_free = count_free + 1
-!$omp end atomic
-        endif !magnitude
-      endif !not free
-    enddo
-!$omp end parallel do
-  
-  wake%n_prt = wake%n_prt - count_free
-  if(sim_param%use_divfilt) then
-    deallocate(alpha_pedrizzetti)
-  endif 
-end select 
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
@@ -1855,7 +1530,7 @@ end select
         isp = isp + n_sbprt ! added subparticles
         
         iwc = iwc +1 ! added parent panel     
-
+           
         ! parent panel from previous row
         call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 4) ! parent panel
         cen_parent(:,iwc) = pos_p
@@ -1925,7 +1600,7 @@ end select
           dir_parent(:,iwc) = dir_parent(:,iwc-1)
   
           iwc = iwc+1 ! added parent panel
-          
+           
         enddo ! loop over panels for this component
         
         iwc = iwc - 1
@@ -1991,7 +1666,7 @@ end select
       deallocate(cen_sbprt, area_sbprt, mag_sbprt, dir_sbprt)
       deallocate(cen_parent, mag_parent, dir_parent)
     
-    ! old behaviour, possibly with refined wake
+     ! old behaviour, possibly with refined wake
       
     else if (wake%refine_wake) then ! wake refinement
       ! each wake panel is converted in multiple particles
@@ -2003,7 +1678,7 @@ end select
         ! compute the quantites of the wake panel
         call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 1, vertices)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
-        
+               
         ! divide the panel in multiple particles by tessellating it with triangles
         call tessellate(vertices, wake%k_refine, wake%tol_refine, cen_sbprt, rad_sbprt, n_sbprt)
     
@@ -2070,7 +1745,6 @@ end select
             if (wake%wake_parts(ip)%free) then
               wake%wake_parts(ip)%free = .false.
               k = ip+1
-              
               wake%n_prt = wake%n_prt+1
               wake%wake_parts(ip)%mag = norm2(partvec)
   
@@ -2083,14 +1757,9 @@ end select
               wake%wake_parts(ip)%cen = pos_p
 
               wake%wake_parts(ip)%parent_id = iw + real(it,wp)/10000.0_wp
-              !> treat initial vortex 
-              if (sim_param%suppress_wake .and. it .eq. 1) then
-                wake%wake_parts(ip)%initial_layer = .true.   
-              endif 
-            if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
-              wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
-              rVol = sim_param%KVol * 0.5_wp*sqrt(area)
-              wake%wake_parts(ip)%vol = 4.0_wp/3.0_wp * pi * rVol**3.0_wp  
+
+              if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
+                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
               else ! revert to sim_param vortex rad
                   wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
               end if
@@ -2310,7 +1979,7 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
           wake%end_pan_idou(wake%pan_neigh(1,iw))
     ave = ave/2.0_wp
   else !has no fixed neighbour
-    if (sim_param%join_te) then
+    if(sim_param%join_te) then
       ave = get_joined_intensity(wake, iw, 1)
     else
       ave = wake%end_pan_idou(iw)
@@ -2342,17 +2011,22 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices
   !Calculate the center
   pos_p = sum(vertices,2)/4.0_wp
   
+!  select case(mod(typ,3))
+!    case 1 ! ghost_left
+!      pos_p = pos_p - 
+!  endif
+  
   ! A = cross product of diagonals       
   area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
               points_end(:,p2)-wake%pan_w_points(:,p1,wake%nmax_pan+1)))
   
-  vel = 0.5_wp*(wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+  vel = 0.5_wp*( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+                 wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
   
   if (present(vertices_out)) then
     vertices_out = vertices
   endif
-  
+              
 end subroutine compute_partvec
 
 !----------------------------------------------------------------------
@@ -2371,34 +2045,32 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     call elems(ie)%p%compute_vel(pos, v)
-    vel = vel + v
+    vel = vel + v/(4*pi)
   enddo
 
   ! calculate the influence of the wake panels
   do ie=1,size(wake%pan_p)
     call wake%pan_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v
+    vel = vel + v/(4*pi)
   enddo
 
   ! calculate the influence of the wake rings
   do ie=1,size(wake%rin_p)
     call wake%rin_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v
+    vel = vel + v/(4*pi)
   enddo
 
   !calculate the influence of the end vortex
   do ie=1,size(wake%end_vorts)
     call wake%end_vorts(ie)%compute_vel(pos, v)
-    vel = vel + v
+    vel = vel + v/(4*pi)
   enddo
-  
+
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)
-    vel = vel + v
+    vel = vel + v/(4*pi)
   enddo
-
-  vel = vel*one_4pi  
 
 end subroutine compute_vel_from_all
 
@@ -2600,8 +2272,8 @@ function get_joined_intensity(wake, iw, side) result(ave)
 end function get_joined_intensity
 
 
-subroutine avoid_collision(elems_virtual, wake, part, vel_in, vel_out)
-  type(t_elem_virtual_p), intent(in)  :: elems_virtual(:)
+subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
+  type(t_pot_elem_p), intent(in)      :: elems(:)
   type(t_wake), intent(inout)         :: wake
   type(t_vortpart), intent(inout)     :: part
   real(wp), intent(in)                :: vel_in(3)
@@ -2632,68 +2304,157 @@ subroutine avoid_collision(elems_virtual, wake, part, vel_in, vel_out)
   !starting position
   pos1 = part%cen
   vel = vel_in
+
   !Cycle on all the elements
-  do ie=1,size(elems_virtual)
-      !Get the position of the particle with respect to the element
-      dist1 = pos1-(elems_virtual(ie)%p%cen)
-      elrad = maxval(elems_virtual(ie)%p%edge_len)*r2d2
-      check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
-      distn = norm2(dist1)
-      !if it is in the check radius perform calculations
-      if ((distn .lt. check_radius) ) then
-        !use the relative velocity to take into account also the element
-        !movement
-        relvel = vel - elems_virtual(ie)%p%ub
-        n = elems_virtual(ie)%p%nor
-        dist1_nor = sum(dist1 * n)
-        dist1_tan = norm2(dist1-(n*dist1_nor))
-        normvel = sum(relvel*n)
-        !If it is on the opposite side of the element, or it is moving away,
-        !do not perform any modification
-        if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
-        !get the time at which the particle hits the surface
-        !make sure not to go back in time
-        dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
-        !if it is lower than the timestep (i.e. the particles hits the surface
-        !within next step) start the correction
-        if (dt_part .gt. sim_param%dt) cycle
-        !Get the position at the time in which the particle hits the
-        !surface plane
-        pos2  = part%cen+relvel*dt_part
-        dist2 = pos2 - ( elems_virtual(ie)%p%cen )
-        dist2_nor = sum(dist2 * n)
-          
-        if(dist2_nor .le. blthick) then
-          dist2_tan = norm2(dist2-(n*dist2_nor))
-          if (dist2_tan .lt. elrad_mult*elrad) then
-            !correct the normal velocity to avoid penetration
-            if (dt_part .lt. sim_param%dt) then
-              normvel_corr = -dist1_nor/ &
-                              (sim_param%dt*real(sim_param%ndt_update_wake,wp))
-            else
-              dampf = (dist2_nor/blthick)
-              normvel_corr = normvel + (blthick-dist2_nor)/ &
-                            (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
+  do ie=1,size(elems)
+
+    select type( elem => elems(ie)%p )
+
+      class is (t_surfpan)
+        !Get the position of the particle with respect to the element
+        dist1 = pos1-(elem%cen)
+        elrad = maxval(elem%edge_len)*r2d2
+        check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
+        distn = norm2(dist1)
+
+        !if it is in the check radius perform calculations
+        if ((distn .lt. check_radius) ) then
+
+          !use the relative velocity to take into account also the element
+          !movement
+          relvel = vel - elem%ub
+          n = elem%nor
+          dist1_nor = sum(dist1 * n)
+          dist1_tan = norm2(dist1-(n*dist1_nor))
+          normvel = sum(relvel*n)
+
+          !If it is on the opposite side of the element, or it is moving away,
+          !do not perform any modification
+          if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
+
+            !get the time at which the particle hits the surface
+            !make sure not to go back in time
+            dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
+            !if it is lower than the timestep (i.e. the particles hits the surface
+            !within next step) start the correction
+            if (dt_part .gt. sim_param%dt) cycle
+            !Get the position at the time in which the particle hits the
+            !surface plane
+            pos2  = part%cen+relvel*dt_part
+            dist2 = pos2 - ( elem%cen )
+            dist2_nor = sum(dist2 * n)
+            
+          if(dist2_nor .le. blthick) then
+            dist2_tan = norm2(dist2-(n*dist2_nor))
+
+            if (dist2_tan .lt. elrad_mult*elrad) then
+
+              !correct the normal velocity to avoid penetration
+              if (dt_part .lt. sim_param%dt) then
+                normvel_corr = -dist1_nor/ &
+                                (sim_param%dt*real(sim_param%ndt_update_wake,wp))
+              else
+                dampf = (dist2_nor/blthick)
+                normvel_corr = normvel + (blthick-dist2_nor)/ &
+                              (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
+              endif
+
+              ! should be
+              ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
+              ! but simplifying
+              newvel = vel + (normvel_corr-normvel)*n
+
+              !fix the tangential velocity to keep the magnitude constant
+              normvel_corr = sum(newvel*n)
+              normvel  = sum(vel*n)
+              tanvel   = vel - normvel*n
+              tanvel2  = sum(tanvel**2)
+              nveldiff = normvel**2-normvel_corr**2+tanvel2
+              if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
+                                                      nveldiff.ge.0.0_wp) then
+                tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
+              endif
+              !reconstruct the velocity
+              vel = tanvel + normvel_corr*n
             endif
-            ! should be
-            ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
-            ! but simplifying
-            newvel = vel + (normvel_corr-normvel)*n
-            !fix the tangential velocity to keep the magnitude constant
-            normvel_corr = sum(newvel*n)
-            normvel  = sum(vel*n)
-            tanvel   = vel - normvel*n
-            tanvel2  = sum(tanvel**2)
-            nveldiff = normvel**2-normvel_corr**2+tanvel2
-            if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
-                                                    nveldiff.ge.0.0_wp) then
-              tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
-            endif
-            !reconstruct the velocity
-            vel = tanvel + normvel_corr*n
           endif
+
         endif
-      endif
+
+      class is ( t_vortlatt )
+        !Get the position of the particle with respect to the element
+        dist1 = pos1-(elem%cen)
+        elrad = maxval(elem%edge_len)*r2d2
+        check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
+        distn = norm2(dist1)
+
+        !if it is in the check radius perform calculations
+        if ((distn .lt. check_radius) ) then
+
+          !use the relative velocity to take into account also the element
+          !movement
+          relvel = vel - elem%ub
+          n = elem%nor
+          dist1_nor = norm2(dist1 * n)
+          dist1_tan = norm2(dist1-(n*dist1_nor))
+          normvel = sum(relvel*n)
+
+          !If it is moving away, do not perform any modification
+          if (sum(dist1 * n)*normvel .ge. 0.0_wp) cycle
+
+            !get the time at which the particle hits the surface
+            !make sure not to go back in time
+            dt_part = max(abs(dist1_nor)/(abs(normvel)),0.0_wp)
+            !if it is lower than the timestep (i.e. the particles hits the surface
+            !within next step) start the correction
+            if (dt_part .gt. sim_param%dt) cycle
+
+            !Get the position at the time in which the particle hits the
+            !surface plane
+            pos2  = part%cen+relvel*dt_part
+            dist2 = pos2 - ( elem%cen )
+            dist2_nor = norm2(dist2 * n)
+            blthick = 2.0_wp*blthick
+          if(dist2_nor .le. blthick) then
+            dist2_tan = norm2(dist2-(n*dist2_nor))
+
+            if (dist2_tan .lt. elrad_mult*elrad) then
+
+              !correct the normal velocity to avoid penetration
+              if (dt_part .lt. sim_param%dt) then
+                normvel_corr = -dist1_nor/ &
+                                (sim_param%dt*real(sim_param%ndt_update_wake,wp))
+              else
+                dampf = (dist2_nor/blthick)
+                normvel_corr = normvel + (blthick-dist2_nor)/ &
+                              (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
+              endif
+
+              newvel = vel + (normvel_corr-normvel)*n
+
+              !fix the tangential velocity to keep the magnitude constant
+              normvel_corr = sum(newvel*n)
+              normvel  = sum(vel*n)
+              tanvel   = vel - normvel*n
+              tanvel2  = sum(tanvel**2)
+              nveldiff = normvel**2-normvel_corr**2+tanvel2
+              if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
+                                                      nveldiff.ge.0.0_wp) then
+                tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
+              endif
+              !reconstruct the velocity
+              vel = tanvel + normvel_corr*n
+            endif
+          endif
+
+        endif
+
+      class is ( t_liftlin )
+
+      class default
+
+    end select
+
   enddo
 
   vel_out = vel
