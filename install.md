@@ -2,7 +2,7 @@
 Pre-compiled binary packages are available for Ubuntu 20.04 (focal) and 22.04 (jammy). They include only the standalone DUST version, without the preCICE-MBDyn coupling.
 
 For Ubuntu, you can download and install DUST as follows:
-- Download the related package from the [release page](https://gitlab.com/dust_project/dust_dev/-/releases/)
+- Download the related package from the [release page](https://public.gitlab.polimi.it/DAER/dust/-/releases)
 - Move to the directory where you download the package and run
   ```bash
     sudo apt install ./dust_0.7.2b-1_amd64_focal.deb
@@ -52,7 +52,7 @@ in most Linux distributions.
 - Create a build folder inside this folder (can be "build" or anything else) and move into it:
 
   ```bash
-  $ mkdir build && cd build
+  mkdir build && cd build
   ```
 
 - **Configure** cmake with standard options:
@@ -159,7 +159,7 @@ Compile DUST with **$WITH_PRECICE**=**ON** and include the MBDyn Adapter and Int
 The adapters are located in the *utils/adapter* folder. To add to the system path, for example, add these line to your ~/.bashrc file:
 
   ```bash
-  $ export PYTHONPATH="/path/to/dust/utils/adapter":$PYTHONPATH
+  export PYTHONPATH="/path/to/dust/utils/adapter":$PYTHONPATH
   ```
 
 <details>
@@ -187,7 +187,7 @@ Visit <https://www.mbdyn.org/Installation.html>.
 
 MBDyn must be compiled on branch **develop**. During the configuration phase enable the following options:
  ```bash
-  $ ./configure --enable-netcdf --with-lapack --enable-python
+  ./configure --enable-netcdf --with-lapack --enable-python
   ```
 </details>
 
