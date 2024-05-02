@@ -66,6 +66,7 @@ mu_inf = 0.00001
 ! --- wake parameters ---
 n_wake_panels = 4
 n_wake_particles = 10000
+ndt_update_wake = 1 
 particles_box_min = (/-10.0, -10.0, -10.0/)
 particles_box_max = (/10.0, 10.0, 10.0/)
 implicit_panel_scale = 0.3
@@ -103,7 +104,6 @@ viscosity_effects = F
 particles_redistribution = F
 particles_redistribution_ratio = 3.0
 octree_level_solid = 4
-turbulent_viscosity = F
 HCAS = F
 HCAS_time = 4.0
 HCAS_velocity = (/2.0, 0.0, 0.0/)
@@ -173,11 +173,11 @@ The amount of (if any) debug output is controlled by \param{debug\_level}.
 A parameter controlling the verbosity (both in terms of standard output and files output) 
 of the simulation. A smaller value leads to fewer output, with 0 being a silent simulation, 
 while values higher of 10 lead to debug files to be produced. 
-A value of 3 is a balanced value to obtain a reasonable amount of informations 
+A value of 3 is a balanced value to obtain a reasonable amount of information 
 on the simulation. 
 
 WARNING: the present feature tends to evolve rapidly during the development. 
-Values higher than 10 may lead to unexpected behaviours. 
+Values higher than 10 may lead to unexpected behaviors. 
 
 
 \item \param{tstart}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} real.
@@ -240,7 +240,7 @@ relative geometry file in the same location, as discussed in \ref{sec:Solver_Out
 If such geometry file is not provided the solver, as in the case of standard starting, 
 will attempt to generate such file with the default preprocessor input. Beware that in 
 this case, if the geometry of the results from which the solver is starting was generated 
-from another geometry input this could lead to unexpected behaviour.
+from another geometry input this could lead to unexpected behavior.
 
 
 \item \param{reset\_time}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 
@@ -284,9 +284,9 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
 
 \begin{itemize}
     
-    \item \param{gust_type}: \textit{required:} no. \textit{multiple:} no. \textit{default:} AMC \textit{type:} string.
+    \item \param{gust_type}: \textit{required:} no. \textit{multiple:} no. \textit{default:} ACM \textit{type:} string.
     
-    Select the gust type: \opt{AMC} or \opt{linear}.
+    Select the gust type: \opt{ACM} or \opt{linear}.
     \begin{equation}
         \vec{s} = -\sum \big[\vec{x} - \big(\vec{O} + U_{des}\vec{v}(t-\tau)\big)\vec]\vec{v}
     \end{equation}
@@ -295,12 +295,10 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
         \vec{U} = \vec{U}  + \dfrac{U_{des}}{2}\bigg(1-\cos{\frac{\pi s}{H}}\bigg)    
     \end{equation}
     
-    $\vec{x}$: Position of the point whose airstream velocity is being computed.
-    
     \item \param{gust_origin}: \textit{required:} yes. \textit{multiple:} no. 
     \textit{type:} real array of length 3.
-        
-    $\vec{O}$: Position of the origin point of the gust. 
+    
+    $\vec{0}$: Position of the point  whose airstream velocity is being computed. 
     
     \item \param{gust_front_direction}: \textit{required:} yes. \textit{multiple:} no. 
     \textit{type:} real array of length 3.
@@ -368,6 +366,10 @@ Number of panel wake rows before converting the wake to vortex particles.
 Number of maximum vortex particles in the wake. If the limit is reached the simulation is 
 stopped, but can be restarted from last save with a higher value of the parameter. 
 
+\item \param{ndt\_update\_wake}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 1 \textit{type:} integer.
+
+Number of time step between two wake updates. 
 
 \item \param{particles\_box\_min}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} (/-10.0, -10.0, -10.0/) \textit{type:} real array of length 3.
@@ -539,7 +541,7 @@ Employ the divergence filtering to keep the vorticity field divergence-free.
 \textit{default:} 40.0 \textit{type:} real.
 
 Timescale of the time filter to filter the divergence. 
-The input is not the actual timescale but the number of simulation time steps 
+The input is not the actual timescale but the number of simulation timesteps 
 of which the timescale is consisting. 
 
 \item \param{fmm}: \textit{required:} no. \textit{multiple:} no. \textit{default:} T 
@@ -743,7 +745,7 @@ iterations, to suppress possible oscillations.
 \item \param{ll_stall_regularisation}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} True. \textit{type:} logical.
 
-During the first time steps of simulations employing lifting lines, 
+During the first timesteps of simulations employing lifting lines, 
 usually in challenging configurations such as hovering rotors, 
 it is possible that a non perfect convergence of the non-linear 
 solver leads to some few elements of the lifting line (typically one) 
@@ -881,28 +883,28 @@ In red is highlighted the length of each cube side, \param{box_length}}
 \label{sec:Time_Stepping}
 The simulation is started from parameter \param{tstart} 
 (unless restarting from a previous solution and not resetting time) 
-and ends at \param{tend} after a certain number of time steps. 
+and ends at \param{tend} after a certain number of timesteps. 
 The user must provide the parameters \param{tstart}, \param{tend} 
-and alternatively the number of time steps (\param{timesteps}) between 
-them or the size of the time steps (\param{dt}). The non specified 
+and alternatively the number of timesteps (\param{timesteps}) between 
+them or the size of the timesteps (\param{dt}). The non specified 
 parameter is computed during the execution.
 
-When specifying the number of time steps, the interval between the 
+When specifying the number of timesteps, the interval between the 
 starting time (or re-starting time) and the end time is divided in 
 a number \param{timesteps} of equal intervals, and then \param{timesteps}+1 
 steps are executed, counting also the starting one.
 
-When specifying the time step length \param{dt}, the smallest number of 
+When specifying the timestep length \param{dt}, the smallest number of 
 steps to get to \param{tend} is executed. If the time interval cannot be 
-divided into an integer number of time steps, all the time steps will be 
-executed anyway with a time step length of \param{dt}, and the last time step 
+divided into an integer number of timesteps, all the timesteps will be 
+executed anyway with a timestep length of \param{dt}, and the last timestep 
 will be shorter to arrive precisely at \param{tend}. It must however be 
-noted that DUST is not designed at the moment to handle variable time step 
+noted that DUST is not designed at the moment to handle variable timestep 
 lengths, for this reason in few particular unsteady configurations, this 
-shorter time step could lead to small fluctuations of the loads just in the 
-last time step. To avoid this issue use a \param{dt} which lead to a precise 
-number of time steps or prescribe the number of time steps instead of the 
-time step length (or discard the results of the last step). 
+shorter timestep could lead to small fluctuations of the loads just in the 
+last timestep. To avoid this issue use a \param{dt} which lead to a precise 
+number of timesteps or prescribe the number of timesteps instead of the 
+timestep length (or discard the results of the last step). 
 
 \section{Models Parameters Choice}
 \label{sec:Solver_ParametersChoice}
@@ -973,7 +975,7 @@ inside DUST. %(more details are presented in the Theory Manual).
 
 Reference frames are defined hierarchically from a base reference frame. 
 The base reference frame is called "0" and cannot be defined, 
-is a standard right-handed Cartesian reference frame and is defined 
+is a standard right-nanded Cartesian reference frame and is defined 
 inside DUST. Starting from the base reference frame all the necessary 
 reference frames can be defined. 
 
@@ -1391,10 +1393,7 @@ required in the multiplicity are:
     \item \param{Hub\_Offset}: \textit{required:} yes if \param{mult_type} is \opt{rotor}. 
     \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} real. 
     
-    offset from the rotation pole (the origin of the multiple reference frame) of the beginning 
-    of the chain of reference frames for each blade. 
-    It is constant and does not imply any secondary motion, can be used to represent the 
-    central part of the rotor axis assembly. 
+    offset from the rotation pole (the origin of the multiple reference frame) of the beginning of the chain of reference frames for each blade. It is constant and does not imply any secondary motion, can be used to represent the central part of the rotor axis assembly. 
 
     \item \param{harmonic\_input}: \textit{required:} no, \textit{type:} logical. 
     
@@ -1519,7 +1518,7 @@ and the angular velocity will be:
                                     \big(\dot{\xi}_{ns} - n\Omega\xi_{nc}\big) \sin{n\psi_m}\Big]  +  \dot{\xi}_{N/2}(-1)^{m} \\
 \end{align}
 For the pitch degree of freedom, the motion will take into consideration the control mixing and the flap, and lag components. The input of this degree of freedom 
-are intended to be the actual swashplate input, rather than the actual pitch rotation. 
+are intened to be the actual swashplate input, rather than the actual pitch rotation. 
 
 The pitch root rotation will be then:
 \begin{align}
@@ -1582,7 +1581,7 @@ in \DUST{} will be discussed.
 
 All the equations, models, inputs, outputs etc. in the code are \textbf{dimensional}. 
 This does not mean that they are required to be in a specific dimensional unit, 
-but only that \textbf{no sort of adimensionalization is performed in the code}. 
+but only that \textbf{no sort of non-dimensionalization is performed in the code}. 
 The user is fully responsible for the scaling (or not) of his inputs, and as a 
 consequence of the outputs. 
 
@@ -1602,7 +1601,7 @@ The user can take a completely dimensional approach and insert (or build)
 the geometry in the correct size in meters, and impose a free stream velocity 
 and density corresponding to the real flight conditions. In this case the results, 
 for example in terms of loads, will be in the same units set employed in the inputs, 
-$L [N]$. To obtain the loads coefficient then the user must adimensionalize the 
+$L [N]$. To obtain the loads coefficient then the user must non-dimensionalize the 
 results employing the appropriate reference quantities used in the computations:
 \begin{equation*}
     C_L = \frac{L}{1/2 \rho U^2 b c} = \frac{L}{1/2 \cdot 1.225  \cdot 60^2 \cdot 20 \cdot 2}
@@ -1623,13 +1622,13 @@ leading for example to the scaled loads $L'$. These outputs, being scaled,
 are not numerically equal to the ones obtained in example \ref{ex:pot-dim}, 
 however they can be on the one hand scaled back to the real ones employing 
 the inverse scaling used for the inputs, or on the other hand if only the 
-adimensional coefficients are sought they can be obtained using the scaled 
+non-dimensional coefficients are sought they can be obtained using the scaled 
 reference quantities:
 \begin{equation*}
     C_L = \frac{L'}{1/2 \rho' U'^2 b' c'} = \frac{L'}{1/2 \cdot 1  \cdot 1^2 \cdot 1 \cdot 0.1}
 \end{equation*}
-When adimensionalized on the appropriate reference quantities the 
-adimensional coefficients have always the same values.
+When non-dimensionalized on the appropriate reference quantities the 
+non-dimensional coefficients have always the same values.
 \end{example}
 
 \begin{example}[Potential case, partially scaled]
@@ -1650,10 +1649,10 @@ be retrieved using the reference quantities employed in the computation:
 \end{example}
 
 It must however be stressed that when talking about scaling of the inputs 
-and adimensionalization of the results, these operations are left to the 
+and non-dimensionalization of the results, these operations are left to the 
 user to be carried out independently before and after the execution of \DUST{}. 
 To maintain complete usage flexibility, it is not possible to introduce any 
-explicit scaling or adimensionalizing unit. 
+explicit scaling or non-dimensionalizing unit. 
 When using certain features of the code (lifting lines, 
 vorticity diffusion, separations etc.) the effects of viscosity 
 and compressibility are simulated in different manners. 
@@ -1666,7 +1665,7 @@ properties of the flow must be provided, rather than the non dimensional
 numbers Reynolds and Mach. It is responsibility of the user to insert 
 them correctly and eventually scale them to obtain similarity of Reynolds 
 and Mach with respect to the target conditions. Examples on how to achieve 
-that in different conditions are presented in example~\ref{ex:rema-scaling}.
+that in different conditions are presented in example \ref{ex:rema-scaling}.
 
 \begin{example}[Ways to determine physical properties]
 \label{ex:rema-scaling}
@@ -1710,7 +1709,7 @@ quantities employed during the simulation.
 \section{Debug Levels}
 \label{sec:Solver_DebugLevels}
 
-As discussed in section~\ref{sec:Solver_InputFile} in the solver input 
+As discussed in section \ref{sec:Solver_InputFile} in the solver input 
 file it is possible to set the parameter \param{debug\_level} which selects 
 the verbosity of the output of the code. The level is selected choosing an 
 integer number, and it is cumulative: selecting a certain value the user gets 
@@ -1718,7 +1717,7 @@ the additional output given at that value \emph{and} all the outputs at the lowe
 As a rule of thumb the debug levels up to 10 generate increasing levels of 
 verbosity in the screen outputs, while increasing levels over 10 generate 
 additional outputs saved in files, in the appropriate \param{basename\_debug} path. 
-The current effects of the debug level are presented in table~\ref{tab:debug_level}. 
+The current effects of the debug level are presented in table \ref{tab:debug_level}. 
 Be aware that the debug file output is mainly targeted for development work, and its 
 content is susceptible to sudden and undocumented changes. 
 
