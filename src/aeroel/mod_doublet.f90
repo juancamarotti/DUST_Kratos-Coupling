@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -54,10 +54,13 @@
 module mod_doublet
 
 use mod_param, only: &
-  wp, &
+  wp, nl, &
   prev_tri , next_tri , &
   prev_qua , next_qua , &
-  pi, eps
+  pi, eps, max_char_len
+
+use mod_handling, only: &
+  error, warning, printout
 
 use mod_aeroel, only: &
   c_pot_elem
@@ -83,7 +86,7 @@ real(wp) :: eps_dou
 real(wp) :: r_Rankine
 real(wp) :: r_cutoff
 
-
+character(len=*), parameter :: this_mod_name = 'mod_doublet' 
 contains
 
 !----------------------------------------------------------------------
@@ -163,9 +166,9 @@ subroutine potential_calc_doublet(this, dou, pos)
 
       ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
       !TODO: use "sign" here and check the results
-      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + eps ) then
         dou = dou + real(this%n_ver-2,wp) * pi
-      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
+      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - eps ) then
         dou = dou - real(this%n_ver-2,wp) * pi
       end if
 
@@ -316,76 +319,87 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
 end subroutine gradient_calc_doublet
 
 !----------------------------------------------------------------------
-
-subroutine linear_potential_calc_doublet(this, TL, TR, pos)
+subroutine linear_potential_calc_doublet(this, TL, TR, pos) 
   class(c_pot_elem), intent(in) :: this
-  real(wp), intent(out)         :: TL, TR
   real(wp), intent(in)          :: pos(:)
+  real(wp), intent(out)         :: TL, TR  
 
-  real(wp)                      :: radius, xQ, yQ, zQ, r0a(3), r0b(3) 
-  real(wp)                      :: xa, ya, xb, yb, theta, dab, va, ra, rb, mab
-  real(wp)                      :: ea, eb, ha, hb, AA, BB, Qn
-  real(wp)                      :: Phi, Q
-  integer                       :: i1, indp1
-
-  radius = norm2(pos-this%cen)  
+  real(wp)                      :: xQ, yQ, zQ
+  real(wp)                      :: R1 , R2, Q, v, theta
+  real(wp), dimension(3)        :: e3, Qp
+  real(wp)                      :: den, sum_x, sum_y, sum_xy
+  real(wp)                      :: phi, phi_x, phi_y, phi_xy
+  real(wp), allocatable         :: verp(:,:) 
+  integer                       :: indm1 , indp1, i1, is
+  character(len=max_char_len)   :: msg(3)  
+  character(len=*), parameter   :: this_sub_name='linear_potential_calc_doublet'
+  
+  ! From Newman 'Distributions of sources and normal dipoles over a quadrilateral panel' Sec. 4
+  
   ! Control point (Q): distance (normal proj) of the point <pos> from the panel <this>
   xQ = dot_product(pos-this%cen, this%tang(:,1))
   yQ = dot_product(pos-this%cen, this%tang(:,2))
   zQ = dot_product(pos-this%cen, this%nor) 
 
-  Phi = 0.0_wp
-  Q = 0.0_wp 
+  ! Control point (Q)
+  zQ = dot_product((pos-this%cen) , this%nor)
+  Qp = pos - zQ * this%nor 
+
+  ! projection of the vertices on the mean plane 
+  allocate(verp(3,this%n_ver)) 
+  do is = 1 , this%n_ver
+    verp(:,is) = this%ver(:,is) - this%nor * &
+                    dot_product( (this%ver(:,is) - this%cen ), this%nor )
+  enddo 
+
+  call potential_calc_doublet(this, phi, pos)  
+  sum_x = 0.0_wp; sum_y = 0.0_wp; sum_xy = 0.0_wp;  
 
   do i1 = 1 , this%n_ver
-    !This is ugly but should be general and work...
-    indp1 = 1+mod(i1,this%n_ver)
-    ! doublet  -----
-    r0a = this%ver(:,i1) - this%cen
-    r0b = this%ver(:,indp1) - this%cen
 
-    xa = dot_product(r0a, this%tang(:,1))
-    ya = dot_product(r0a, this%tang(:,2))
-    
-    xb = dot_product(r0b, this%tang(:,1))
-    yb = dot_product(r0b, this%tang(:,2)) 
-
-    theta = atan2(yb - ya, xb - xa)
-    dab = this%edge_len(i1) !sqrt((xb - xa)**2 + (yb - ya)**2) (check) 
-    va = (xQ - xa) * sin(theta) - (yQ - ya) * cos(theta)
-    ra = sqrt((xQ - xa)**2.0_wp + (yQ - ya)**2.0_wp + zQ**2.0_wp)
-    rb = sqrt((xQ - xb)**2.0_wp + (yQ - yb)**2.0_wp + zQ**2.0_wp)
-    mab = (yb - ya) / (xb - xa)
-    ea = (xQ - xa)**2.0_wp + zQ**2.0_wp
-    eb = (xQ - xb)**2.0_wp + zQ**2.0_wp
-    ha = (xQ - xa) * (yQ - ya)
-    hb = (xQ - xb) * (yQ - yb)
-    AA = atan2(mab * ea - ha, zQ * ra)
-    if (abs(AA + pi) .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
-        AA = pi
-    end if
-    BB = atan2(mab * eb - hb, zQ * rb)
-    if (abs(BB + pi) .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
-        BB = pi
+    if ( this%n_ver .eq. 3 ) then
+      indm1 = prev_tri(i1)
+      indp1 = next_tri(i1)
+    else if ( this%n_ver .eq. 4 ) then
+      indm1 = prev_qua(i1)
+      indp1 = next_qua(i1)
     end if
 
-    Qn = log((ra + rb + dab) / (ra + rb - dab))
+    R1 = norm2( pos - verp(:,i1) )
+    R2 = norm2( pos - verp(:,indp1) )
+    den = R1+R2-this%edge_len(i1)
 
-    Phi = Phi + (AA - BB)
+    if(den < 1e-6_wp .and. sim_param%debug_level .ge. 5) then
+      write(msg(1),'(A)') 'Too small denominator in &
+      &source computation with point projection, using actual &
+      &points instead.'
+      write(msg(2),'(A,F12.6,F12.6,F12.6)') 'Computing sources on point: ',&
+      pos(1),pos(2),pos(3)
+      write(msg(3),'(A)')'This is most likely due to severely warped &
+      &quadrilateral elements adjacent to small elements.'//nl//&
+      &'      === CHECK MESH QUALITY! ==='
+      call warning(this_sub_name, this_mod_name, msg)
+    endif
 
-    Q = Q + Qn * (yQ * sin(theta) - xQ * cos(theta) +  &
-                  va * sin(theta) * cos(theta)) - (rb - ra) * cos(theta)**2
-  enddo
+    Q = log((R1+R2+this%edge_len(i1)) / (den))
+
+    v = dot_product(cross(Qp - verp(:,i1), this%edge_vec(:,i1)), this%nor) / this%edge_len(i1)
+    theta = atan2(verp(2, indp1) - verp(2,i1), verp(1, indp1) - verp(1,i1)) 
+    sum_x = sum_x + Q*sin(theta)
+    sum_y = sum_y + Q*cos(theta) 
+    sum_xy = sum_xy + cos(theta)*(v*Q*sin(theta) - (R2 - R1)*cos(theta)) 
+
+  end do
   
-  if (Phi .lt. -2.0_wp*pi) then
-    Phi = Phi + 4.0_wp*pi
-  elseif (Phi .gt. 2.0_wp*pi) then
-    Phi = Phi - 4.0_wp*pi
-  end if
+  phi_x = xq*phi + zq*sum_x 
+  phi_y = yq*phi - zq*sum_y 
+  TR = xq*phi_x + yq*phi_y - xq*yq*phi + zq*sum_xy ! phi_xy 
+  TL = phi - TR 
 
-  TL = Phi - (Phi*xQ*yQ + zQ*Q)
-  TR = Phi*xQ*yQ + zQ*Q
-  
+  !> clean up
+  deallocate(verp) 
+
 end subroutine linear_potential_calc_doublet
+
 
 end module mod_doublet

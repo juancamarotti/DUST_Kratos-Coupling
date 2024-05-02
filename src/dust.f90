@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -146,7 +146,7 @@ use mod_octree, only: &
   apply_multipole_panels
 
 use mod_math, only: & 
-  cross, dot, vec2mat, invmat
+  cross, dot, vec2mat, invmat_banded
 
 #if USE_PRECICE
   use mod_precice, only: &
@@ -967,7 +967,7 @@ end if
       endif
       enddo
       !> inverse of jacobian matrix (only the non zero part is inverted, the rest is zero) 
-      call invmat(jacobi, size(jacobi,1))
+      call invmat_banded(jacobi, size(jacobi,1))
     endif !> update jacobi matrix
 
     !> Newton Raphson iteration to get the new circulation/pressure difference
@@ -1464,7 +1464,7 @@ end if
       !> Update geometry
       call update_geometry(geo, te, time, .false., .true.)
       if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-        call complete_wake(wake, geo, elems_tot, te)
+        call complete_wake(wake, geo, elems_tot, te, it)
       end if
     endif
     t1 = dust_time() 

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -58,8 +58,8 @@ implicit none
 
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
-          unique, infinite_plate_spline, tessellate, & 
-          vec2mat, mat2vec, invmat 
+          unique, unique_row, infinite_plate_spline, tessellate, & 
+          vec2mat, mat2vec, invmat, invmat_banded, linspace
 
 private
 
@@ -109,13 +109,14 @@ subroutine linear_interp_vector(val_vec , t_vec , t , val)
     call error(this_sub_name, this_mod_name, 'Different sizes for x and y &
                                   &data vector provided for interpolation')
   end if
-
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
-  if ( t .lt. minval(t_vec) ) then
+  if ( t .le. minval(t_vec)-eps ) then
+    write(*,*) t, minval(t_vec)
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
-  if ( t .gt. maxval(t_vec) ) then
+  if ( t .ge. maxval(t_vec)+eps ) then
+    write(*,*) t, maxval(t_vec)
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
@@ -154,11 +155,11 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
   end if
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
-  if ( t .lt. minval(t_vec) ) then
+  if ( t .le. minval(t_vec)-eps ) then
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
-  if ( t .gt. maxval(t_vec) ) then
+  if ( t .ge. maxval(t_vec)+eps ) then
     call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
@@ -176,7 +177,29 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 end subroutine linear_interp_array
 
 ! ----------------------------------------------------------------------
-subroutine invmat(A, n)
+subroutine invmat(A) 
+  real(wp), intent(inout) :: A(:,:)
+  real(wp), allocatable   :: work(:)
+  integer                 :: info
+  integer, allocatable    :: ipiv(:)
+  character(len=*), parameter :: this_sub_name= 'invmat'
+
+  !> invert the A matrix
+  allocate(ipiv(size(A,1)))
+  allocate(work(size(A,1)))
+#if (DUST_PRECISION == 1)
+  call sgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
+  call sgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
+#elif(DUST_PRECISION == 2)
+  call dgetrf(size(A,1), size(A,1), A, size(A,1), ipiv, info)  
+  call dgetri(size(A,1), A, size(A,1), ipiv, work, size(A,1), info)
+#endif
+  deallocate(ipiv, work) 
+end subroutine invmat
+! ----------------------------------------------------------------------
+
+! ----------------------------------------------------------------------
+subroutine invmat_banded(A, n)
   integer, intent(in)                     :: n   ! n is the A size 
   real(wp), intent(inout)                 :: A(n,n)
   
@@ -198,11 +221,15 @@ subroutine invmat(A, n)
   ! (i1,j1) and (i2,j2) are the extremes of the non-zero block
   i2 = 0
   j2 = 0
-  
+
+!do i1=1,n
+!write(*,*) A(i1,:)
+!enddo
+!write(*,*) "++++"
   do i1 = 1,n
       do j1 = 1,n
         ! check if we are still inside a previous block
-        if(j1 .gt. j2+1 .or. i1 .gt. i2+1) then
+        if(j1 .ge. j2+1 .or. i1 .ge. i2+1) then
           if (abs(A(i1,j1)) .ge. 1e-16_wp) then
             i2 = i1
             
@@ -223,7 +250,7 @@ subroutine invmat(A, n)
             ! extract the block
             Anz = A(i1:i2,j1:j2)
             allocate(ipiv(nb)); ipiv = 0
- 
+! write(*,*) Anz
             !> Factorize the block
 #if (DUST_PRECISION==1)
             call sgetrf(nb, nb, Anz, nb, ipiv, info)
@@ -268,7 +295,7 @@ subroutine invmat(A, n)
           
       enddo !j1
   enddo !i1
-end subroutine invmat
+end subroutine invmat_banded
 
 
 ! ----------------------------------------------------------------------
@@ -530,6 +557,48 @@ subroutine unique(vec, vec_unique, tol)
 
 end subroutine unique  
 
+subroutine unique_row(vec, vec_unique, tol)  
+  real(wp), intent(inout)                  :: vec(:,:) 
+  real(wp), intent(in)                  :: tol
+  real(wp), allocatable, intent(out)    :: vec_unique(:,:)
+  
+  real(wp), allocatable                 :: vec_sort(:) 
+  real(wp), allocatable                 :: vec_tmp(:,:)
+  real(wp), allocatable                 :: vec_sort_row(:,:)
+  integer,  allocatable                 :: ind(:)
+  integer                               :: nel, i, j, u 
+  !> column vector 
+  nel = size(vec, 1) 
+  allocate(vec_sort_row(nel, size(vec,2))); vec_sort_row = 0.0_wp
+
+  call sort_vector_real(vec(:,1), nel, vec_sort, ind)
+
+  vec_sort_row = vec(ind, :) 
+
+  i = 1;   j = 2;   u = 1
+
+  allocate(vec_tmp(nel, size(vec,2))); vec_tmp = 0.0_wp 
+
+  vec_tmp(1, :) = vec_sort_row(1,:) 
+  do while (j .le. nel)
+    if (abs(vec_sort(j) - vec_sort(i)) .le. tol) then  
+      j = j + 1
+    else
+      u = u + 1
+      vec_tmp(u,:) = vec_sort_row(j, :) 
+      i = j 
+      j = j + 1   
+    endif 
+  enddo
+  
+  deallocate(vec_sort, vec_sort_row)
+
+  allocate(vec_unique(u, size(vec,2))); vec_unique = 0.0_wp 
+  vec_unique = vec_tmp(1:u, :)  
+
+end subroutine unique_row 
+
+
 ! ----------------------------------------------------------------------
 ! RBF interpolation weight matrix for 2D structures (plates)
 subroutine infinite_plate_spline(pos_interp, pos_ref, W)
@@ -581,14 +650,14 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   enddo  
 
   ! inverse matrix (NB the inverse is overwritten into Z_r)
-  call invmat(Z_r, size(Z_r,1))
+  call invmat(Z_r)
 
   allocate(Y_r(4,4))  
   
   ! inverse matrix (NB the inverse is overwritten into Y_r)
   Y_r = matmul(transpose(R_r),matmul(Z_r,R_r))
   Y_r = Y_r + 1e-6_wp
-  call invmat(Y_r, size(Y_r,1))
+  call invmat(Y_r)
 
   allocate(eye(n_r,n_r))
   eye = 0.0_wp
@@ -816,6 +885,29 @@ real(wp) function circumradius(vertices)
   
 end function circumradius
 
+! ----------------------------------------------------------------------
+subroutine linspace(from, to, array)
+  real(wp), intent(in)    :: from, to
+  real(wp), intent(out)   :: array(:)
+
+  real(wp)                :: range
+  integer                 :: n, i
+  
+  n = size(array)
+  range = to - from
+
+  if (n .eq. 0) return
+
+  if (n .eq. 1) then
+    array(1) = from
+    return
+  end if
+
+  do i=1, n
+    array(i) = from + range * real(i - 1, wp)/real(n - 1,wp)
+  end do
+
+end subroutine
 ! ----------------------------------------------------------------------
 ! Modified modulo function to cycle arrays 
 ! Substitutes 0 with last element

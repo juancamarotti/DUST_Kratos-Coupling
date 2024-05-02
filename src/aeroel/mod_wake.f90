@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -454,9 +454,9 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(te%id_lifting_line(size(te%scaling))); te%id_lifting_line = 0 
 
   if (sim_param%autoscale_te) then !> automatic scaling
-    
     i1 = 0 !> global index on the trailing edge 
     iw = 0 !> local index on the trailing edge elements (components) 
+
     do ic = 1, size(geo%components) 
       do ie = 1, geo%components(ic)%n_s
         i1 = i1 + 1 
@@ -1276,11 +1276,12 @@ end subroutine update_wake
 !! Completes the updating to the next time step begun in update_wake
 !! first and second row are updated to the next step and new particles are
 !! created if necessary; they will appear at the save_date in the next time step
-subroutine complete_wake(wake, geo, elems, te)
+subroutine complete_wake(wake, geo, elems, te, it)
   type(t_wake), target, intent(inout)   :: wake
   type(t_geo), intent(in)               :: geo
   type(t_pot_elem_p), intent(in)        :: elems(:)
   type(t_tedge), intent(inout)          :: te
+  integer, intent(in)                   :: it
 
   integer                               :: p1, p2
   integer                               :: ip, iw, ipan, id, is, nprev
@@ -1311,15 +1312,19 @@ subroutine complete_wake(wake, geo, elems, te)
   wake%pan_w_points(:,:,1) = wake%w_start_points
   wake%pan_gen_dir = te%t_hinged
 
+
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
 #if USE_PRECICE
     ! Coupled components were already taken care of in precice update nfw
     if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
 #endif
+
     wake%pan_gen_dir(:,ip) = wake%pan_gen_dir(:,ip)/norm2(wake%pan_gen_dir(:,ip))
+
     
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
@@ -1750,10 +1755,13 @@ subroutine complete_wake(wake, geo, elems, te)
               endif
   
               wake%wake_parts(ip)%cen = pos_p
-            if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
-              wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
+
+              wake%wake_parts(ip)%parent_id = iw + real(it,wp)/10000.0_wp
+
+              if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
+                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
               else ! revert to sim_param vortex rad
-                wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+                  wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
               end if
               wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
               wake%wake_parts(ip)%vel = vel_part
@@ -1809,7 +1817,13 @@ subroutine complete_wake(wake, geo, elems, te)
               endif
 
               wake%wake_parts(ip)%cen = pos_p
-
+              
+              ! fixed vortex rad for actuator disk
+              wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+              
+              wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
+              wake%wake_parts(ip)%vel = vel_part
+              
               exit
             endif
           enddo  !ip

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -430,6 +430,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   integer(h5loc)                                     :: floc
   integer                                            :: iSurfPan, iVortLatt
   character(len=max_char_len)                        :: msg
+  real(wp)                                           :: ac_ll(3)
   character(len=*), parameter                        :: this_sub_name='create_geometry'
 
   tstart = sim_param%t0
@@ -727,15 +728,26 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   do i_comp = 1, size(geo%components)
     if ((geo%components(i_comp)%coupling) .and. (trim(geo%components(i_comp)%coupling_type) .eq. 'rbf')) then 
-      !> build connectivity for the panel center 
+      !> build connectivity for the panel center
+      !> CAUTION: ll%cen is at 50% chord, but forces must be applied at 25% (cfr. mod_post_integral l. 297)
       allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
 
-      do i = 1, size(geo%components(i_comp)%el)
-        !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
-        ! to interface with coupling
-        cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
-          geo%components(i_comp)%el(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
-      end do 
+      if (geo%components(i_comp)%comp_el_type .eq. 'l') then 
+        do i = 1, size(geo%components(i_comp)%el)
+          !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+          ! to interface with coupling
+          ac_ll = sum ( geo%components(i_comp)%el(i)%ver(:,1:2),2 ) / 2.0_wp
+          cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+            ac_ll -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
+        end do 
+      else
+        do i = 1, size(geo%components(i_comp)%el)
+          !> el(i)%cen could be in a dust-defined reference frame, convert it back to base reference
+          ! to interface with coupling
+          cen(:,i) = matmul(transpose(geo%refs(geo%components(i_comp)%ref_id)%R_g),&
+            geo%components(i_comp)%el(i)%cen -geo%refs(geo%components(i_comp)%ref_id)%of_g) 
+        end do 
+      endif
       
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
       !> transfer index and weight matrix 
@@ -1186,7 +1198,9 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
-        
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl_init , 'Hinge_Rotation_Amplitude_initial', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_cosine_cycl, 'Hinge_Rotation_cosine_cycles', hiloc)   
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_initial_time, 'Hinge_Rotation_Initial_Time', hiloc)   
 
         if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
@@ -1378,6 +1392,8 @@ subroutine load_components(geo, in_file, out_file, te)
           trim(comp_input) .eq. 'pointwise') then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+        geo%components(i_comp)%n_s = par_nelems_span
+        geo%components(i_comp)%n_c = par_nelems_chor         
       end if
 
       call close_hdf5_group(geo_loc)
@@ -1507,6 +1523,12 @@ subroutine load_components(geo, in_file, out_file, te)
                                                 'Hinge_Rotation_Omega', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, &
                                                 'Hinge_Rotation_Phase', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl_init, &
+                                                'Hinge_Rotation_Amplitude_initial', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_cosine_cycl, &
+                                                'Hinge_Rotation_cosine_cycles', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_initial_time, &
+                                                'Hinge_Rotation_Initial_Time', hiloc)
           call close_hdf5_group(hiloc)
 
         end do
@@ -2233,7 +2255,7 @@ subroutine create_strip_connectivity(geo)
       end do
     
       !> Allocate and fill comp%strip_elem array
-      if ( mod(n_el,n_s) .ne. 0 ) then
+      if ( mod(n_el, n_s) .ne. 0 ) then
         call error(this_sub_name, this_mod_name, ' The number of elements of&
             & a parametric element is not an exact multiple of the number of&
             & spanwise stripes. There is something wrong in the geometry input&

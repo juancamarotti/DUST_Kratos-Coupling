@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -94,6 +94,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: rotu(3)
   real(wp) :: r_Vortex
   real(wp) :: r_cutoff
+  real(wp) :: parent_id
   
 contains
 

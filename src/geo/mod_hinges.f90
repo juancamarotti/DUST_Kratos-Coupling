@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -86,6 +86,9 @@ type :: t_hinge_input
   real(wp) :: rotation_amplitude
   real(wp) :: rotation_omega
   real(wp) :: rotation_phase
+  real(wp) :: rotation_amplitude_init
+  real(wp) :: rotation_cosine_cycl
+  real(wp) :: rotation_initial_time
   integer, allocatable :: coupling_nodes(:)
   real(wp) :: le1(2) 
   real(wp) :: te1(2) 
@@ -195,6 +198,9 @@ type :: t_hinge
   real(wp) :: f_ampl
   real(wp) :: f_omega
   real(wp) :: f_phase
+  real(wp) :: f_ampl_init
+  real(wp) :: f_cosine_cycl
+  real(wp) :: f_initial_time
 
   !> Coupling nodes ( for Hinge_Rotation_input = coupling )
   ! replicating geo%components(i_comp)%i_points_precice(:)
@@ -869,19 +875,53 @@ subroutine update_theta( this, t )
 
   if ( trim(this%input_type) .eq. 'function:const' ) then
     this%theta = this%f_ampl
+
   elseif ( trim(this%input_type) .eq. 'function:sin' ) then
-    this%theta = this%f_ampl * sin( this%f_omega * t - this%f_phase )
+    if ( t .le. this%f_initial_time ) then
+      this%theta = this%f_ampl_init
+    else
+      this%theta = this%f_ampl_init + &
+                   this%f_ampl * sin( this%f_omega * (t - this%f_initial_time) - this%f_phase )
+    end if
+
   elseif ( trim(this%input_type) .eq. 'function:cos' ) then
-    this%theta = this%f_ampl * cos( this%f_omega * t - this%f_phase )
+    if ( t .le. this%f_initial_time ) then
+      this%theta = this%f_ampl_init
+    else
+      this%theta = this%f_ampl_init + &
+                   this%f_ampl * cos( this%f_omega * (t - this%f_initial_time) - this%f_phase )
+    end if
+
+  elseif ( trim(this%input_type) .eq. 'function:cosine_driver' ) then
+    !> before the start of the driver
+    if ( t .le. this%f_initial_time ) then
+      this%theta = this%f_ampl_init
+    !> driver
+    elseif ((t .gt. this%f_initial_time) .and. (t .le. this%f_initial_time + 2.0_wp*pi/this%f_omega*this%f_cosine_cycl)) then
+        this%theta = this%f_ampl_init + &
+                    this%f_ampl * (1.0_wp - cos( this%f_omega * (t - this%f_initial_time)))
+    !> final value
+    elseif ( t .gt. this%f_initial_time +  2.0_wp*pi/this%f_omega*this%f_cosine_cycl) then
+      !> check if this%f_cosine_cycl is a multiple of 0.5 (half cycle(s))
+      if (mod(this%f_cosine_cycl, 0.5) == 0.0 .and. modulo(this%f_cosine_cycl, 1.0) /= 0.0) then
+        this%theta = 2.0_wp * this%f_ampl + this%f_ampl_init
+      !> check if this%f_cosine_cycl is a multiple of 1 (full cycle(s))
+      elseif (mod(this%f_cosine_cycl, 1.0_wp) == 0.0  ) then
+        this%theta = this%f_ampl_init
+      !> otherwise, it takes the last calculated value
+      else
+        this%theta = this%theta_old
+      endif
+    endif
+
+  !elseif ( trim(this%input_type) .eq. 'from_file' ) then
+    ! TODO
+    
   else
     this%theta_old = 0.0_wp
     this%theta     = 0.0_wp
-    ! *** to do ***
-    !> fix this
-    ! write(*,*) ' Error in t_hinge % init_theta(): only working &
-    !            &with function:const, :sin, :cos, so far. Stop'; stop
-  end if
 
+  end if
 
 end subroutine update_theta
 
@@ -946,7 +986,6 @@ subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
                       matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
 
         end do
-
         
         !> Blending region
         do ib = 1, size(this%blen%n2h(ih)%p2h)
@@ -996,8 +1035,8 @@ subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
               Rot_I = eye + sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
               
               if (te_i(1 , it) .eq. ii) then ! hinge node is also trailing edge node
-!
-                te_t(:,it) = te_t(:,it) + this%rot%n2h(ih)%s2h(ib) * matmul( Rot_I, te_t(:,it))
+
+                te_t(:,it) = this%rot%n2h(ih)%s2h(ib) * matmul( Rot_I, te_t(:,it))
               
               end if
             
@@ -1138,6 +1177,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     if ( ( trim(hinges(i)%rotation_input) .ne. 'function:const' ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'function:sin'   ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .and. &
+          ( trim(hinges(i)%rotation_input) .ne. 'function:cosine_driver') .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
             write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = &
@@ -1146,16 +1186,19 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     else
       if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
             ( trim(hinges(i)%rotation_input) .eq. 'function:sin'   ) .or. &
-            ( trim(hinges(i)%rotation_input) .eq. 'function:cos'   ) ) then
+            ( trim(hinges(i)%rotation_input) .eq. 'function:cos'   ) .or. &
+            ( trim(hinges(i)%rotation_input) .eq. 'function:cosine_driver')) then
 
         call getsuboption(hinge_prs, 'Hinge_Rotation_Function', fun_prs)
         hinges(i) % rotation_amplitude = getreal(fun_prs,'amplitude')
         hinges(i) % rotation_omega     = getreal(fun_prs,'omega')
         hinges(i) % rotation_phase     = getreal(fun_prs,'phase')
-
-      elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
-        write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
-                    &not implemented yet.'; stop
+        hinges(i) % rotation_amplitude_init     = getreal(fun_prs,'amplitude_initial')
+        hinges(i) % rotation_cosine_cycl     = getreal(fun_prs,'number_of_cycles')
+        hinges(i) % rotation_initial_time     = getreal(fun_prs,'initial_time')
+      !elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
+      !  write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
+      !              &not implemented yet.'; stop
 
       elseif ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
 
@@ -1184,6 +1227,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
         hinges(i) % rotation_amplitude = 1.0_wp
         hinges(i) % rotation_omega     = 0.0_wp
         hinges(i) % rotation_phase     = 0.0_wp
+        hinges(i) % rotation_amplitude_init  = 0.0_wp
+        hinges(i) % rotation_cosine_cycl     = 0.5_wp
+        hinges(i) % rotation_initial_time     = 0.0_wp
 
       end if
     end if
@@ -1279,6 +1325,15 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
   call fun_prs%CreateRealOption('phase', &
       'Phase of the rotation, for constant, function:const, :sin, :cos &
       &Rotation_Input', '0.0')
+  call fun_prs%CreateRealOption('amplitude_initial', &
+      'Initial Amplitude of the rotation, for function:sin, &
+      &:cos, cosine_driver Rotation_Input', '0.0')
+  call fun_prs%CreateRealOption('number_of_cycles', &
+      'Number of cycles for function:cosine_driver Rotation_Input', '0.5')
+  call fun_prs%CreateRealOption('initial_time', &
+      'Rotation Initial Time for function::sin, :cos &
+      &Rotation_Input', '0.0')      
+
   !> Hinge_Rotation_Input = from_file
   call hinge_prs%CreateSubOption('hinge_rotation_file', &
               'Parser for hinge input from file', file_prs )

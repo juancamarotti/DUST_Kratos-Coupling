@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -426,7 +426,7 @@ end subroutine load_vl
 !----------------------------------------------------------------------
 
 subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
-                          vpvort_v, v_rad, vpturbvisc)
+                          vpvort_v, v_rad, vp_parentid, vpturbvisc)
   integer(h5loc), intent(in)                   :: floc
   real(wp), allocatable, intent(out)           :: wpoints(:,:)
   integer, allocatable, intent(out)            :: welems(:,:)
@@ -435,7 +435,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
   real(wp), allocatable, intent(out)           :: vpvort(:)
   real(wp), allocatable, intent(out)           :: vpvort_v(:,:)
   real(wp), allocatable, intent(out)           :: v_rad(:)
-
+  real(wp), allocatable, intent(out)           :: vp_parentid(:)
   real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
   
   integer(h5loc)                               :: gloc
@@ -573,11 +573,16 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
     call read_hdf5_al(v_rad,'VortexRad',gloc)
+    call read_hdf5_al(vp_parentid,'ParentId',gloc)
     if(present(vpturbvisc)) call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
+    allocate(vpvort_v(3,size(wvort_read,2))) !vorticity vector 
     do ip = 1,size(vpvort)
       vpvort(ip) = norm2(wvort_read(:,ip))
+      vpvort_v(:,ip) = wvort_read(:,ip)/vpvort(ip)
+      !write(*,*) 'vorticity vector', vpvort_v(:,ip) !, vpvort(ip)
     enddo
+    
     !deallocate(wvort_read)
     call move_alloc(wvort_read, vpvort_v)
     call close_hdf5_group(gloc)

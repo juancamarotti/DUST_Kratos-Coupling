@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2022 Politecnico di Milano,
+!! Copyright (C) 2018-2023 Politecnico di Milano,
 !!                           with support from A^3 from Airbus
 !!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
@@ -59,6 +59,8 @@ use mod_handling, only: &
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
+use mod_parametric_io, only: &
+  geoseries, geoseries_both
 !----------------------------------------------------------------------
 
 implicit none
@@ -68,7 +70,7 @@ public :: read_mesh_ll, read_xac_offset
 private
 
 character(len=max_char_len) :: msg
-character(len=*), parameter :: this_mod_name = 'mod_parametric_io'
+character(len=*), parameter :: this_mod_name = 'mod_ll_io'
 
 !----------------------------------------------------------------------
 
@@ -108,6 +110,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   real(wp), allocatable                                   :: chord_list(:), twist_list(:)
   ! regions  ---
   real(wp), allocatable                                   :: span_list(:), sweep_list(:), dihed_list(:)
+  real(wp), allocatable                                   :: y_ref_list(:), r_in_list(:), r_ob_list(:) 
   character(len=max_char_len), allocatable                :: type_span_list(:)
   integer                                                 :: n_type_span
   character                                               :: ElType
@@ -173,9 +176,17 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                                     & uniform, cosine, cosineIB, cosineOB, equalarea', &
                 multiple=.true.);
 
-
+  call pmesh_prs%CreateRealOption( 'r', 'growth ratio of the elements at edge', &
+                multiple=.true.);
+  call pmesh_prs%CreateRealOption( 'r_ib', 'growth ratio of the elements inboard', &
+                multiple=.true.);
+  call pmesh_prs%CreateRealOption( 'r_ob', 'growth ratio of the elements at outboard', &
+                multiple=.true.);
+  call pmesh_prs%CreateRealOption( 'y_refinement', 'spanwise station to which the refinement start', &
+                multiple=.true.); 
+  
   !read the parameters
-  call pmesh_prs%read_options(mesh_file,printout_val=.true.)
+  call pmesh_prs%read_options(mesh_file, printout_val=.true.)
 
   nelem_chord     = 1          
   nelem_chord_tot = 1          
@@ -227,7 +238,9 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   allocate(      span_list(nRegions));         span_list = 0.0_wp
   allocate(     sweep_list(nRegions));        sweep_list = 0.0_wp
   allocate(     dihed_list(nRegions));        dihed_list = 0.0_wp
-
+  allocate(     y_ref_list(nRegions));        y_ref_list = 0.0_wp
+  allocate(      r_in_list(nRegions));         r_in_list = 0.0_wp
+  allocate(      r_ob_list(nRegions));         r_ob_list = 0.0_wp 
   nelem_span_tot = 0
   do iRegion = 1,nRegions
     nelem_span_list(iRegion) = getint(pmesh_prs,'nelem_span')
@@ -247,6 +260,17 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   else if ( n_type_span .eq. nRegions ) then
     do iRegion = 1 , nRegions
       type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
+      !> check geometry series type 
+      if (trim(type_span_list(iRegion)) .eq. 'geoseries') then 
+        y_ref_list(iRegion)      = getreal(pmesh_prs,   'y_refinement')
+        write(*,*) ' y_ref_list(',iRegion,') : ' , y_ref_list(iRegion)
+        r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+        r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob') 
+      elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ib') then 
+        r_in_list(iRegion)       = getreal(pmesh_prs,   'r_ib')
+      elseif (trim(type_span_list(iRegion)) .eq. 'geoseries_ob') then
+        r_ob_list(iRegion)       = getreal(pmesh_prs,   'r_ob')
+      endif
     end do
   else
     write(*,*) ' mesh_file   : ' , trim(mesh_file)
@@ -354,13 +378,22 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
       ispace = 4
 
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseries' ) then
+      ispace = 5 
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseries_ob' ) then
+      ispace = 6 
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'geoseries_ib' ) then
+      ispace = 7
+
     else
       write(*,*) ' mesh_file   : ' , trim(mesh_file)
       write(*,*) ' type_span_list(',iRegion,') : ' , &
                     trim(type_span_list(iRegion))
       call error(this_sub_name, this_mod_name, 'Inconsistent input: &
             & type_span must be equal to uniform, cosine, cosineIB,&
-            & cosineOB, equalarea.')
+            & cosineOB, equalarea, geoseries, geoseries_ob, geoseries_ib.')
     end if
 
     !> save before update
@@ -394,7 +427,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       iend = iend + npoint_chord_tot
       ich = ich + 1
 
-      w2 = spacing_weights ( ispace, iSpan, nelem_span_list(iRegion) )
+      w2 = spacing_weights ( ispace, iSpan, nelem_span_list(iRegion) , &
+                            r_in_list(iRegion), r_ob_list(iRegion), y_ref_list(iRegion))
       w1 = 1.0_wp - w2
 
       chord_p(ich) = w1*chord_list(iRegion) + w2*chord_list(iRegion+1)
@@ -419,7 +453,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
       end if
 
-      w2 = spacing_weights ( ispace, iSpan-1, nelem_span_list(iRegion) )
+      w2 = spacing_weights ( ispace, iSpan-1, nelem_span_list(iRegion), & 
+                            r_in_list(iRegion), r_ob_list(iRegion), y_ref_list(iRegion) )
       w1 = 1.0_wp - w2
 
       ! For flat meshes the section is not rotated, but the
@@ -529,12 +564,16 @@ end subroutine read_mesh_ll
 !!   ISPACE = 2    left cosine spacing
 !!   ISPACE = 3    right cosine spacing
 !!   ISPACE = 4    equalarea spacing
+!!   ISPACE = 5    geoseries 
+!!   ISPACE = 6    geoseries_ob
+!!   ISPACE = 7    geoseries_ib
 
-function spacing_weights ( itype, i, n ) result(w)
+function spacing_weights ( itype, i, n, r_ib, r_ob, y_refinement ) result(w)
 
   integer,      intent(in)  :: itype, i, n
+  real(wp),     intent(in)  :: r_ib, r_ob, y_refinement
   real(wp)                  :: w
-
+  real(wp),     allocatable :: division(:), divisionIB(:), divisionOB(:)
 
   select case (itype)
 
@@ -550,6 +589,16 @@ function spacing_weights ( itype, i, n ) result(w)
   case(4) ! equalarea 
     w =  sqrt(real(i,wp)/real(n,wp)) 
 
+  case(5) ! geoseries
+    call geoseries_both(0.0_wp, 1.0_wp, n, y_refinement, r_ib, r_ob, division)
+    w = division(i + 1)
+
+  case(6) 
+    call geoseries(0.0_wp, 1.0_wp, n, r_ob, divisionIB, divisionOB) 
+    w = divisionOB(i + 1)
+  case(7) 
+    call geoseries(0.0_wp, 1.0_wp, n, r_ib, divisionIB, divisionOB) 
+    w = divisionIB(i)
   case default ! uniform
     w = real(i,wp) / real(n,wp)
   end select

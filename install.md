@@ -30,35 +30,32 @@ in most Linux distributions.
 ## Ubuntu 20.04 or above
 
 <details>
-  <summary markdown="span">Compilers</summary>
+  <summary markdown="span"><b>Compilers</b></summary>
 
-#### Compilers
   ```bash
   sudo apt install gcc g++ gfortran
   ```
 </details>
 
 <details>
-  <summary markdown="span">Libraries</summary>
+  <summary markdown="span"><b>Libraries</b></summary>
 
-#### Libraries
   ```bash
-  sudo apt install liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
+  sudo apt install cmake liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
   ```
+
 </details>
 
 <details>
-  <summary markdown="span">Installation</summary>
+  <summary markdown="span"><b>Installation</b></summary>
   
-## DUST building and installation (tested under Ubuntu20.04):
-
 - Create a build folder inside this folder (can be "build" or anything else) and move into it:
 
   ```bash
   mkdir build && cd build
   ```
 
-- Configure cmake with standard options:
+- **Configure** cmake with standard options:
 
   ```bash
   cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
@@ -67,16 +64,22 @@ in most Linux distributions.
   - **$CMAKE_BUILD_TYPE** can be **Release** or **Debug**
   - **$WITH_PRECICE** can be **YES** or **NO**
 
-- If you want to compile with intel MKL libraries first:
+  For example: 
+
   ```bash
-    source /opt/intel/oneapi/setvars.sh
+  cmake -DCMAKE_BUILD_TYPE=Release -DWITH_PRECICE=NO ../
+  ```
+
+- If you want to compile with intel MKL libraries first (optional):
+  ```bash
+  source /opt/intel/oneapi/setvars.sh
   ```
   then: 
   ```bash
   cmake -DDUST_MKL=YES ../ 
   ``` 
   
-- Build DUST:
+- **Build DUST**:
 
   ```bash
   make
@@ -91,7 +94,63 @@ in most Linux distributions.
 
   Other install folders can be set by setting
 
+  ```bash
   cmake -D CMAKE_INSTALL_PREFIX=/path/to/install/folder ../
+  ```
+
+</details>
+
+## Apple Silicon
+
+<details>
+  <summary markdown="span"><b>Compilers</b></summary>
+
+  ```bash
+  brew install install gcc g++ gfortran
+  ```
+
+</details>
+
+<details>
+  <summary markdown="span"><b>Libraries</b></summary>
+
+  ```bash
+  brew install cmake lapack blas openblas cgns hdf5 llvm
+  ```
+
+Then export llvm libraries:
+
+  ```bash
+  export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+  export LDFLAGS="-I/opt/homebrew/opt/llvm/include" 
+  echo 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"' >> ~/.zshrc 
+  ```
+
+</details>
+<details>
+  <summary markdown="span"><b>Installation</b></summary>
+  
+- Create a build folder inside this folder (can be "build" or anything else) and move into it:
+
+  ```bash
+  mkdir build && cd build
+  ```
+- CGNS folder is located in /opt/homebrew, therefore the cmake command will be:
+
+  ```bash
+  cmake -DCMAKE_BUILD_TYPE=Release -DWITH_PRECICE=NO -DCGNS_LIB=/opt/homebrew/lib -DCGNS_LIB=/opt/homebrew/include ../
+  ```
+- Build DUST:
+
+  ```bash
+  make
+  ```
+
+- Install DUST (with root privileges if needed):
+
+  ```bash
+  sudo make install
+  ```
 </details>
 
 ## Coupling with preCICE-MBDyn
