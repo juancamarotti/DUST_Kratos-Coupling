@@ -43,6 +43,15 @@ ELSE()
   MESSAGE(ERROR "Unknown choice for WITH_PRECICE")
 ENDIF()
 
+IF(WITH_COSIMIO STREQUAL "YES")
+  ADD_DEFINITIONS(-DUSE_COSIMIO)
+ELSEIF(WITH_COSIMIO STREQUAL "NO")
+  # Do nothing
+ELSE()
+  MESSAGE(FATAL_ERROR "Unknown choice for WITH_COSIMIO")
+ENDIF()
+
+
 
 # =========== COMPILER ========================
 OPTION (USE_OpenMP "Use OpenMP to enamble <omp.h>" ON)
@@ -139,6 +148,26 @@ IF(WITH_PRECICE STREQUAL "YES")
   LIST(APPEND linkedlibs precice)
 ENDIF()
 
+#> CoSimIO ------------------------------------------------------
+IF(WITH_COSIMIO STREQUAL "YES")
+  set(COSIMIO_C_LIB_DIR "/home/camarotti/Software/CoSimIO/build/co_sim_io/c")
+  set(COSIMIO_F_DIR     "/home/camarotti/Software/CoSimIO/build/co_sim_io/fortran")
+  set(COSIMIO_CORE_DIR  "/home/camarotti/Software/CoSimIO/build")
+
+  # Fortran .mod files:
+  include_directories(${COSIMIO_F_DIR})
+
+  # libraries search paths:
+  link_directories(${COSIMIO_C_LIB_DIR} ${COSIMIO_F_DIR} ${COSIMIO_CORE_DIR})
+
+  # libs to link:
+  list(APPEND linkedlibs co_sim_io_fortran co_sim_io_c co_sim_io)
+
+  # if you use MPI flavor:
+  # list(APPEND linkedlibs co_sim_io_mpi co_sim_io_c_mpi)
+ENDIF()
+
+
 #set the includes
 include_directories(${incldirs} ${PRECICE_INC} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
 
@@ -182,7 +211,9 @@ IF (WITH_PRECICE STREQUAL "YES")
   file(GLOB sources_precice ${PROJECT_SOURCE_DIR}/src/precice/*.f90)
   list(APPEND sources ${sources_precice} )
 ENDIF()
-
+# IF(WITH_COSIMIO STREQUAL "YES")
+#   list(APPEND sources ${COSIMIO_F90})
+# ENDIF()
 
 #create a library
 add_library(dustlibF90 OBJECT ${sources})
