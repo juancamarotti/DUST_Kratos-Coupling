@@ -153,6 +153,11 @@ use mod_math, only: &
     t_precice
 #endif
 
+#if USE_COSIMIO
+  use mod_cosimio, only: &
+    tprecice
+#end if
+
 use mod_wind, only: &
   variable_wind
 
