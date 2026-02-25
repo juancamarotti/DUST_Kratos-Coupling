@@ -110,33 +110,39 @@ end type t_cosimio_field
 !> PreCICE type -------------------------------------------------
 type :: t_cosimio
 
-  !> PreCICE configuration
-  character(len=precice_mcl) :: config_file_name
-  character(len=precice_mcl) :: solver_name
-  character(len=precice_mcl) :: mesh_name     ! *** to do *** just one mesh?
-  integer :: comm_rank, comm_size
+  character(len=128) :: connection_name
+  character(len=128) :: mesh_id
+  logical            :: is_connected = .false.
+  integer            :: step = 0
+  real(wp)           :: dt
 
-  !> PreCICE mesh
-  type(t_cosimio_mesh) :: mesh
+  ! !> PreCICE configuration
+  ! character(len=precice_mcl) :: config_file_name
+  ! character(len=precice_mcl) :: solver_name
+  ! character(len=precice_mcl) :: mesh_name     ! *** to do *** just one mesh?
+  ! integer :: comm_rank, comm_size
 
-  !> PreCICE fields
-  integer :: n_fields
-  type(t_cosimio_field), allocatable :: fields(:)
+  ! !> PreCICE mesh
+  ! type(t_cosimio_mesh) :: mesh
 
-  !> PreCICE variables
-  real(wp) :: dt_cosimio
-  integer  :: is_ongoing
-  character(len=precice_mcl) :: write_initial_data, &
-                                read_it_checkp, write_it_checkp
+  ! !> PreCICE fields
+  ! integer :: n_fields
+  ! type(t_cosimio_field), allocatable :: fields(:)
+
+  ! !> PreCICE variables
+  ! real(wp) :: dt_cosimio
+  ! integer  :: is_ongoing
+  ! character(len=precice_mcl) :: write_initial_data, &
+  !                               read_it_checkp, write_it_checkp
 
   contains
 
   procedure, pass(this) :: initialize
-  ! procedure, pass(this) :: initialize_mesh
-  ! procedure, pass(this) :: initialize_fields
+  procedure, pass(this) :: initialize_mesh
+  procedure, pass(this) :: initialize_fields
   ! procedure, pass(this) :: update_force
   ! procedure, pass(this) :: update_force_coupled_hinge
-  ! procedure, pass(this) :: update_elems
+  procedure, pass(this) :: update_elems
   ! procedure, pass(this) :: update_near_field_wake
 
 end type t_cosimio
@@ -146,7 +152,7 @@ contains
 !----------------------------------------------------------------
 !>
 subroutine initialize(this)
-    class(t_cosimio), intent(inout) :: this
+  class(t_cosimio), intent(inout) :: this
 !   logical :: exists
   
 !   call printout(nl//'Using PreCICE')
@@ -187,11 +193,11 @@ subroutine initialize(this)
 
 end subroutine initialize
 
-! !----------------------------------------------------------------
-! !>
-! subroutine initialize_mesh( this, geo )
-!   class(t_cosimio), intent(inout) :: this
-!   type(t_geo)     , intent(in)    :: geo
+!----------------------------------------------------------------
+!>
+subroutine initialize_mesh( this, geo )
+  class(t_cosimio), intent(inout) :: this
+  type(t_geo)     , intent(in)    :: geo
 
 !   integer :: i_comp, n_comp
 !   integer :: dnnodes, nnodes, ih, n_hinges
@@ -285,12 +291,12 @@ end subroutine initialize
 !                               this%mesh%nodes, this%mesh%node_ids )
 !   this%mesh%nnodes = nnodes
 
-! end subroutine initialize_mesh
+end subroutine initialize_mesh
 
-! !----------------------------------------------------------------
-! !>
-! subroutine initialize_fields( this )
-!   class(t_cosimio), intent(inout) :: this
+!----------------------------------------------------------------
+!>
+subroutine initialize_fields( this )
+  class(t_cosimio), intent(inout) :: this
 
 !   !> Expected fields
 !   integer, parameter :: n_max_fields = 6
@@ -348,7 +354,7 @@ end subroutine initialize
 !     end if
 !   end do
 
-! end subroutine initialize_fields
+end subroutine initialize_fields
 
 ! !----------------------------------------------------------------
 ! !> Update force/moment fields
@@ -645,13 +651,13 @@ end subroutine initialize
 
 ! end subroutine update_force_coupled_hinge
 
-! !----------------------------------------------------------------
-! !> Update force/moment fields
-! subroutine update_elems( this, geo, elems, te )
-!   class(t_cosimio)  , intent(inout) :: this
-!   type(t_geo)       , intent(inout) :: geo
-!   type(t_pot_elem_p), intent(inout) :: elems(:)
-!   type(t_tedge), optional, intent(inout) :: te
+!----------------------------------------------------------------
+!> Update force/moment fields
+subroutine update_elems( this, geo, elems, te )
+  class(t_cosimio)  , intent(inout) :: this
+  type(t_geo)       , intent(inout) :: geo
+  type(t_pot_elem_p), intent(inout) :: elems(:)
+  type(t_tedge), optional, intent(inout) :: te
 
 !   integer :: i,j, i_comp, ip, iw, ih, ib, ii, it, il
 !   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
@@ -1250,7 +1256,7 @@ end subroutine initialize
 !     end associate
 !   end do
 
-! end subroutine update_elems
+end subroutine update_elems
 
 ! !----------------------------------------------------------------
 ! !> Update near field wake
