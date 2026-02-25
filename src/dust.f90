@@ -155,8 +155,8 @@ use mod_math, only: &
 
 #if USE_COSIMIO
   use mod_cosimio, only: &
-    tprecice
-#end if
+    t_cosimio
+#endif
 
 use mod_wind, only: &
   variable_wind
@@ -259,6 +259,17 @@ type(t_octree)                    :: octree
   integer                         :: it_precice = 0
 #endif
 
+#if USE_COSIMIO
+  !> CoSimIO data
+  type(t_cosimio)                 :: cosimio
+  integer                         :: bool
+  logical                         :: cosimio_convergence
+  logical                         :: coupling_is_ongoing
+  integer                         :: k
+  real(wp)                        :: sum_force(3)
+  integer                         :: it_cosimio = 0
+#endif
+
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 
@@ -307,11 +318,15 @@ endif
 sim_param%basename_debug = basename_debug
 
 #if USE_PRECICE
-!> Initialize PreCICE 
-! Do it here because it needs to read precice_config path from dust.in
-call precice%initialize()
+  !> Initialize PreCICE 
+  ! Do it here because it needs to read precice_config path from dust.in
+  call precice%initialize()
 #endif
 
+#ifdef USE_COSIMIO
+  !> Initialize CoSimIO
+  call cosimio%initialize()
+#endif
 
 !> Parameters Initializations 
 call initialize_doublet()
@@ -387,6 +402,15 @@ call finalizeParameters(prms)
   call precice%update_elems(geo, elems_tot, te ) 
 #endif
 
+!> Initialize CoSimIO mesh and fields 
+#if USE_COSIMIO
+  te%t_hinged = te%t
+  call cosimio%initialize_mesh( geo )
+  call cosimio%initialize_fields()
+  !call precicef_initialize(precice%dt_precice)
+  call cosimio%update_elems(geo, elems_tot, te ) 
+#endif
+
 !> Initialization 
 if(sim_param%use_fmm) then
   call printout(nl//'====== Initializing Octree ======')
@@ -454,7 +478,7 @@ if (( size(elems_ll) .gt. 0 )) then
   deallocate(al_v)
 end if
 
-!> Initialize coupling 
+!> Initialize precice coupling 
 #if USE_PRECICE
   call precicef_ongoing(precice%is_ongoing)  
   write(*,*) ' is coupling ongoing: ', precice%is_ongoing
@@ -496,6 +520,51 @@ end if
   
   !> Store the second row of the wake
   wake%old_second_row = wake%pan_w_points(:,:,2)
+#endif
+
+!> Initialize cosimio coupling 
+#if USE_COSIMIO
+  ! call precicef_ongoing(precice%is_ongoing)  
+  coupling_is_ongoing = .true.
+  write(*,*) ' is coupling ongoing: ', coupling_is_ongoing
+  ! call precicef_ongoing(precice%is_ongoing)
+  cosimio_convergence = .true.
+  write(*,*) ' is coupling ongoing: ', coupling_is_ongoing
+  write(*,*) ' dt_cosimio        : ', sim_param%dt
+  
+  !> Before entering the time cycle we need to actually initialize the
+  ! position of the elements, so we have to query the structural solver 
+  !> Read data from structural solver
+  ! do i = 1, size(precice%fields)
+  !   if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
+  !     if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+  !       call precicef_read_bsdata( precice%fields(i)%fid, &
+  !                                 precice%mesh%nnodes  , &
+  !                                 precice%mesh%node_ids, &
+  !                                 precice%fields(i)%fdata(1,:) )
+  !     elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+  !         call precicef_read_bvdata( precice%fields(i)%fid, &
+  !                                   precice%mesh%nnodes  , &
+  !                                   precice%mesh%node_ids, &
+  !                                   precice%fields(i)%fdata )
+  !     endif
+  !   end if
+  ! end do
+
+  ! !> Update dust geometry ( elems and first wake panels )
+  ! call precice%update_elems( geo, elems_tot, te )
+
+  ! !> Update geo_data()
+  ! do i_el = 1, size(elems_tot)
+  !   call elems_tot(i_el)%p%calc_geo_data( &
+  !                         geo%points(:,elems_tot(i_el)%p%i_ver) )
+  ! end do
+
+  ! !> Update near-field wake
+  ! call precice%update_near_field_wake( geo, wake, te )
+  
+  ! !> Store the second row of the wake
+  ! wake%old_second_row = wake%pan_w_points(:,:,2)
 #endif
 
 
