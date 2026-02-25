@@ -531,8 +531,6 @@ end if
   cosimio_convergence = .true.
   write(*,*) ' is coupling ongoing: ', coupling_is_ongoing
   write(*,*) ' dt_cosimio        : ', sim_param%dt
-
-  write(*,*) ' trying the new branch' 
   
   !> Before entering the time cycle we need to actually initialize the
   ! position of the elements, so we have to query the structural solver 
