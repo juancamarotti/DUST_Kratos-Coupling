@@ -308,7 +308,12 @@ type t_sim_param
 #if USE_PRECICE
   character(len=max_char_len) :: precice_config
 #endif
-  
+
+  !> PreCICE
+#if USE_COSIMIO
+  character(len=max_char_len) :: cosimio_config
+#endif
+
 contains
   procedure, pass(this) :: save_param => save_sim_param
 end type t_sim_param
@@ -511,6 +516,11 @@ subroutine create_param_main(prms)
   !> preCICE
 #if USE_PRECICE
   call prms%CreateStringOption('precice_config','PreCICE configuration file','./../precice-config.xml')
+#endif
+
+  !> CoSimIO
+#if USE_COSIMIO
+  call prms%CreateStringOption('cosimio_config','CoSimIO configuration file','./../precice-config.xml')
 #endif
 
 end subroutine create_param_main
@@ -869,6 +879,12 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 #if USE_PRECICE
     sim_param%precice_config              = getstr(prms,'precice_config')
 #endif
+
+  !> CoSimIO
+#if USE_COSIMIO
+    sim_param%cosimio_config              = getstr(prms,'cosimio_config')
+#endif
+  
   
   !> Manage restart
   sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
