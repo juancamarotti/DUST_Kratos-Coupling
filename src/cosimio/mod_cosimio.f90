@@ -47,6 +47,13 @@
 
 module mod_cosimio
 
+#if USE_COSIMIO
+  use co_sim_io, only: CoSimIO_Info, CoSimIO_Run, &
+                       CoSimIO_Info_SetString, CoSimIO_Info_SetInt, CoSimIO_CreateInfo, &
+                       CoSimIO_ImportData, CoSimIO_Connect, CoSimIO_Info_GetInt, CoSimIO_Info_GetString
+  use, intrinsic :: iso_c_binding, only: c_int, c_double
+#endif
+
 use mod_param, only: &
   wp, pi, nl, max_char_len
 
@@ -84,67 +91,51 @@ private
 public :: t_cosimio
 
 !> Parameters
-integer, parameter :: precice_mcl = max_char_len
+integer, parameter :: cosimio_mcl = max_char_len
 
-!> PreCICE mesh -------------------------------------------------
+!> CoSimIO mesh -------------------------------------------------
 type :: t_cosimio_mesh
-  character(len=precice_mcl) :: mesh_name
-  integer                    :: mesh_id
-  integer , allocatable      :: node_ids(:)
+  character(len=cosimio_mcl) :: mesh_name
+  character(len=128)         :: mesh_id
+  integer, allocatable       :: node_ids(:)
   real(wp), allocatable      :: nodes(:,:)
-  integer                    :: nnodes
-  integer                    :: ndim
-  integer , allocatable      :: elem_ids(:)
+  integer                    :: nnodes = 0
+  integer                    :: ndim   = 0
+  integer, allocatable       :: elem_ids(:)
 end type t_cosimio_mesh
 
-!> PreCICE field ------------------------------------------------
+!> CoSimIO field ------------------------------------------------
 type :: t_cosimio_field
   integer :: fid
-  character(len=precice_mcl) :: fname
-  character(len=precice_mcl) :: fio    ! 'read'/'write'
-  character(len=precice_mcl) :: ftype  ! 'scalar'/'vector'
+  character(len=cosimio_mcl) :: fname
+  character(len=cosimio_mcl) :: fio    ! 'read'/'write'
+  character(len=cosimio_mcl) :: ftype  ! 'scalar'/'vector'
   real(wp), allocatable :: fdata(:,:)  ! (1,nnodes)/(nd,nnodes)
   real(wp), allocatable :: cdata(:,:)  ! data for storing/reloading fields
 end type t_cosimio_field
 
-!> PreCICE type -------------------------------------------------
+!> CoSimIO type -------------------------------------------------
 type :: t_cosimio
-
-  character(len=128) :: connection_name
-  character(len=128) :: mesh_id
+  character(len=128) :: import_data_identifier = ""
   logical            :: is_connected = .false.
   integer            :: step = 0
-  real(wp)           :: dt
+  real(wp)           :: dt = 0.0_wp
 
-  ! !> PreCICE configuration
-  ! character(len=precice_mcl) :: config_file_name
-  ! character(len=precice_mcl) :: solver_name
-  ! character(len=precice_mcl) :: mesh_name     ! *** to do *** just one mesh?
-  ! integer :: comm_rank, comm_size
+  !> CoSimIO configuration
+  integer :: comm_rank = 0
+  integer :: comm_size = 1
 
-  ! !> PreCICE mesh
-  ! type(t_cosimio_mesh) :: mesh
+  character(len=128) :: connection_name = ""
+  character(len=128) :: solver_name     = "DUST"
+  character(len=128) :: connect_to      = "Kratos"
 
-  ! !> PreCICE fields
-  ! integer :: n_fields
-  ! type(t_cosimio_field), allocatable :: fields(:)
+  type(t_cosimio_mesh) :: mesh
 
-  ! !> PreCICE variables
-  ! real(wp) :: dt_cosimio
-  ! integer  :: is_ongoing
-  ! character(len=precice_mcl) :: write_initial_data, &
-  !                               read_it_checkp, write_it_checkp
-
-  contains
-
+contains
   procedure, pass(this) :: initialize
   procedure, pass(this) :: initialize_mesh
   procedure, pass(this) :: initialize_fields
-  ! procedure, pass(this) :: update_force
-  ! procedure, pass(this) :: update_force_coupled_hinge
   procedure, pass(this) :: update_elems
-  ! procedure, pass(this) :: update_near_field_wake
-
 end type t_cosimio
 
 !> --------------------------------------------------------------
@@ -153,44 +144,48 @@ contains
 !>
 subroutine initialize(this)
   class(t_cosimio), intent(inout) :: this
-!   logical :: exists
-  
-!   call printout(nl//'Using PreCICE')
 
-!   ! *** to do *** read %config_file_name as an input
-!   !> Default input for dust in a preCICE coupled simulation 
-!   this%config_file_name = sim_param%precice_config
-!   this%solver_name = 'dust'
-!   this%  mesh_name = 'dust_mesh'
-!   this%comm_rank = 0
-!   this%comm_size = 1
-  
-!   inquire(file=trim(this%config_file_name), exist=exists)
-!   if (.not. exists) then
-!     call error('initialize', 'mod_precice', 'Precice configuration file "'&
-!               &//trim(this%config_file_name)//'" not found.'//nl//'If this is not a coupled &
-!               &simulation, please compile DUST using WITH_PRECICE=NO')
-!   end if
-  
-!   !> Initialize PreCICE participant and mesh
-!   call precicef_create( this%solver_name, &
-!                         this%config_file_name, &
-!                         this%comm_rank, &
-!                         this%comm_size )
+  type(CoSimIO_Info) :: run_info
+  type(CoSimIO_Info) :: ret_info
 
-!   this%mesh%mesh_name = this%mesh_name
-!   call precicef_get_dims( this%mesh%ndim )
-!   call precicef_get_mesh_id( this%mesh%mesh_name, this%mesh%mesh_id )
+  character(len=20) :: my_name
+  character(len=20) :: connect_to
+  character(len=20) :: communication_format
+  integer :: echo_level
+  character(len=20) :: version
 
-!   !> Initialize some preCICE variables
-!   this%write_initial_data(1:precice_mcl)='                                                  '
-!   this%read_it_checkp(    1:precice_mcl)='                                                  '
-!   this%write_it_checkp(   1:precice_mcl)='                                                  '
+  integer :: connection_status
+  character(len=cosimio_mcl) :: connection_name_tmp
 
-!   call precicef_action_write_initial_data(this%write_initial_data)
-!   call precicef_action_read_iter_checkp(this%read_it_checkp)
-!   call precicef_action_write_iter_checkp(this%write_it_checkp)
+  call printout(nl//'Using CoSimIO')
 
+  ! Basic names
+  this%solver_name     = "DUST"
+  this%mesh%mesh_name  = "dust_interface"
+
+  my_name            = "Dust_Adapter"
+  connect_to         = "Dust_Kratos_Wrapper"
+  communication_format = "file"
+  version = "1.25"
+  echo_level = 0
+
+  ! Build connect info
+  run_info = CoSimIO_CreateInfo()
+  call CoSimIO_Info_SetString(run_info, "my_name",         my_name)
+  call CoSimIO_Info_SetString(run_info, "connect_to",      connect_to)
+  call CoSimIO_Info_SetString(run_info, "communication_format", communication_format)
+  call CoSimIO_Info_SetInt(run_info, "echo_level", echo_level)
+  call CoSimIO_Info_SetString(run_info, "version", version)
+
+  ! Connect (your wrapper)
+  ret_info = CoSimIO_Connect(run_info)
+
+  connection_status = CoSimIO_Info_GetInt(ret_info, "connection_status")
+  if (connection_status /= 1) then
+    call error("initialize", "mod_cosimio", "CoSimIO connect failed")
+  end if
+
+  this%is_connected = .true.
 end subroutine initialize
 
 !----------------------------------------------------------------
@@ -206,7 +201,7 @@ subroutine initialize_mesh( this, geo )
 !   ! participates to the coupling. So far, all the components
 !   ! participate.
 !   logical :: coupling = .true.
-!   character(len=precice_mcl) :: coupling_type
+!   character(len=cosimio_mcl) :: coupling_type
 
 !   n_comp = size(geo%components)
 
@@ -300,9 +295,9 @@ subroutine initialize_fields( this )
 
 !   !> Expected fields
 !   integer, parameter :: n_max_fields = 6
-!   character(len=precice_mcl) :: field_list(n_max_fields)
-!   character(len=precice_mcl) :: type_list(n_max_fields)
-!   character(len=precice_mcl) :: io_list(n_max_fields)
+!   character(len=cosimio_mcl) :: field_list(n_max_fields)
+!   character(len=cosimio_mcl) :: type_list(n_max_fields)
+!   character(len=cosimio_mcl) :: io_list(n_max_fields)
 
 !   integer :: i, nf, hasdata
 
